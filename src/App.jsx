@@ -2375,13 +2375,22 @@ const LoginPage = ({
   const [esRegistro, setEsRegistro] = React.useState(false);
 
   return (
-    <div style={{...styles.containerCenter, background: 'radial-gradient(circle, #1a1a1a 0%, #000 100%)'}}>
-      <div style={{ marginBottom: '30px', textAlign: 'center' }}>
-         <h1 style={{...styles.goldTitle, fontSize: '3rem', letterSpacing: '5px'}}>LA FORTUNA</h1>
+    <div style={{...styles.containerCenter, background: 'radial-gradient(circle, #1a1a1a 0%, #000 100%)',
+      padding: '20px', // Espacio de seguridad para que no toque los bordes del cel
+      boxSizing: 'border-box',
+      minHeight: '100vh'}}>
+      <div style={{ marginBottom: '30px', textAlign: 'center', width: '100%' }}>
+         <h1 style={{
+           ...styles.goldTitle, 
+           fontSize: 'clamp(2rem, 8vw, 3rem)', // Se ajusta según el ancho de pantalla
+           letterSpacing: '5px',
+           margin: '0'
+         }}>LA FORTUNA</h1>
          <p style={{color: '#d4af37', fontSize: '0.8rem', marginTop: '-10px'}}>BRAZILIAN JIU JITSU VAULT</p>
       </div>
 
-      <div style={{...styles.card, width: '350px', border: '1px solid #d4af37'}}>
+      <div style={{...styles.card, width: '350px', border: '1px solid #d4af37',padding: '25px',
+        boxSizing: 'border-box'}}>
         <h2 style={{color: '#fff', fontSize: '1.2rem', marginBottom: '20px'}}>
           {esRegistro ? 'SOLICITAR ACCESO' : 'INICIAR SESIÓN'}
         </h2>
