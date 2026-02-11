@@ -33,15 +33,49 @@ const BusquedaPage = ({ onBack, onSelectVideo }) => {
   const [termino, setTermino] = React.useState("");
 
   // Aplanamos la DB para buscar en todos los videos de todos los cursos
-  const todasLasTecnicas = Object.keys(DB_INSTRUCCIONALES).flatMap(cursoKey =>
+  const todasLasTecnicas = React.useMemo(() => {
+  return Object.keys(DB_INSTRUCCIONALES).flatMap(cursoKey =>
     DB_INSTRUCCIONALES[cursoKey].volumenes.flatMap(vol =>
-      vol.partes.map(parte => ({
-        ...parte,
-        curso: cursoKey,
-        volNombre: vol.nombre
-      }))
+      vol.partes.map(parte => {
+        let sub = parte.subcategoria;
+        const n = parte.nombre.toLowerCase();
+        
+        // --- MOTOR DE BÚSQUEDA POR PALABRAS CLAVE ---
+        if (!sub) {
+          // 1. POSICIONES DE CONTROL
+          if (n.includes('side control') || n.includes('lateral') || n.includes('100 kilos') || n.includes('cross side')) sub = "CONTROL LATERAL";
+          else if (n.includes('half guard') || n.includes('media guardia') || n.includes('z-guard')) sub = "MEDIA GUARDIA";
+          else if (n.includes('closed guard') || n.includes('guardia cerrada')) sub = "GUARDIA CERRADA";
+          else if (n.includes('mount') || n.includes('montada')) sub = "MONTADA";
+          else if (n.includes('back') || n.includes('espalda') || n.includes('rear mount')) sub = "ESPALDA";
+          else if (n.includes('turtle') || n.includes('tortuga')) sub = "TORTUGA";
+          else if (n.includes('north south') || n.includes('norte sur')) sub = "NORTE-SUR";
+          
+          // 2. GUARDIAS ABIERTAS Y SISTEMAS
+          else if (n.includes('berimbolo') || n.includes('bolo')) sub = "BERIMBOLO";
+          else if (n.includes('buggy')) sub = "BUGGY CHOKE";
+          else if (n.includes('leg lock') || n.includes('ashi') || n.includes('heel hook')) sub = "LEG LOCKS";
+          else if (n.includes('crucifix') || n.includes('crucifijo')) sub = "CRUCIFIX";
+          else if (n.includes('octopus')) sub = "OCTOPUS GUARD";
+          
+          // 3. DEFENSAS (Para la categoría DEFENSAS)
+          else if (n.includes('escape') || n.includes('defend') || n.includes('defensa') || n.includes('counter')) {
+             if (n.includes('mount') || n.includes('montada')) sub = "ESCAPES MONTADA";
+             else if (n.includes('back') || n.includes('espalda')) sub = "DEFENSA ESPALDA";
+             else sub = "RE-GUARDIA"; // Por defecto si es escape de guardia
+          }
+        }
+
+        return {
+          ...parte,
+          subcategoria: sub,
+          curso: cursoKey,
+          volNombre: vol.nombre
+        };
+      })
     )
   );
+}, [DB_INSTRUCCIONALES]);// [] significa que solo se calcula una vez al cargar la app
 
   const resultados = todasLasTecnicas.filter(t =>
     t.nombre.toLowerCase().includes(termino.toLowerCase())
@@ -246,10 +280,10 @@ const DB_INSTRUCCIONALES = {
         id: "V1",
         nombre: "Volumen 1",
         partes: [
-          { nombre: "1. Craig The King Jones and Hey She's Hotter", id: "1YtOMvRtLKnFjjMHZWhEFefcdYitHfVkv" },
+          { nombre: "1. Craig The King Jones and Hey She's Hotter", id: "1YtOMvRtLKnFjjMHZWhEFefcdYitHfVkv", subcategoria: ""},
           { nombre: "2. Half Guard Vs Side Control", id: "1ybiHRszC99FbUqpYcQHfqCx7AmbN9gae" },
           { nombre: "3. Jiu Jitsu VS Wrestling Cross Face", id: "1AB9Q8Sd69IO-rMm2OscTbYB7ISC_NnaZ" },
-          { nombre: "4. Side Control Is Not Real", id: "1ZVumoCDF8ApauLjcQ0dCjPPH48i1pfr5" },
+          { nombre: "4. Side Control Is Not Real", id: "1ZVumoCDF8ApauLjcQ0dCjPPH48i1pfr5", subcategoria: "SIDE CONTROL" },
           { nombre: "5. The Only Grips You'll Ever Need", id: "13R72QxQ4OWV8cKUr5feCXyFXP-Iozey0" },
           { nombre: "6. Piss Like A Dog", id: "1gjPSTKkD35WbG-dYLUTmX3IuycZKail3" },
           { nombre: "7. The Modern Technical Get The FUCK Up", id: "12qLgOC-bprnZPsr57pSrqJXEO31c9Ka2" },
@@ -2443,7 +2477,16 @@ const LoginPage = ({
     </div>
   );
 };
+// 1. CONSTANTES MAESTRAS (Fuera del componente para que siempre estén disponibles)
+const SUB_POSICIONES = [
+  'GUARDIA CERRADA', 'MEDIA GUARDIA', 'GUARDIA ABIERTA', 'PASES', 
+  'CONTROL LATERAL', 'MONTADA', 'ESPALDA', 'NORTE-SUR'
+];
 
+const SUB_DEFENSAS = [
+  'ESCAPES MONTADA', 'ESCAPES LATERAL', 'DEFENSA ESPALDA', 'RE-GUARDIA',
+  'DEFENSA TRIÁNGULO', 'DEFENSA ARM BAR', 'DEFENSA GUILLOTINA', 'POSTURA'
+];
 
 const MapaPage = ({
   onBack, onSelectVideo, onNavigateToNotes, onContinue, hasSession,
@@ -2453,31 +2496,68 @@ const MapaPage = ({
   volSel, setVolSel,
   vistos = []
 }) => {
+  // 2. ESTADOS
   const [terminoBusqueda, setTerminoBusqueda] = React.useState("");
   const [esMovil, setEsMovil] = React.useState(window.innerWidth < 768);
 
+  // 3. EFECTOS
   React.useEffect(() => {
     const handleResize = () => setEsMovil(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // 4. EL CAZADOR DE TÉCNICAS (todasLasTecnicas)
+  // Debe ir ANTES de resultadosBusqueda y de la lógica de nodos
   const todasLasTecnicas = React.useMemo(() => {
     return Object.keys(DB_INSTRUCCIONALES).flatMap(cursoKey =>
       DB_INSTRUCCIONALES[cursoKey].volumenes.flatMap(vol =>
-        vol.partes.map(parte => ({
-          ...parte,
-          curso: cursoKey,
-          volNombre: vol.nombre
-        }))
+        vol.partes.map(parte => {
+          let sub = parte.subcategoria;
+          const nombreMin = parte.nombre.toLowerCase();
+          
+          // Auto-etiquetado inteligente
+          if (!sub) {
+            if (nombreMin.includes('side control') || nombreMin.includes('lateral') || nombreMin.includes('100 kilos')) {
+              sub = "CONTROL LATERAL";
+            } else if (nombreMin.includes('half guard') || nombreMin.includes('media guardia')) {
+              sub = "MEDIA GUARDIA";
+            } else if (nombreMin.includes('closed guard') || nombreMin.includes('guardia cerrada')) {
+              sub = "GUARDIA CERRADA";
+            } else if (nombreMin.includes('mount') || nombreMin.includes('montada')) {
+              sub = "MONTADA";
+            } else if (nombreMin.includes('back') || nombreMin.includes('espalda')) {
+              sub = "ESPALDA";
+            } else if (nombreMin.includes('pass') || nombreMin.includes('pases')) {
+              sub = "PASES";
+            } else if (nombreMin.includes('open guard') || nombreMin.includes('guardia abierta')) {
+              sub = "GUARDIA ABIERTA";
+            } else if (nombreMin.includes('north south') || nombreMin.includes('norte sur')) {
+              sub = "NORTE-SUR";
+            } else if (nombreMin.includes('back defense') || nombreMin.includes('defensa de espalda')) {
+              sub = "DEFENSA ESPALDA";
+            } else if (nombreMin.includes('pass') || nombreMin.includes('pases')) {
+              sub = "PASES";
+            }
+          }
+
+          return {
+            ...parte,
+            subcategoria: sub,
+            curso: cursoKey,
+            volNombre: vol.nombre
+          };
+        })
       )
     );
-  }, []);
+  }, []); // Solo se calcula una vez
 
+  // 5. RESULTADOS DE BÚSQUEDA (Depende de todasLasTecnicas)
   const resultadosBusqueda = terminoBusqueda
     ? todasLasTecnicas.filter(t => t.nombre.toLowerCase().includes(terminoBusqueda.toLowerCase())).slice(0, 10)
     : [];
 
+  // 6. LÓGICA DE NODOS
   let nodosAMostrar = [];
   let tituloCentral = "";
 
@@ -2493,7 +2573,17 @@ const MapaPage = ({
     tituloCentral = autorSel;
   } else if (categoriaSel) {
     tituloCentral = categoriaSel;
-    if (categoriaSel === 'AUTORES') {
+
+    if (categoriaSel === 'POSICIÓN' || categoriaSel === 'DEFENSAS') {
+      const lista = categoriaSel === 'POSICIÓN' ? SUB_POSICIONES : SUB_DEFENSAS;
+      nodosAMostrar = lista.map(item => ({ nombre: item, type: 'subcategoria' }));
+    } 
+    else if (SUB_POSICIONES.includes(categoriaSel) || SUB_DEFENSAS.includes(categoriaSel)) {
+      nodosAMostrar = todasLasTecnicas
+        .filter(t => t.subcategoria === categoriaSel)
+        .map(t => ({ nombre: t.nombre, id: t.id, type: 'parte' }));
+    }
+    else if (categoriaSel === 'AUTORES') {
       const autores = ['Craig Jones', 'Eddie Bravo', 'John Danaher', 'Levi Jones-Leary', 'Bernardo Faria', 'Bruno Malfacine', 'Josef Chen', 'Paulo Marmund', 'Gordon Ryan'];
       nodosAMostrar = autores.map(a => ({ nombre: a, type: 'autor' }));
     } else {
@@ -2502,77 +2592,134 @@ const MapaPage = ({
     }
   }
 
+  // 7. FUNCIONES DE INTERACCIÓN
   const handleNodeClick = (nodo) => {
-    if (nodo.type === 'autor') setAutorSel(nodo.nombre);
+    if (nodo.type === 'subcategoria') setCategoriaSel(nodo.nombre);
+    else if (nodo.type === 'autor') setAutorSel(nodo.nombre);
     else if (nodo.type === 'curso') setInstrSel(nodo.id || nodo.nombre);
     else if (nodo.type === 'volumen') setVolSel(nodo.raw);
     else if (nodo.type === 'parte') onSelectVideo({ titulo: nodo.nombre, id: nodo.id });
   };
 
   const irAtras = () => {
-    if (volSel) setVolSel(null);
+    if (SUB_POSICIONES.includes(categoriaSel)) setCategoriaSel('POSICIÓN');
+    else if (SUB_DEFENSAS.includes(categoriaSel)) setCategoriaSel('DEFENSAS');
+    else if (volSel) setVolSel(null);
     else if (instrSel) setInstrSel(null);
     else if (autorSel) setAutorSel(null);
     else onBack();
   };
 
+  // 8. RENDERIZADO
   return (
     <div style={{ ...mapStyles.layout, flexDirection: esMovil ? 'column' : 'row' }}>
       <aside style={{
-        ...mapStyles.sidebar,
-        width: esMovil ? '100%' : '250px',
-        height: esMovil ? 'auto' : '100vh',
-        position: esMovil ? 'relative' : 'fixed',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '10px',
-        zIndex: 100,
-        padding: '15px',
+  ...mapStyles.sidebar,
+  width: esMovil ? '100%' : '250px',
+  height: esMovil ? 'auto' : '100vh',
+  position: esMovil ? 'relative' : 'fixed',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '10px',
+  zIndex: 100,
+  padding: '15px',
+  boxSizing: 'border-box'
+}}>
+  {/* FILA 1: NAVEGACIÓN */}
+  <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'space-between' }}>
+    <button 
+      onClick={irAtras} 
+      style={{ ...styles.btnOutline, flex: '0 0 40px', padding: '10px 0' }}
+    >
+      ←
+    </button>
+    <button 
+      onClick={onContinue} 
+      disabled={!hasSession}
+      style={{ 
+        ...styles.btnGold, 
+        flex: 1, 
+        fontSize: '0.65rem', 
+        opacity: hasSession ? 1 : 0.5 
+      }}
+    >
+      {esMovil ? 'CONTINUAR' : '▶ CONTINUAR SESIÓN'}
+    </button>
+    <button 
+      onClick={onNavigateToNotes} 
+      style={{ ...styles.btnOutline, flex: 1, fontSize: '0.65rem', borderColor: '#d4af37' }}
+    >
+      BITÁCORA
+    </button>
+  </div>
+
+  {/* FILA 2: BÚSQUEDA */}
+  <div style={{ width: '100%' }}>
+    <input
+      type="text"
+      placeholder="Buscar técnica..."
+      value={terminoBusqueda}
+      onChange={(e) => setTerminoBusqueda(e.target.value)}
+      style={{
+        width: '100%',
+        padding: '12px',
+        backgroundColor: '#111',
+        border: '1px solid #d4af37',
+        color: '#fff',
+        borderRadius: '5px',
+        fontSize: '0.85rem',
+        outline: 'none',
         boxSizing: 'border-box'
-      }}>
-        {/* NAVEGACIÓN */}
-        <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'space-between' }}>
-          <button onClick={irAtras} style={{ ...styles.btnOutline, flex: '0 0 40px', padding: '10px 0' }}>←</button>
-          <button onClick={onContinue} disabled={!hasSession} style={{ ...styles.btnGold, flex: 1, fontSize: '0.65rem', opacity: hasSession ? 1 : 0.5 }}>CONTINUAR</button>
-          <button onClick={onNavigateToNotes} style={{ ...styles.btnOutline, flex: 1, fontSize: '0.65rem', borderColor: '#d4af37' }}>BITÁCORA</button>
-        </div>
+      }}
+    />
+  </div>
 
-        <input
-          type="text"
-          placeholder="Buscar técnica..."
-          value={terminoBusqueda}
-          onChange={(e) => setTerminoBusqueda(e.target.value)}
-          style={{ width: '100%', padding: '12px', backgroundColor: '#111', border: '1px solid #d4af37', color: '#fff', borderRadius: '5px', outline: 'none' }}
-        />
+  {/* FILA 3: CATEGORÍAS (Híbrido PC/Móvil) */}
+  <div style={{ marginTop: esMovil ? '0' : '20px' }}>
+    {!esMovil && <h3 style={{ color: '#d4af37', marginBottom: '15px', fontSize: '0.9rem' }}>FILTRAR POR</h3>}
+    
+    <div style={{ 
+      display: 'flex', 
+      flexDirection: esMovil ? 'row' : 'column',
+      overflowX: esMovil ? 'auto' : 'visible',
+      gap: '8px',
+      scrollbarWidth: 'none'
+    }}>
+      {['DEFENSAS', 'POSICIÓN', 'DERRIBOS', 'AUTORES', 'JUEGOS'].map(cat => {
+        // Lógica para mantener encendido el botón si estamos en una subcategoría
+        const estaActivo = categoriaSel === cat || 
+          (cat === 'POSICIÓN' && SUB_POSICIONES.includes(categoriaSel)) ||
+          (cat === 'DEFENSAS' && SUB_DEFENSAS.includes(categoriaSel));
 
-        {/* CATEGORÍAS MÓVIL */}
-        {esMovil && !terminoBusqueda && !instrSel && (
-          <div style={{ width: '100%' }}>
-            <p style={{ color: '#d4af37', fontSize: '0.7rem', margin: '5px 0' }}>FILTRAR POR:</p>
-            <div style={{ display: 'flex', overflowX: 'auto', gap: '8px', paddingBottom: '10px', scrollbarWidth: 'none' }}>
-              {['DEFENSAS', 'POSICIÓN', 'DERRIBOS', 'AUTORES', 'JUEGOS'].map(cat => (
-                <div key={cat} onClick={() => { setCategoriaSel(cat); setAutorSel(null); setInstrSel(null); setVolSel(null); setTerminoBusqueda(""); }}
-                  style={{ padding: '8px 15px', borderRadius: '20px', fontSize: '0.65rem', whiteSpace: 'nowrap', backgroundColor: categoriaSel === cat ? '#d4af37' : '#111', color: categoriaSel === cat ? '#000' : '#fff', border: '1px solid #d4af37' }}>
-                  {cat}
-                </div>
-              ))}
-            </div>
+        return (
+          <div 
+            key={cat}
+            onClick={() => { 
+              setCategoriaSel(cat); 
+              setAutorSel(null); 
+              setInstrSel(null); 
+              setVolSel(null); 
+              setTerminoBusqueda(""); 
+            }}
+            style={{ 
+              ...mapStyles.sideItem, 
+              backgroundColor: estaActivo ? '#d4af37' : '#111', 
+              color: estaActivo ? '#000' : '#fff',
+              border: '1px solid #d4af37',
+              whiteSpace: 'nowrap',
+              padding: esMovil ? '8px 15px' : '12px',
+              borderRadius: esMovil ? '20px' : '5px',
+              fontSize: esMovil ? '0.65rem' : '0.85rem',
+              cursor: 'pointer'
+            }}
+          >
+            {cat}
           </div>
-        )}
-
-        {/* CATEGORÍAS ESCRITORIO */}
-        {!esMovil && (
-          <div style={{ marginTop: '20px' }}>
-            <h3 style={{ color: '#d4af37', marginBottom: '15px', fontSize: '0.9rem' }}>FILTRAR POR</h3>
-            {['DEFENSAS', 'POSICIÓN', 'DERRIBOS', 'AUTORES', 'JUEGOS'].map(cat => (
-              <div key={cat} onClick={() => { setCategoriaSel(cat); setAutorSel(null); setInstrSel(null); setVolSel(null); setTerminoBusqueda(""); }}
-                style={{ ...mapStyles.sideItem, backgroundColor: categoriaSel === cat ? '#d4af37' : 'transparent', color: categoriaSel === cat ? '#000' : '#fff', padding: '12px', marginBottom: '5px', borderRadius: '5px', cursor: 'pointer' }}>
-                {cat}
-              </div>
-            ))}
-          </div>
-        )}
-      </aside>
+        );
+      })}
+    </div>
+  </div>
+</aside>
 
       <main style={mapStyles.mapArea}>
         <div style={{ ...mapStyles.canvas, transform: esMovil ? 'scale(0.6)' : 'scale(1)', transformOrigin: 'center center' }}>
@@ -2944,6 +3091,28 @@ export default function App() {
     const guardado = localStorage.getItem('lafortuna_last_video');
     return guardado ? JSON.parse(guardado) : null;
   });
+  const [usuario, setUsuario] = useState(null);
+  React.useEffect(() => {
+  // Este es el "escucha" oficial de Firebase
+  const deshacerEscucha = onAuthStateChanged(auth, (user) => {
+    if (user) {
+      // Si Firebase encuentra al usuario, lo ponemos en el estado
+      setUsuario(user);
+      
+      // Cargamos sus datos (vistos, notas, etc)
+      cargarDatosDesdeFirebase(user.uid);
+
+      // ¡IMPORTANTE!: Si estamos en la página de login, lo mandamos al Hub
+      // Esto evita que el refresh te deje atrapado en el login
+      setPage('hub'); 
+    } else {
+      setUsuario(null);
+      setPage('login');
+    }
+  });
+
+  return () => deshacerEscucha(); // Limpieza al cerrar
+}, []);
   const cargarDatosDesdeFirebase = async (uid) => {
     try {
       const userDoc = await getDoc(doc(db, "usuarios", uid));
