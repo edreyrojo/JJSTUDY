@@ -2454,8 +2454,6 @@ const MapaPage = ({
   vistos = []
 }) => {
   const [terminoBusqueda, setTerminoBusqueda] = React.useState("");
-
-  // --- 1. SENSOR DE MÓVIL ---
   const [esMovil, setEsMovil] = React.useState(window.innerWidth < 768);
 
   React.useEffect(() => {
@@ -2464,7 +2462,6 @@ const MapaPage = ({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 2. FÁBRICA DE RESULTADOS PARA BÚSQUEDA
   const todasLasTecnicas = React.useMemo(() => {
     return Object.keys(DB_INSTRUCCIONALES).flatMap(cursoKey =>
       DB_INSTRUCCIONALES[cursoKey].volumenes.flatMap(vol =>
@@ -2481,39 +2478,27 @@ const MapaPage = ({
     ? todasLasTecnicas.filter(t => t.nombre.toLowerCase().includes(terminoBusqueda.toLowerCase())).slice(0, 10)
     : [];
 
-  // --- LÓGICA DE NODOS (UNIFICADA) ---
   let nodosAMostrar = [];
   let tituloCentral = "";
 
   if (volSel) {
     nodosAMostrar = volSel?.partes?.map(p => ({ nombre: p.nombre, type: 'parte', id: p.id })) || [];
     tituloCentral = volSel?.nombre || "";
-  } 
-  else if (instrSel) {
+  } else if (instrSel) {
     const cursoData = DB_INSTRUCCIONALES[instrSel];
     nodosAMostrar = cursoData?.volumenes?.map(v => ({ nombre: v.nombre, type: 'volumen', raw: v })) || [];
     tituloCentral = instrSel;
-  } 
-  else if (autorSel) {
-    nodosAMostrar = Object.keys(DB_INSTRUCCIONALES)
-      .filter(key => DB_INSTRUCCIONALES[key].autor === autorSel)
-      .map(key => ({ nombre: key, id: key, type: 'curso' }));
+  } else if (autorSel) {
+    nodosAMostrar = Object.keys(DB_INSTRUCCIONALES).filter(key => DB_INSTRUCCIONALES[key].autor === autorSel).map(key => ({ nombre: key, id: key, type: 'curso' }));
     tituloCentral = autorSel;
-  } 
-  else if (categoriaSel) {
+  } else if (categoriaSel) {
     tituloCentral = categoriaSel;
     if (categoriaSel === 'AUTORES') {
       const autores = ['Craig Jones', 'Eddie Bravo', 'John Danaher', 'Levi Jones-Leary', 'Bernardo Faria', 'Bruno Malfacine', 'Josef Chen', 'Paulo Marmund', 'Gordon Ryan'];
       nodosAMostrar = autores.map(a => ({ nombre: a, type: 'autor' }));
     } else {
-      const cursosFiltrados = Object.keys(DB_INSTRUCCIONALES).filter(key => 
-        DB_INSTRUCCIONALES[key].categorias?.includes(categoriaSel)
-      );
-      nodosAMostrar = cursosFiltrados.map(key => ({
-        id: key,
-        nombre: DB_INSTRUCCIONALES[key].titulo,
-        type: 'curso'
-      }));
+      const cursosFiltrados = Object.keys(DB_INSTRUCCIONALES).filter(key => DB_INSTRUCCIONALES[key].categorias?.includes(categoriaSel));
+      nodosAMostrar = cursosFiltrados.map(key => ({ id: key, nombre: DB_INSTRUCCIONALES[key].titulo, type: 'curso' }));
     }
   }
 
@@ -2532,149 +2517,100 @@ const MapaPage = ({
   };
 
   return (
-    <div style={mapStyles.layout}>
+    <div style={{ ...mapStyles.layout, flexDirection: esMovil ? 'column' : 'row' }}>
       <aside style={{
         ...mapStyles.sidebar,
-        width: esMovil ? '100%' : '250px', // Ocupa todo el ancho si es móvil
-        display: esMovil && !terminoBusqueda && (volSel || instrSel || autorSel) ? 'none' : 'flex' 
-        // ^ Ocultar sidebar en móviles cuando ya estamos navegando profundamente para ganar espacio
+        width: esMovil ? '100%' : '250px',
+        height: esMovil ? 'auto' : '100vh',
+        position: esMovil ? 'relative' : 'fixed',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px',
+        zIndex: 100,
+        padding: '15px',
+        boxSizing: 'border-box'
       }}>
-        <button onClick={irAtras} style={styles.btnOutline}>← REGRESAR</button>
-
-        <div style={{ marginTop: '20px' }}>
-          <input
-            type="text"
-            placeholder="Buscar técnica..."
-            value={terminoBusqueda}
-            onChange={(e) => setTerminoBusqueda(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '10px',
-              backgroundColor: '#111',
-              border: '1px solid #d4af37',
-              color: '#fff',
-              borderRadius: '5px',
-              fontSize: '0.8rem',
-              outline: 'none'
-            }}
-          />
+        {/* NAVEGACIÓN */}
+        <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'space-between' }}>
+          <button onClick={irAtras} style={{ ...styles.btnOutline, flex: '0 0 40px', padding: '10px 0' }}>←</button>
+          <button onClick={onContinue} disabled={!hasSession} style={{ ...styles.btnGold, flex: 1, fontSize: '0.65rem', opacity: hasSession ? 1 : 0.5 }}>CONTINUAR</button>
+          <button onClick={onNavigateToNotes} style={{ ...styles.btnOutline, flex: 1, fontSize: '0.65rem', borderColor: '#d4af37' }}>BITÁCORA</button>
         </div>
 
-        <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <button
-            onClick={onContinue}
-            disabled={!hasSession}
-            style={{ ...styles.btnGold, fontSize: '0.7rem', opacity: hasSession ? 1 : 0.5, cursor: hasSession ? 'pointer' : 'not-allowed' }}
-          >
-            ▶ CONTINUAR SESIÓN
-          </button>
-          <button onClick={onNavigateToNotes} style={{ ...styles.btnOutline, fontSize: '0.7rem', borderColor: '#d4af37' }}>
-            MI BITÁCORA
-          </button>
-        </div>
+        <input
+          type="text"
+          placeholder="Buscar técnica..."
+          value={terminoBusqueda}
+          onChange={(e) => setTerminoBusqueda(e.target.value)}
+          style={{ width: '100%', padding: '12px', backgroundColor: '#111', border: '1px solid #d4af37', color: '#fff', borderRadius: '5px', outline: 'none' }}
+        />
 
-        <h3 style={{ color: '#d4af37', marginTop: '30px', fontSize: '0.9rem' }}>FILTRAR POR</h3>
-        <div style={{ display: esMovil ? 'flex' : 'block', flexWrap: 'wrap', gap: '5px' }}>
-          {['DEFENSAS', 'POSICIÓN', 'DERRIBOS', 'AUTORES', 'JUEGOS'].map(cat => (
-            <div key={cat}
-              onClick={() => { setCategoriaSel(cat); setAutorSel(null); setInstrSel(null); setVolSel(null); setTerminoBusqueda(""); }}
-              style={{ 
-                ...mapStyles.sideItem, 
-                flex: esMovil ? '1 1 45%' : 'none',
-                backgroundColor: categoriaSel === cat && !terminoBusqueda ? '#d4af37' : 'transparent', 
-                color: categoriaSel === cat && !terminoBusqueda ? '#000' : '#fff',
-                fontSize: '0.7rem',
-                padding: '8px'
-              }}>
-              {cat}
+        {/* CATEGORÍAS MÓVIL */}
+        {esMovil && !terminoBusqueda && !instrSel && (
+          <div style={{ width: '100%' }}>
+            <p style={{ color: '#d4af37', fontSize: '0.7rem', margin: '5px 0' }}>FILTRAR POR:</p>
+            <div style={{ display: 'flex', overflowX: 'auto', gap: '8px', paddingBottom: '10px', scrollbarWidth: 'none' }}>
+              {['DEFENSAS', 'POSICIÓN', 'DERRIBOS', 'AUTORES', 'JUEGOS'].map(cat => (
+                <div key={cat} onClick={() => { setCategoriaSel(cat); setAutorSel(null); setInstrSel(null); setVolSel(null); setTerminoBusqueda(""); }}
+                  style={{ padding: '8px 15px', borderRadius: '20px', fontSize: '0.65rem', whiteSpace: 'nowrap', backgroundColor: categoriaSel === cat ? '#d4af37' : '#111', color: categoriaSel === cat ? '#000' : '#fff', border: '1px solid #d4af37' }}>
+                  {cat}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
+        )}
+
+        {/* CATEGORÍAS ESCRITORIO */}
+        {!esMovil && (
+          <div style={{ marginTop: '20px' }}>
+            <h3 style={{ color: '#d4af37', marginBottom: '15px', fontSize: '0.9rem' }}>FILTRAR POR</h3>
+            {['DEFENSAS', 'POSICIÓN', 'DERRIBOS', 'AUTORES', 'JUEGOS'].map(cat => (
+              <div key={cat} onClick={() => { setCategoriaSel(cat); setAutorSel(null); setInstrSel(null); setVolSel(null); setTerminoBusqueda(""); }}
+                style={{ ...mapStyles.sideItem, backgroundColor: categoriaSel === cat ? '#d4af37' : 'transparent', color: categoriaSel === cat ? '#000' : '#fff', padding: '12px', marginBottom: '5px', borderRadius: '5px', cursor: 'pointer' }}>
+                {cat}
+              </div>
+            ))}
+          </div>
+        )}
       </aside>
 
       <main style={mapStyles.mapArea}>
-        <div style={{...mapStyles.canvas, transform: esMovil ? 'scale(0.9)' : 'scale(1)'}}>
-
+        <div style={{ ...mapStyles.canvas, transform: esMovil ? 'scale(0.6)' : 'scale(1)', transformOrigin: 'center center' }}>
           {terminoBusqueda ? (
             <div style={{ zIndex: 10, width: '100%', maxWidth: '500px', maxHeight: '80vh', overflowY: 'auto', padding: '20px' }}>
-              <h2 style={{ color: '#d4af37', textAlign: 'center', marginBottom: '20px', fontSize: '1.2rem' }}>RESULTADOS</h2>
-              {resultadosBusqueda.map((t, i) => {
-                const completado = vistos?.includes(t.id);
-                return (
-                  <div key={i} onClick={() => onSelectVideo({ titulo: t.nombre, id: t.id })}
-                    style={{
-                      padding: '15px', backgroundColor: '#0a0a0a', border: `1px solid ${completado ? '#4CAF50' : '#222'}`,
-                      margin: '8px 0', borderRadius: '8px', cursor: 'pointer'
-                    }}
-                  >
-                    <div style={{ color: completado ? '#4CAF50' : '#d4af37', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                      {completado ? '✅ ' : ''}{t.nombre}
-                    </div>
-                    <div style={{ fontSize: '0.6rem', color: '#666', marginTop: '4px' }}>{t.curso} • {t.volNombre}</div>
-                  </div>
-                );
-              })}
+              <h2 style={{ color: '#d4af37', textAlign: 'center', marginBottom: '20px' }}>RESULTADOS</h2>
+              {resultadosBusqueda.map((t, i) => (
+                <div key={i} onClick={() => onSelectVideo({ titulo: t.nombre, id: t.id })} style={{ padding: '15px', backgroundColor: '#0a0a0a', border: `1px solid ${vistos?.includes(t.id) ? '#4CAF50' : '#222'}`, margin: '8px 0', borderRadius: '8px', cursor: 'pointer' }}>
+                  <div style={{ color: vistos?.includes(t.id) ? '#4CAF50' : '#d4af37', fontWeight: 'bold' }}>{vistos?.includes(t.id) ? '✅ ' : ''}{t.nombre}</div>
+                  <div style={{ fontSize: '0.65rem', color: '#666' }}>{t.curso} • {t.volNombre}</div>
+                </div>
+              ))}
             </div>
           ) : (
             <>
               <svg style={mapStyles.svgLayer}>
                 {nodosAMostrar.map((n, i) => {
-                  const totalNodos = nodosAMostrar.length;
-                  const radioBase = esMovil ? 120 : 260; 
-                  const radioFinal = radioBase + (totalNodos > 12 ? (i * 3) : 0);
-                  const angle = (i * (360 / totalNodos)) * (Math.PI / 180);
-
+                  const total = nodosAMostrar.length;
+                  const angle = (i * (360 / total)) * (Math.PI / 180);
                   return (
-                    <line 
-                      key={i} x1="50%" y1="50%" 
-                      x2={`${50 + (Math.cos(angle) * (esMovil ? 25 : 35))}%`} 
-                      y2={`${50 + (Math.sin(angle) * (esMovil ? 25 : 35))}%`} 
-                      stroke={vistos?.includes(n.id) ? '#4CAF50' : '#d4af37'} 
-                      strokeWidth="1" opacity="0.2" className="floating-node"
-                      style={{ animationDelay: `${i * -0.8}s`, animationDuration: `${5 + (i % 3)}s`}}
-                    />
+                    <line key={i} x1="50%" y1="50%" x2={`${50 + (Math.cos(angle) * 35)}%`} y2={`${50 + (Math.sin(angle) * 35)}%`} stroke={vistos?.includes(n.id) ? '#4CAF50' : '#d4af37'} strokeWidth="1" opacity="0.2" className="floating-node" style={{ animationDelay: `${i * -0.8}s`, animationDuration: `${5 + (i % 3)}s` }} />
                   );
                 })}
               </svg>
 
-              <div style={{
-                ...mapStyles.mainNode,
-                width: esMovil ? '100px' : '150px',
-                height: esMovil ? '100px' : '150px',
-                fontSize: esMovil ? '0.7rem' : '0.9rem',
-                zIndex: 5
-              }}>{tituloCentral}</div>
+              <div style={mapStyles.mainNode}>{tituloCentral}</div>
 
               {nodosAMostrar.map((n, i) => {
-                const totalNodos = nodosAMostrar.length;
-                const radioBase = esMovil ? 130 : 260;
-                const radioFinal = radioBase + (totalNodos > 12 ? (i * 3) : 0);
-                const angle = (i * (360 / totalNodos)) * (Math.PI / 180);
-                const x = Math.cos(angle) * radioFinal;
-                const y = Math.sin(angle) * radioFinal;
-                const size = esMovil ? 85 : 110;
-                const offset = size / 2;
-
-                let estaVisto = false;
-                if (n.type === 'parte') estaVisto = vistos?.includes(n.id);
-                else if (n.type === 'volumen') estaVisto = n.raw?.partes?.every(p => vistos?.includes(p.id));
+                const total = nodosAMostrar.length;
+                const radio = 260;
+                const angle = (i * (360 / total)) * (Math.PI / 180);
+                const x = Math.cos(angle) * radio;
+                const y = Math.sin(angle) * radio;
+                const visto = n.type === 'parte' ? vistos?.includes(n.id) : n.raw?.partes?.every(p => vistos?.includes(p.id));
 
                 return (
-                  <div key={i} onClick={() => handleNodeClick(n)} className="floating-node"
-                    style={{
-                      ...mapStyles.subNodeFloating, 
-                      width: `${size}px`,
-                      height: `${size}px`,
-                      fontSize: esMovil ? '0.55rem' : '0.75rem',
-                      left: `calc(50% + ${x}px - ${offset}px)`,
-                      top: `calc(50% + ${y}px - ${offset}px)`,
-                      animationDelay: `${i * -0.8}s`,
-                      animationDuration: `${5 + (i % 3)}s`,
-                      borderColor: estaVisto ? '#4CAF50' : '#d4af37',
-                      color: estaVisto ? '#4CAF50' : '#fff',
-                    }}
-                  >
-                    {estaVisto ? '✅ ' : ''}{n.nombre}
+                  <div key={i} onClick={() => handleNodeClick(n)} className="floating-node" style={{ ...mapStyles.subNodeFloating, left: `calc(50% + ${x}px - 55px)`, top: `calc(50% + ${y}px - 55px)`, animationDelay: `${i * -0.8}s`, animationDuration: `${5 + (i % 3)}s`, borderColor: visto ? '#4CAF50' : '#d4af37', color: visto ? '#4CAF50' : '#fff', cursor: 'pointer' }}>
+                    {visto ? '✅ ' : ''}{n.nombre}
                   </div>
                 );
               })}
@@ -2691,83 +2627,57 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
     if (!raw) return "";
     try {
       const parsed = JSON.parse(raw);
-      return parsed.texto || ""; // Extraemos solo el texto del objeto
+      return parsed.texto || "";
     } catch (e) {
-      return raw; // Si es una nota vieja (texto simple), la devuelve tal cual
+      return raw;
     }
   });
-  // Ejemplo de cómo quedaría tu función guardar en Firebase
 
   const [timestamp, setTimestamp] = useState("");
   const [tiempoActivo, setTiempoActivo] = useState("");
   const [nombreMarcador, setNombreMarcador] = useState("");
+  
+  // --- SENSOR DE MÓVIL ---
+  const [esMovil, setEsMovil] = React.useState(window.innerWidth < 768);
+  React.useEffect(() => {
+    const handleResize = () => setEsMovil(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const insertarMarcaDeTiempo = () => {
     if (!timestamp.trim()) {
-    alert("Por favor pon un minuto (ej: 02:45)");
-    return;
-  }
-  const etiqueta = nombreMarcador.trim() || "Punto de interés";
-  const nuevaMarca = `\n[${timestamp.trim()} - ${etiqueta}] `;
-  setNota(nota + nuevaMarca);
-  setTimestamp("");
-  setNombreMarcador("");
-};
+      alert("Por favor pon un minuto (ej: 02:45)");
+      return;
+    }
+    const etiqueta = nombreMarcador.trim() || "Punto de interés";
+    const nuevaMarca = `\n[${timestamp.trim()} - ${etiqueta}] `;
+    setNota(nota + nuevaMarca);
+    setTimestamp("");
+    setNombreMarcador("");
+  };
 
   const isCompletado = vistos.includes(video?.id);
 
-  React.useEffect(() => {
-    const raw = localStorage.getItem(`nota_${video?.titulo}`);
-    if (!raw) {
-      setNota("");
-    } else {
-      try {
-        const parsed = JSON.parse(raw);
-        setNota(parsed.texto || "");
-      } catch (e) {
-        setNota(raw);
-      }
-    }
-  }, [video]);
-
-  // --- FUNCIÓN UNIFICADA DE GUARDADO ---
+  // --- FUNCIÓN DE GUARDADO (Mantenemos tu lógica original) ---
   const guardar = async () => {
     if (!video?.id) return;
-    
-    const ahora = new Date().toLocaleString(); // Definimos la fecha aquí
-    
-    const dataNota = {
-      texto: nota,
-      videoId: video.id,
-      fecha: ahora
-    };
-
-    // 1. Guardar en LocalStorage (Formato viejo por compatibilidad)
+    const ahora = new Date().toLocaleString();
+    const dataNota = { texto: nota, videoId: video.id, fecha: ahora };
     localStorage.setItem(`nota_${video.titulo}`, JSON.stringify(dataNota));
-
-    // 2. Guardar en LocalStorage (Diccionario unificado)
     const notasLocales = JSON.parse(localStorage.getItem('lafortuna_notas') || '{}');
     notasLocales[video.id] = nota;
     localStorage.setItem('lafortuna_notas', JSON.stringify(notasLocales));
 
-    // 3. Guardar en Firebase (Sincronización en la nube)
     if (auth.currentUser) {
       try {
         const userRef = doc(db, "usuarios", auth.currentUser.uid);
-        await setDoc(userRef, {
-          notas: {
-            [video.id]: nota
-          }
-        }, { merge: true });
-        console.log("Sincronizado en la nube de La Fortuna ✅");
-      } catch (err) {
-        console.error("Error al subir a la nube:", err);
-      }
+        await setDoc(userRef, { notas: { [video.id]: nota } }, { merge: true });
+      } catch (err) { console.error("Error al subir:", err); }
     }
-
     alert(`Bitácora actualizada: ${ahora}`);
   };
 
-  // --- LÓGICA DE NAVEGACIÓN ---
   const videoSiguiente = getAdjacentVideo(video, 'next');
   const videoAnterior = getAdjacentVideo(video, 'prev');
 
@@ -2778,187 +2688,126 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
       setTiempoActivo(segundos);
     }
   };
+
   return (
-  <div style={{ 
-    display: 'flex', 
-    height: '100vh', 
-    width: '100vw', 
-    backgroundColor: '#000', 
-    overflow: 'hidden', 
-    color: '#fff',
-    boxSizing: 'border-box' // Evita que el padding estire el contenedor
-  }}>
-
-    {/* SECCIÓN IZQUIERDA: VIDEO Y HEADER */}
     <div style={{ 
-      flex: 3, // Usamos flex ratio en lugar de % fijos para evitar errores de px
       display: 'flex', 
-      flexDirection: 'column', 
-      borderRight: '1px solid #222',
-      height: '100%' 
+      flexDirection: esMovil ? 'column' : 'row', // CAMBIO CLAVE
+      height: '100vh', 
+      width: '100vw', 
+      backgroundColor: '#000', 
+      color: '#fff',
+      overflow: 'hidden'
     }}>
 
-      {/* HEADER DE NAVEGACIÓN */}
-      <div style={{
-        padding: '10px 20px',
-        height: '60px', // Altura fija para el header
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        backgroundColor: '#0a0a0a',
-        borderBottom: '1px solid #222',
-        boxSizing: 'border-box'
-      }}>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button
-            onClick={() => videoAnterior && onSelectVideo(videoAnterior)}
-            style={{ ...styles.btnOutline, width: 'auto', padding: '5px 10px', opacity: videoAnterior ? 1 : 0.3 }}
-            disabled={!videoAnterior}
-          >
-            ←
-          </button>
-          <button onClick={onBack} style={{ ...styles.btnOutline, width: 'auto', borderColor: '#444', padding: '5px 10px' }}>
-            MAPA
-          </button>
-        </div>
-
-        <div style={{ textAlign: 'center', flex: 1 }}>
-          <h2 style={{ fontSize: '0.9rem', color: '#d4af37', margin: 0, textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {video?.titulo}
-          </h2>
-          <button
-            onClick={onNavigateToNotes}
-            style={{ background: 'none', border: 'none', color: '#d4af37', fontSize: '0.65rem', textDecoration: 'underline', cursor: 'pointer' }}
-          >
-            MI BITÁCORA
-          </button>
-        </div>
-
-        <button
-          onClick={() => videoSiguiente && onSelectVideo(videoSiguiente)}
-          style={{ ...styles.btnGold, width: 'auto', padding: '5px 10px', opacity: videoSiguiente ? 1 : 0.3 }}
-          disabled={!videoSiguiente}
-        >
-          →
-        </button>
-      </div>
-
-      {/* ÁREA DEL VIDEO */}
-      <div style={{ flex: 1, backgroundColor: '#111', position: 'relative', overflow: 'hidden' }}>
-        <iframe
-          key={`${video?.id}-${tiempoActivo}`}
-          src={`https://drive.google.com/file/d/${video?.id}/preview${tiempoActivo ? `?t=${tiempoActivo}` : ''}`}
-          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
-          allowFullScreen
-        ></iframe>
-      </div>
-    </div>
-
-    {/* SECCIÓN DERECHA: NOTAS Y ACCIONES */}
-    <div style={{ 
-      flex: 1, 
-      maxWidth: '400px', // Limitamos el ancho para que no sea excesivo en pantallas grandes
-      backgroundColor: '#0a0a0a', 
-      display: 'flex', 
-      flexDirection: 'column', 
-      padding: '20px', 
-      boxSizing: 'border-box',
-      height: '100%' 
-    }}>
-      <h3 style={{ color: '#d4af37', fontSize: '1rem', marginBottom: '15px' }}>BITÁCORA TÉCNICA</h3>
-      
-      {/* SECCIÓN DE MARCADORES RÁPIDOS */}
-      <div style={{ marginBottom: '15px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <input 
-          type="text" 
-          placeholder="Nombre del detalle..." 
-          value={nombreMarcador}
-          onChange={(e) => setNombreMarcador(e.target.value)}
-          style={{ backgroundColor: '#111', border: '1px solid #333', color: '#fff', padding: '8px', borderRadius: '5px', fontSize: '0.8rem' }}
-        />
-        <div style={{ display: 'flex', gap: '5px' }}>
-          <input 
-            type="text" 
-            placeholder="00:00" 
-            value={timestamp}
-            onChange={(e) => setTimestamp(e.target.value)}
-            style={{ flex: '1', backgroundColor: '#111', border: '1px solid #333', color: '#d4af37', padding: '8px', borderRadius: '5px', textAlign: 'center' }}
-          />
-          <button onClick={insertarMarcaDeTiempo} style={{ ...styles.btnGold, width: 'auto', padding: '0 15px', fontSize: '0.7rem' }}>+ MARCAR</button>
-        </div>
-      </div>
-
-      {/* BOTONES DE SALTO DINÁMICOS - Con scroll interno si hay muchos */}
+      {/* SECCIÓN IZQUIERDA (O SUPERIOR): VIDEO Y NAV */}
       <div style={{ 
+        flex: esMovil ? 'none' : 3, 
         display: 'flex', 
-        gap: '6px', 
-        flexWrap: 'wrap', 
-        marginBottom: '15px', 
-        maxHeight: '120px', 
-        overflowY: 'auto',
-        paddingRight: '5px' 
+        flexDirection: 'column', 
+        borderRight: esMovil ? 'none' : '1px solid #222',
+        borderBottom: esMovil ? '1px solid #222' : 'none',
+        height: esMovil ? 'auto' : '100%' 
       }}>
-        {(nota.match(/\[\d+:\d+ - .*?\]/g) || []).map((marca, i) => {
-          const partes = marca.replace('[', '').replace(']', '').split(' - ');
-          return (
-            <button 
-              key={i}
-              onClick={() => saltarATiempo(partes[0])} 
-              style={{ 
-                fontSize: '0.6rem', padding: '5px 8px', backgroundColor: '#1a1a1a', 
-                color: '#d4af37', border: '1px solid #d4af37', borderRadius: '4px', 
-                cursor: 'pointer', flex: '1 1 auto', textAlign: 'center'
-              }}
-            >
-              <div style={{ fontWeight: 'bold' }}>{partes[1]}</div>
-              <div style={{ opacity: 0.6 }}>{partes[0]}</div>
-            </button>
-          );
-        })}
+        
+        {/* HEADER */}
+        <div style={{
+          padding: '10px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          backgroundColor: '#0a0a0a',
+          height: '60px'
+        }}>
+          <button onClick={() => videoAnterior && onSelectVideo(videoAnterior)} 
+                  style={{ ...styles.btnOutline, width: '40px', opacity: videoAnterior ? 1 : 0.2 }} disabled={!videoAnterior}>←</button>
+          
+          <div style={{ textAlign: 'center', flex: 1, overflow: 'hidden' }}>
+            <h2 style={{ fontSize: esMovil ? '0.75rem' : '0.9rem', color: '#d4af37', margin: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+              {video?.titulo}
+            </h2>
+            <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#666', fontSize: '0.6rem', textDecoration: 'underline' }}>VOLVER AL MAPA</button>
+          </div>
+
+          <button onClick={() => videoSiguiente && onSelectVideo(videoSiguiente)} 
+                  style={{ ...styles.btnGold, width: '40px', opacity: videoSiguiente ? 1 : 0.2 }} disabled={!videoSiguiente}>→</button>
+        </div>
+
+        {/* CONTENEDOR VIDEO */}
+        <div style={{ 
+          width: '100%', 
+          aspectRatio: '16/9', // Mantiene la forma del video siempre
+          backgroundColor: '#000',
+          position: 'relative'
+        }}>
+          <iframe
+            key={`${video?.id}-${tiempoActivo}`}
+            src={`https://drive.google.com/file/d/${video?.id}/preview${tiempoActivo ? `?t=${tiempoActivo}` : ''}`}
+            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+            allowFullScreen
+          ></iframe>
+        </div>
       </div>
 
-      {/* TEXTAREA QUE SE AJUSTA AL ESPACIO SOBRANTE */}
-      <textarea
-        value={nota}
-        onChange={(e) => setNota(e.target.value)}
-        placeholder="Escribe tus notas aquí..."
-        style={{
-          flex: 1,
-          backgroundColor: '#111',
-          color: '#eee',
-          padding: '12px',
-          borderRadius: '8px',
-          border: '1px solid #333',
-          marginBottom: '15px',
-          resize: 'none',
-          fontFamily: 'sans-serif',
-          fontSize: '0.85rem',
-          lineHeight: '1.4'
-        }}
-      />
+      {/* SECCIÓN DERECHA (O INFERIOR): NOTAS */}
+      <div style={{ 
+        flex: 1, 
+        overflowY: 'auto', // Scroll propio para las notas
+        padding: '15px', 
+        backgroundColor: '#0a0a0a',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        <h3 style={{ color: '#d4af37', fontSize: '0.9rem', marginBottom: '10px' }}>BITÁCORA TÉCNICA</h3>
+        
+        {/* MARCADORES */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '15px' }}>
+          <input 
+            type="text" placeholder="Nombre del detalle..." value={nombreMarcador}
+            onChange={(e) => setNombreMarcador(e.target.value)}
+            style={{ backgroundColor: '#111', border: '1px solid #333', color: '#fff', padding: '10px', borderRadius: '5px', fontSize: '0.8rem' }}
+          />
+          <div style={{ display: 'flex', gap: '5px' }}>
+            <input 
+              type="text" placeholder="00:00" value={timestamp}
+              onChange={(e) => setTimestamp(e.target.value)}
+              style={{ flex: 1, backgroundColor: '#111', border: '1px solid #333', color: '#d4af37', textAlign: 'center', borderRadius: '5px' }}
+            />
+            <button onClick={insertarMarcaDeTiempo} style={{ ...styles.btnGold, padding: '0 15px', fontSize: '0.7rem' }}>+ MARCAR</button>
+          </div>
+        </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <button style={{...styles.btnGold, padding: '10px'}} onClick={guardar}>
-          GUARDAR EN VAULT
-        </button>
+        {/* BOTONES DE TIEMPO (SCROLL HORIZONTAL EN MÓVIL) */}
+        <div style={{ 
+          display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '10px', marginBottom: '10px'
+        }}>
+          {(nota.match(/\[\d+:\d+ - .*?\]/g) || []).map((marca, i) => {
+            const partes = marca.replace('[', '').replace(']', '').split(' - ');
+            return (
+              <button key={i} onClick={() => saltarATiempo(partes[0])} 
+                style={{ fontSize: '0.6rem', padding: '8px', backgroundColor: '#1a1a1a', color: '#d4af37', border: '1px solid #d4af37', borderRadius: '4px', whiteSpace: 'nowrap' }}>
+                {partes[1]} ({partes[0]})
+              </button>
+            );
+          })}
+        </div>
 
-        <button
-          onClick={() => toggleVisto(video?.id)}
-          style={{
-            ...styles.btnOutline,
-            borderColor: isCompletado ? '#4CAF50' : '#d4af37',
-            color: isCompletado ? '#4CAF50' : '#fff',
-            padding: '10px',
-            fontSize: '0.75rem',
-            fontWeight: 'bold'
-          }}
-        >
-          {isCompletado ? 'COMPLETADA ✅' : 'MARCAR VISTA'}
-        </button>
+        <textarea
+          value={nota} onChange={(e) => setNota(e.target.value)}
+          placeholder="Tus notas aquí..."
+          style={{ flex: 'none', height: esMovil ? '150px' : '300px', backgroundColor: '#111', color: '#eee', padding: '12px', borderRadius: '8px', border: '1px solid #333', marginBottom: '15px', fontSize: '0.85rem' }}
+        />
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingBottom: '30px' }}>
+          <button style={{...styles.btnGold, padding: '12px'}} onClick={guardar}>GUARDAR EN VAULT</button>
+          <button onClick={() => toggleVisto(video?.id)} 
+                  style={{ ...styles.btnOutline, borderColor: isCompletado ? '#4CAF50' : '#d4af37', color: isCompletado ? '#4CAF50' : '#fff', padding: '12px' }}>
+            {isCompletado ? 'COMPLETADA ✅' : 'MARCAR VISTA'}
+          </button>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
 };
 
 // --- HUB Y NOTAS ---
