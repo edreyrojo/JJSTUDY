@@ -2455,7 +2455,16 @@ const MapaPage = ({
 }) => {
   const [terminoBusqueda, setTerminoBusqueda] = React.useState("");
 
-  // 1. FÁBRICA DE RESULTADOS PARA BÚSQUEDA
+  // --- 1. SENSOR DE MÓVIL ---
+  const [esMovil, setEsMovil] = React.useState(window.innerWidth < 768);
+
+  React.useEffect(() => {
+    const handleResize = () => setEsMovil(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // 2. FÁBRICA DE RESULTADOS PARA BÚSQUEDA
   const todasLasTecnicas = React.useMemo(() => {
     return Object.keys(DB_INSTRUCCIONALES).flatMap(cursoKey =>
       DB_INSTRUCCIONALES[cursoKey].volumenes.flatMap(vol =>
@@ -2476,38 +2485,30 @@ const MapaPage = ({
   let nodosAMostrar = [];
   let tituloCentral = "";
 
-  // NIVEL 4: Viendo las partes de un volumen
   if (volSel) {
     nodosAMostrar = volSel?.partes?.map(p => ({ nombre: p.nombre, type: 'parte', id: p.id })) || [];
     tituloCentral = volSel?.nombre || "";
   } 
-  // NIVEL 3: Viendo los volúmenes de un instruccional
   else if (instrSel) {
     const cursoData = DB_INSTRUCCIONALES[instrSel];
     nodosAMostrar = cursoData?.volumenes?.map(v => ({ nombre: v.nombre, type: 'volumen', raw: v })) || [];
     tituloCentral = instrSel;
   } 
-  // NIVEL 2: Viendo los cursos de un autor específico
   else if (autorSel) {
     nodosAMostrar = Object.keys(DB_INSTRUCCIONALES)
       .filter(key => DB_INSTRUCCIONALES[key].autor === autorSel)
       .map(key => ({ nombre: key, id: key, type: 'curso' }));
     tituloCentral = autorSel;
   } 
-  // NIVEL 1: Viendo los cursos de una categoría (JUEGOS, DEFENSAS, etc.)
   else if (categoriaSel) {
     tituloCentral = categoriaSel;
-
     if (categoriaSel === 'AUTORES') {
-      // Lista manual de autores (puedes automatizarlo después si quieres)
       const autores = ['Craig Jones', 'Eddie Bravo', 'John Danaher', 'Levi Jones-Leary', 'Bernardo Faria', 'Bruno Malfacine', 'Josef Chen', 'Paulo Marmund', 'Gordon Ryan'];
       nodosAMostrar = autores.map(a => ({ nombre: a, type: 'autor' }));
     } else {
-      // BUSQUEDA DINÁMICA EN LA BD POR CATEGORÍA
       const cursosFiltrados = Object.keys(DB_INSTRUCCIONALES).filter(key => 
         DB_INSTRUCCIONALES[key].categorias?.includes(categoriaSel)
       );
-
       nodosAMostrar = cursosFiltrados.map(key => ({
         id: key,
         nombre: DB_INSTRUCCIONALES[key].titulo,
@@ -2532,10 +2533,14 @@ const MapaPage = ({
 
   return (
     <div style={mapStyles.layout}>
-      <aside style={mapStyles.sidebar}>
+      <aside style={{
+        ...mapStyles.sidebar,
+        width: esMovil ? '100%' : '250px', // Ocupa todo el ancho si es móvil
+        display: esMovil && !terminoBusqueda && (volSel || instrSel || autorSel) ? 'none' : 'flex' 
+        // ^ Ocultar sidebar en móviles cuando ya estamos navegando profundamente para ganar espacio
+      }}>
         <button onClick={irAtras} style={styles.btnOutline}>← REGRESAR</button>
 
-        {/* --- NUEVA BARRA DE BÚSQUEDA --- */}
         <div style={{ marginTop: '20px' }}>
           <input
             type="text"
@@ -2569,142 +2574,104 @@ const MapaPage = ({
         </div>
 
         <h3 style={{ color: '#d4af37', marginTop: '30px', fontSize: '0.9rem' }}>FILTRAR POR</h3>
-        {['DEFENSAS', 'POSICIÓN', 'DERRIBOS', 'AUTORES', 'JUEGOS'].map(cat => (
-          <div key={cat}
-            onClick={() => { setCategoriaSel(cat); setAutorSel(null); setInstrSel(null); setVolSel(null); setTerminoBusqueda(""); }}
-            style={{ ...mapStyles.sideItem, backgroundColor: categoriaSel === cat && !terminoBusqueda ? '#d4af37' : 'transparent', color: categoriaSel === cat && !terminoBusqueda ? '#000' : '#fff' }}>
-            {cat}
-          </div>
-        ))}
+        <div style={{ display: esMovil ? 'flex' : 'block', flexWrap: 'wrap', gap: '5px' }}>
+          {['DEFENSAS', 'POSICIÓN', 'DERRIBOS', 'AUTORES', 'JUEGOS'].map(cat => (
+            <div key={cat}
+              onClick={() => { setCategoriaSel(cat); setAutorSel(null); setInstrSel(null); setVolSel(null); setTerminoBusqueda(""); }}
+              style={{ 
+                ...mapStyles.sideItem, 
+                flex: esMovil ? '1 1 45%' : 'none',
+                backgroundColor: categoriaSel === cat && !terminoBusqueda ? '#d4af37' : 'transparent', 
+                color: categoriaSel === cat && !terminoBusqueda ? '#000' : '#fff',
+                fontSize: '0.7rem',
+                padding: '8px'
+              }}>
+              {cat}
+            </div>
+          ))}
+        </div>
       </aside>
 
       <main style={mapStyles.mapArea}>
-        <div style={mapStyles.canvas}>
+        <div style={{...mapStyles.canvas, transform: esMovil ? 'scale(0.9)' : 'scale(1)'}}>
 
           {terminoBusqueda ? (
-            /* --- VISTA DE RESULTADOS DE BÚSQUEDA --- */
             <div style={{ zIndex: 10, width: '100%', maxWidth: '500px', maxHeight: '80vh', overflowY: 'auto', padding: '20px' }}>
               <h2 style={{ color: '#d4af37', textAlign: 'center', marginBottom: '20px', fontSize: '1.2rem' }}>RESULTADOS</h2>
               {resultadosBusqueda.map((t, i) => {
                 const completado = vistos?.includes(t.id);
                 return (
-                  <div
-                    key={i}
-                    onClick={() => onSelectVideo({ titulo: t.nombre, id: t.id })}
+                  <div key={i} onClick={() => onSelectVideo({ titulo: t.nombre, id: t.id })}
                     style={{
-                      padding: '15px',
-                      backgroundColor: '#0a0a0a',
-                      border: `1px solid ${completado ? '#4CAF50' : '#222'}`,
-                      margin: '8px 0',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      transition: 'transform 0.2s'
+                      padding: '15px', backgroundColor: '#0a0a0a', border: `1px solid ${completado ? '#4CAF50' : '#222'}`,
+                      margin: '8px 0', borderRadius: '8px', cursor: 'pointer'
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
-                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                   >
-                    <div style={{ color: completado ? '#4CAF50' : '#d4af37', fontWeight: 'bold' }}>
+                    <div style={{ color: completado ? '#4CAF50' : '#d4af37', fontWeight: 'bold', fontSize: '0.8rem' }}>
                       {completado ? '✅ ' : ''}{t.nombre}
                     </div>
-                    <div style={{ fontSize: '0.65rem', color: '#666', marginTop: '4px' }}>{t.curso} • {t.volNombre}</div>
+                    <div style={{ fontSize: '0.6rem', color: '#666', marginTop: '4px' }}>{t.curso} • {t.volNombre}</div>
                   </div>
                 );
               })}
             </div>
           ) : (
-            /* --- VISTA ORIGINAL DEL MAPA --- */
             <>
               <svg style={mapStyles.svgLayer}>
-  {nodosAMostrar.map((n, i) => {
-    const totalNodos = nodosAMostrar.length;
-    const radioBase = 260;
-    const incrementoPorNodo = totalNodos > 12 ? (i * 5) : 0;
-    const radioFinal = radioBase + incrementoPorNodo;
-    const angle = (i * (360 / totalNodos)) * (Math.PI / 180);
+                {nodosAMostrar.map((n, i) => {
+                  const totalNodos = nodosAMostrar.length;
+                  const radioBase = esMovil ? 120 : 260; 
+                  const radioFinal = radioBase + (totalNodos > 12 ? (i * 3) : 0);
+                  const angle = (i * (360 / totalNodos)) * (Math.PI / 180);
 
-    // Calculamos el destino de la línea exactamente igual al centro del nodo
-    const targetX = 50 + (Math.cos(angle) * radioFinal / 10); // Dividimos por factor de escala del contenedor
-    const targetY = 50 + (Math.sin(angle) * radioFinal / 10);
+                  return (
+                    <line 
+                      key={i} x1="50%" y1="50%" 
+                      x2={`${50 + (Math.cos(angle) * (esMovil ? 25 : 35))}%`} 
+                      y2={`${50 + (Math.sin(angle) * (esMovil ? 25 : 35))}%`} 
+                      stroke={vistos?.includes(n.id) ? '#4CAF50' : '#d4af37'} 
+                      strokeWidth="1" opacity="0.2" className="floating-node"
+                      style={{ animationDelay: `${i * -0.8}s`, animationDuration: `${5 + (i % 3)}s`}}
+                    />
+                  );
+                })}
+              </svg>
 
-    return (
-      <line 
-        key={i} 
-        x1="50%" y1="50%" 
-        x2={`${50 + (Math.cos(angle) * 35)}%`} // Ajuste dinámico de longitud
-        y2={`${50 + (Math.sin(angle) * 35)}%`} 
-        stroke={vistos?.includes(n.id) ? '#4CAF50' : '#d4af37'} 
-        strokeWidth="1" 
-        opacity="0.2"
-        className="floating-node" // La línea ahora flota con el mismo ritmo que el nodo
-        style={{ animationDelay: `${i * -0.8}s`, // Mismo factor que el nodo
-    animationDuration: `${5 + (i % 3)}s`}} // Desfase rítmico
-      />
-    );
-  })}
-</svg>
-
-              <div style={mapStyles.mainNode}>{tituloCentral}</div>
+              <div style={{
+                ...mapStyles.mainNode,
+                width: esMovil ? '100px' : '150px',
+                height: esMovil ? '100px' : '150px',
+                fontSize: esMovil ? '0.7rem' : '0.9rem',
+                zIndex: 5
+              }}>{tituloCentral}</div>
 
               {nodosAMostrar.map((n, i) => {
                 const totalNodos = nodosAMostrar.length;
-                const radioBase = 260;
-                const incrementoPorNodo = totalNodos > 12 ? (i * 5) : 0;
-                const radioFinal = radioBase + incrementoPorNodo;
-
+                const radioBase = esMovil ? 130 : 260;
+                const radioFinal = radioBase + (totalNodos > 12 ? (i * 3) : 0);
                 const angle = (i * (360 / totalNodos)) * (Math.PI / 180);
                 const x = Math.cos(angle) * radioFinal;
                 const y = Math.sin(angle) * radioFinal;
+                const size = esMovil ? 85 : 110;
+                const offset = size / 2;
+
                 let estaVisto = false;
-
-  if (n.type === 'parte') {
-    // Si es un video individual, check normal
-    estaVisto = vistos?.includes(n.id);
-  } 
-  else if (n.type === 'volumen') {
-    // Si es un volumen, verificamos si TODAS sus partes están en vistos
-    const partesDelVolumen = n.raw?.partes || [];
-    estaVisto = partesDelVolumen.length > 0 && 
-                partesDelVolumen.every(p => vistos?.includes(p.id));
-  }
-  else if (n.type === 'curso') {
-    // Opcional: Si quieres que el curso también brille en verde al terminarlo todo
-    const cursoData = DB_INSTRUCCIONALES[n.id];
-    const todasLasPartesDelCurso = cursoData?.volumenes.flatMap(v => v.partes) || [];
-    estaVisto = todasLasPartesDelCurso.length > 0 && 
-                todasLasPartesDelCurso.every(p => vistos?.includes(p.id));
-  }
-
+                if (n.type === 'parte') estaVisto = vistos?.includes(n.id);
+                else if (n.type === 'volumen') estaVisto = n.raw?.partes?.every(p => vistos?.includes(p.id));
 
                 return (
-                  <div
-                    key={i}
-                    onClick={() => handleNodeClick(n)}
-                    className="floating-node"
+                  <div key={i} onClick={() => handleNodeClick(n)} className="floating-node"
                     style={{
                       ...mapStyles.subNodeFloating, 
-                      left: `calc(50% + ${x}px - 55px)`,
-                      top: `calc(50% + ${y}px - 55px)`,
-                      // --- EFECTO DE ESCALA Y RELEVANCIA ---
-                      transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)', // Animación fluida
-                      cursor: 'pointer',
-                      zIndex: 1, // Para que al agrandarse quede por encima de los demás
-                      animationDelay: `${i * -0.8}s`, // IGUAL AL DE LA LÍNEA
+                      width: `${size}px`,
+                      height: `${size}px`,
+                      fontSize: esMovil ? '0.55rem' : '0.75rem',
+                      left: `calc(50% + ${x}px - ${offset}px)`,
+                      top: `calc(50% + ${y}px - ${offset}px)`,
+                      animationDelay: `${i * -0.8}s`,
                       animationDuration: `${5 + (i % 3)}s`,
                       borderColor: estaVisto ? '#4CAF50' : '#d4af37',
                       color: estaVisto ? '#4CAF50' : '#fff',
-                      backgroundColor: estaVisto ? 'rgba(76, 175, 80, 0.1)' : '#111',
-                      boxShadow: estaVisto ? '0 0 15px rgba(76, 175, 80, 0.3)' : 'none'
-                    }}
-                    // Eventos para cambiar la escala manualmente con el cursor
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'scale(1.5)';
-                      e.currentTarget.style.zIndex = '10';
-                      e.currentTarget.style.boxShadow = '0 0 20px rgba(212, 175, 55, 0.6)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'scale(1)';
-                      e.currentTarget.style.zIndex = '1';
-                      e.currentTarget.style.boxShadow = estaVisto ? '0 0 15px rgba(76, 175, 80, 0.3)' : 'none';
                     }}
                   >
                     {estaVisto ? '✅ ' : ''}{n.nombre}
