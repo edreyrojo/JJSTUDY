@@ -2498,81 +2498,64 @@ const MapaPage = ({
   volSel, setVolSel,
   vistos = []
 }) => {
-  // 2. ESTADOS
+  // 1. ESTADOS
   const [terminoBusqueda, setTerminoBusqueda] = React.useState("");
   const [esMovil, setEsMovil] = React.useState(window.innerWidth < 768);
 
-  // 3. EFECTOS
+  // 2. EFECTOS
   React.useEffect(() => {
     const handleResize = () => setEsMovil(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 4. EL CAZADOR DE TÉCNICAS (todasLasTecnicas)
-  // Debe ir ANTES de resultadosBusqueda y de la lógica de nodos
+  // 3. EL CAZADOR DE TÉCNICAS (Primero declaramos la variable)
   const todasLasTecnicas = React.useMemo(() => {
     return Object.keys(DB_INSTRUCCIONALES).flatMap(cursoKey =>
       DB_INSTRUCCIONALES[cursoKey].volumenes.flatMap(vol =>
         vol.partes.map(parte => {
-          let sub = parte.subcategoria;
-          const nombreMin = parte.nombre.toLowerCase();
+          let sub = parte.subcategoria || "";
+          const n = parte.nombre.toLowerCase();
+          const cursoNom = cursoKey.toLowerCase();
           
-          // Auto-etiquetado inteligente
-          if (!sub) {const n = parte.nombre.toLowerCase();
-  const cursoNom = cursoKey.toLowerCase();
+          if (!sub) {
+            const esCursoDefensa = cursoNom.includes('pillars') || cursoNom.includes('escapes') || cursoNom.includes('retention');
 
-  // REGLA PARA DERRIBOS (Nivel 1)
-  if (
-    n.includes('takedown') || 
-    n.includes('take down') || 
-    n.includes('throw') || 
-    n.includes('sweep') && n.includes('standing') || // Sweeps de pie
-    n.includes('derribo') || 
-    n.includes('proyeccion') ||
-    cursoNom.includes('feet to floor') // Todo lo de este curso es derribo
-  ) {
-    // Aquí podrías decidir si mandarlo a una subcategoría (ej. DERRIBOS DE PIE)
-    // o simplemente marcarlo para que el buscador de categorías lo encuentre.
-    sub = "DERRIBOS"; 
-  }
-            if (nombreMin.includes('side control') || nombreMin.includes('lateral') || nombreMin.includes('100 kilos')) {
-              sub = "CONTROL LATERAL";
-            } else if (nombreMin.includes('half guard') || nombreMin.includes('media guardia')) {
-              sub = "MEDIA GUARDIA";
-            } else if (nombreMin.includes('closed guard') || nombreMin.includes('guardia cerrada')) {
-              sub = "GUARDIA CERRADA";
-            } else if (nombreMin.includes('mount') || nombreMin.includes('montada')) {
-              sub = "MONTADA";
-            } else if (nombreMin.includes('back') || nombreMin.includes('espalda')) {
-              sub = "ESPALDA";
-            } else if (nombreMin.includes('pass') || nombreMin.includes('pases')) {
-              sub = "PASES";
-            } else if (nombreMin.includes('open guard') || nombreMin.includes('guardia abierta')) {
-              sub = "GUARDIA ABIERTA";
-            } else if (nombreMin.includes('north south') || nombreMin.includes('norte sur')) {
-              sub = "NORTE-SUR";
-            } else if (nombreMin.includes('back defense') || nombreMin.includes('defensa de espalda')) {
-              sub = "DEFENSA ESPALDA";
-            } else if (nombreMin.includes('pass') || nombreMin.includes('pases')) {
-              sub = "PASES";
-            } else if (nombreMin.includes('takedown, take down') || nombreMin.includes('derribo')) {
+            // --- FILTRO DE DEFENSAS ---
+            if (n.includes('escape') || n.includes('defensa') || n.includes('defense') || n.includes('counter') || esCursoDefensa) {
+              if (n.includes('mount') || n.includes('montada')) sub = "ESCAPES MONTADA";
+              else if (n.includes('side') || n.includes('lateral')) sub = "ESCAPES LATERAL";
+              else if (n.includes('back') || n.includes('espalda')) sub = "DEFENSA ESPALDA";
+              else if (n.includes('leg lock') || n.includes('heel hook')) sub = "DEFENSA LEG LOCKS";
+              else if (n.includes('triang')) sub = "DEFENSA TRIANGULO";
+              else if (n.includes('arm bar') || n.includes('armbar') || n.includes('joint lock') || n.includes('armlock')) sub = "DEFENSA ARM BAR";
+              else if (n.includes('darce') || n.includes('guillotine') || n.includes('choke')) sub = "DEFENSA STRANGLES";
+              else sub = "RE-GUARDIA"; 
+            } 
+            // --- FILTRO DE DERRIBOS ---
+            else if (n.includes('takedown') || n.includes('take down') || n.includes('standing') || n.includes('derribo') || cursoNom.includes('feet to floor')) {
               sub = "DERRIBOS";
             }
+            // --- POSICIONES ---
+            else if (n.includes('side control') || n.includes('lateral') || n.includes('100 kilos')) sub = "CONTROL LATERAL";
+            else if (n.includes('half guard') || n.includes('media guardia')) sub = "MEDIA GUARDIA";
+            else if (n.includes('closed guard') || n.includes('guardia cerrada')) sub = "GUARDIA CERRADA";
+            else if (n.includes('mount') || n.includes('montada')) sub = "MONTADA";
+            else if (n.includes('back') || n.includes('espalda')) sub = "ESPALDA";
+            else if (n.includes('north south') || n.includes('norte sur')) sub = "NORTE-SUR";
           }
 
-          return {
-            ...parte,
-            subcategoria: sub,
-            curso: cursoKey,
-            volNombre: vol.nombre
-          };
+          return { ...parte, subcategoria: sub, curso: cursoKey, volNombre: vol.nombre };
         })
       )
     );
-  }, []); // Solo se calcula una vez
+  }, []);
 
-  // 5. RESULTADOS DE BÚSQUEDA (Depende de todasLasTecnicas)
+  // 4. CHEQUEO DE CONSOLA (Ahora sí, después de definir la variable)
+  const chequeoArmBar = todasLasTecnicas.filter(t => t.subcategoria === "DEFENSA ARM BAR");
+  console.log("Videos en DEFENSA ARM BAR encontrados:", chequeoArmBar.length);
+
+  // 5. RESULTADOS DE BÚSQUEDA
   const resultadosBusqueda = terminoBusqueda
     ? todasLasTecnicas.filter(t => t.nombre.toLowerCase().includes(terminoBusqueda.toLowerCase())).slice(0, 10)
     : [];
@@ -2582,58 +2565,41 @@ const MapaPage = ({
   let tituloCentral = "";
 
   if (volSel) {
-  nodosAMostrar = volSel?.partes?.map(p => ({ nombre: p.nombre, type: 'parte', id: p.id })) || [];
-  tituloCentral = volSel?.nombre || "";
-  
-} else if (instrSel) {
-  const cursoData = DB_INSTRUCCIONALES[instrSel];
-  nodosAMostrar = cursoData?.volumenes?.map(v => ({ nombre: v.nombre, type: 'volumen', raw: v })) || [];
-  tituloCentral = instrSel;
+    nodosAMostrar = volSel?.partes?.map(p => ({ nombre: p.nombre, type: 'parte', id: p.id })) || [];
+    tituloCentral = volSel?.nombre || "";
+  } else if (instrSel) {
+    const cursoData = DB_INSTRUCCIONALES[instrSel];
+    nodosAMostrar = cursoData?.volumenes?.map(v => ({ nombre: v.nombre, type: 'volumen', raw: v })) || [];
+    tituloCentral = instrSel;
+  } else if (autorSel) {
+    nodosAMostrar = Object.keys(DB_INSTRUCCIONALES).filter(key => DB_INSTRUCCIONALES[key].autor === autorSel).map(key => ({ nombre: key, id: key, type: 'curso' }));
+    tituloCentral = autorSel;
+  } else if (categoriaSel) {
+    tituloCentral = categoriaSel;
 
-} else if (autorSel) {
-  nodosAMostrar = Object.keys(DB_INSTRUCCIONALES)
-    .filter(key => DB_INSTRUCCIONALES[key].autor === autorSel)
-    .map(key => ({ nombre: key, id: key, type: 'curso' }));
-  tituloCentral = autorSel;
-  
-} else if (categoriaSel) {
-  tituloCentral = categoriaSel;
-
-  // CASO 1: Menús de Nivel 1 que abren Subcategorías (Posiciones y Defensas)
-  if (categoriaSel === 'POSICIÓN' || categoriaSel === 'DEFENSAS') {
-    const lista = categoriaSel === 'POSICIÓN' ? SUB_POSICIONES : SUB_DEFENSAS;
-    nodosAMostrar = lista.map(item => ({ nombre: item, type: 'subcategoria' }));
-  } 
-  
-  // CASO 2: Visualización de Técnicas por Subcategoría (Media Guardia, Espalda, etc.)
-  else if (SUB_POSICIONES.includes(categoriaSel) || SUB_DEFENSAS.includes(categoriaSel)) {
-    nodosAMostrar = todasLasTecnicas
-      .filter(t => t.subcategoria === categoriaSel)
-      .map(t => ({ nombre: t.nombre, id: t.id, type: 'parte' }));
+    if (categoriaSel === 'POSICIÓN' || categoriaSel === 'DEFENSAS') {
+      const lista = categoriaSel === 'POSICIÓN' ? SUB_POSICIONES : SUB_DEFENSAS;
+      nodosAMostrar = lista.map(item => ({ nombre: item, type: 'subcategoria' }));
+    } 
+    else if (SUB_POSICIONES.includes(categoriaSel) || SUB_DEFENSAS.includes(categoriaSel)) {
+      // FILTRO CRÍTICO: Usamos trim() para limpiar espacios
+      nodosAMostrar = todasLasTecnicas
+        .filter(t => t.subcategoria.trim() === categoriaSel.trim())
+        .map(t => ({ nombre: t.nombre, id: t.id, type: 'parte' }));
+    }
+    else if (categoriaSel === 'DERRIBOS') {
+      nodosAMostrar = todasLasTecnicas.filter(t => t.subcategoria === "DERRIBOS").map(t => ({ nombre: t.nombre, id: t.id, type: 'parte' }));
+    }
+    else if (categoriaSel === 'AUTORES') {
+      const autores = ['Craig Jones', 'Eddie Bravo', 'John Danaher', 'Levi Jones-Leary', 'Bernardo Faria', 'Bruno Malfacine', 'Josef Chen', 'Paulo Marmund', 'Gordon Ryan'];
+      nodosAMostrar = autores.map(a => ({ nombre: a, type: 'autor' }));
+    } else {
+      const cursosFiltrados = Object.keys(DB_INSTRUCCIONALES).filter(key => DB_INSTRUCCIONALES[key].categorias?.includes(categoriaSel));
+      nodosAMostrar = cursosFiltrados.map(key => ({ id: key, nombre: DB_INSTRUCCIONALES[key].titulo, type: 'curso' }));
+    } 
   }
 
-  // CASO 3: DERRIBOS (Escaneo directo de videos etiquetados como DERRIBOS)
-  else if (categoriaSel === 'DERRIBOS') {
-    nodosAMostrar = todasLasTecnicas
-      .filter(t => t.subcategoria === "DERRIBOS")
-      .map(t => ({ nombre: t.nombre, id: t.id, type: 'parte' }));
-  }
-
-  // CASO 4: Menú de Autores
-  else if (categoriaSel === 'AUTORES') {
-    const autores = ['Craig Jones', 'Eddie Bravo', 'John Danaher', 'Levi Jones-Leary', 'Bernardo Faria', 'Bruno Malfacine', 'Josef Chen', 'Paulo Marmund', 'Gordon Ryan'];
-    nodosAMostrar = autores.map(a => ({ nombre: a, type: 'autor' }));
-  } 
-
-  // CASO 5: Otras categorías (Cursos completos que tengan la categoría asignada)
-  else {
-    const cursosFiltrados = Object.keys(DB_INSTRUCCIONALES)
-      .filter(key => DB_INSTRUCCIONALES[key].categorias?.includes(categoriaSel));
-    nodosAMostrar = cursosFiltrados.map(key => ({ id: key, nombre: DB_INSTRUCCIONALES[key].titulo, type: 'curso' }));
-  } 
-}
-  
-
+  // ... (Siguen handleNodeClick, irAtras y el return del Aside/Main igual que antes)
   // 7. FUNCIONES DE INTERACCIÓN
   const handleNodeClick = (nodo) => {
     if (nodo.type === 'subcategoria') setCategoriaSel(nodo.nombre);
