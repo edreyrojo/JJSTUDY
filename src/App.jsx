@@ -2817,35 +2817,67 @@ const MapaPage = ({
   );
 };
 const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos = [], toggleVisto }) => {
-  const [nota, setNota] = useState("");
+  // 1. Inicializamos vacío
+const [nota, setNota] = useState("");
 
+// 2. Carga forzada desde la Nube
 React.useEffect(() => {
-  if (!video?.id) return;
-  
-  // 1. Primero intentamos cargar de Firebase si hay usuario
-  const cargarNotasSincronizadas = async () => {
-    let notaFinal = "";
+  const cargarDesdeNube = async () => {
+    // Si no hay video o no hay usuario, no hacemos nada
+    if (!video?.id) return;
     
-    // Prioridad 1: Firebase
+    console.log("Iniciando búsqueda de nota para video:", video.id);
+
+    // Esperamos un momento a que Firebase confirme el usuario si acaba de loguearse
     if (auth.currentUser) {
-      const userRef = doc(db, "usuarios", auth.currentUser.uid);
-      const docSnap = await getDoc(userRef);
-      if (docSnap.exists() && docSnap.data().notas?.[video.id]) {
-        notaFinal = docSnap.data().notas[video.id];
+      try {
+        const userRef = doc(db, "usuarios", auth.currentUser.uid);
+        const docSnap = await getDoc(userRef);
+
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          console.log("Documento de usuario encontrado en Firestore");
+
+          // IMPORTANTE: Verifica si tus notas están dentro de un objeto 'notas'
+          if (data.notas && data.notas[video.id]) {
+            const notaNube = data.notas[video.id];
+            console.log("¡Nota encontrada en la nube!");
+            setNota(notaNube);
+            
+            // Sincronizamos el LocalStorage para el futuro
+            localStorage.setItem(`nota_${video.titulo}`, JSON.stringify({
+              texto: notaNube,
+              videoId: video.id,
+              fecha: new Date().toISOString()
+            }));
+            return; // Salimos porque ya encontramos la nota
+          } else {
+            console.log("El documento existe pero no tiene nota para este ID de video.");
+          }
+        } else {
+          console.warn("No existe el documento del usuario en la colección 'usuarios'");
+        }
+      } catch (error) {
+        console.error("Error crítico al leer Firestore:", error);
+      }
+    } else {
+      console.log("No hay usuario autenticado detectado todavía.");
+    }
+
+    // Si llegamos aquí y no hay nota de la nube, buscamos en local como respaldo
+    const localRaw = localStorage.getItem(`nota_${video?.titulo}`);
+    if (localRaw) {
+      try {
+        const parsed = JSON.parse(localRaw);
+        setNota(parsed.texto || "");
+      } catch (e) {
+        setNota(localRaw);
       }
     }
-    
-    // Prioridad 2: Si no hubo nada en Firebase, buscamos en LocalStorage
-    if (!notaFinal) {
-      const notasLocales = JSON.parse(localStorage.getItem('lafortuna_notas') || '{}');
-      notaFinal = notasLocales[video.id] || "";
-    }
-    
-    setNota(notaFinal);
   };
 
-  cargarNotasSincronizadas();
-}, [video?.id]);
+  cargarDesdeNube();
+}, [video?.id, auth.currentUser]); // Se dispara al cambiar video o al detectar usuario
 
   const [timestamp, setTimestamp] = useState("");
   const [tiempoActivo, setTiempoActivo] = useState("");
