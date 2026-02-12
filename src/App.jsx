@@ -2416,85 +2416,152 @@ const getAdjacentVideo = (currentVideo, direction) => {
 
 const LoginPage = ({ 
   onLogin, onRegister, 
-  email, setEmail, 
-  password, setPassword, 
-  nombreCompleto, setNombreCompleto,
+  email = "", setEmail, 
+  password = "", setPassword, 
+  nombreCompleto = "", setNombreCompleto,
   error 
 }) => {
   const [esRegistro, setEsRegistro] = React.useState(false);
 
+  // Verificación defensiva: si las funciones no llegan, lanzamos aviso en consola
+  if (!setPassword || !setEmail) {
+    console.error("ERROR: LoginPage no recibió las funciones setPassword o setEmail desde App.jsx");
+  }
+
   return (
-    <div style={{...styles.containerCenter, background: 'radial-gradient(circle, #1a1a1a 0%, #000 100%)',
-      padding: '20px', // Espacio de seguridad para que no toque los bordes del cel
+    <div style={{
+      ...styles.containerCenter, 
+      background: 'radial-gradient(circle, #1a1a1a 0%, #000 100%)',
+      padding: '20px', 
       boxSizing: 'border-box',
-      minHeight: '100vh'}}>
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      alignItems: 'center'
+    }}>
+      
+      {/* HEADER LOGO */}
       <div style={{ marginBottom: '30px', textAlign: 'center', width: '100%' }}>
          <h1 style={{
            ...styles.goldTitle, 
-           fontSize: 'clamp(2rem, 8vw, 3rem)', // Se ajusta según el ancho de pantalla
+           fontSize: 'clamp(2rem, 8vw, 3rem)', 
            letterSpacing: '5px',
            margin: '0'
          }}>LA FORTUNA</h1>
-         <p style={{color: '#d4af37', fontSize: '0.8rem', marginTop: '-10px'}}>BRAZILIAN JIU JITSU VAULT</p>
+         <p style={{color: '#d4af37', fontSize: '0.8rem', marginTop: '-10px', letterSpacing: '2px'}}>
+           BRAZILIAN JIU JITSU VAULT
+         </p>
       </div>
 
-      <div style={{...styles.card, width: '380px', border: '1px solid #d4af37',padding: '25px',
-        boxSizing: 'border-box'}}>
-        <h2 style={{color: '#fff', fontSize: '1.2rem', marginBottom: '20px'}}>
+      {/* CARD DE LOGIN */}
+      <div style={{
+        ...styles.card, 
+        width: '100%',
+        maxWidth: '380px', // Limita el ancho en PC
+        border: '1px solid #d4af37',
+        padding: '25px',
+        boxSizing: 'border-box',
+        backgroundColor: 'rgba(10, 10, 10, 0.9)',
+        borderRadius: '10px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
+      }}>
+        
+        <h2 style={{color: '#fff', fontSize: '1.2rem', marginBottom: '20px', textAlign: 'center'}}>
           {esRegistro ? 'SOLICITAR ACCESO' : 'INICIAR SESIÓN'}
         </h2>
 
-        {error && <p style={{color: '#ff4444', fontSize: '0.8rem'}}>{error}</p>}
+        {error && (
+          <p style={{
+            color: '#ff4444', 
+            fontSize: '0.8rem', 
+            backgroundColor: 'rgba(255, 68, 68, 0.1)', 
+            padding: '10px', 
+            borderRadius: '5px',
+            textAlign: 'center'
+          }}>
+            {error}
+          </p>
+        )}
 
+        {/* INPUT NOMBRE (SOLO REGISTRO) */}
         {esRegistro && (
           <input 
             type="text" 
             placeholder="Nombre completo" 
-            style={styles.input} 
+            style={{...styles.input, width: '100%', marginBottom: '15px'}} 
             value={nombreCompleto}
             onChange={(e) => setNombreCompleto(e.target.value)}
           />
         )}
 
+        {/* INPUT EMAIL */}
         <input 
-  type="text" 
-  placeholder="Email" 
-  style={{ 
-    ...styles.input, 
-    maxWidth: '320px',  // Aquí controlas el largo
-    margin: '10px auto', // Las separa y las centra
-    display: 'block'    // Asegura el centrado horizontal
-  }} 
-  value={email}
-  onChange={(e) => setEmail(e.target.value)}
-/>
+          type="email" // Usar "email" ayuda al teclado del cel a mostrar el "@"
+          placeholder="Email" 
+          style={{ 
+            ...styles.input, 
+            width: '100%',
+            maxWidth: '320px', 
+            margin: '10px auto', 
+            display: 'block' 
+          }} 
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
 
-<input 
-  type="password" 
-  placeholder="Contraseña" 
-  style={{ 
-    ...styles.input, 
-    maxWidth: '320px',  // Mantener el mismo largo para consistencia
-    margin: '10px auto', 
-    display: 'block' 
-  }} 
-  value={password}
-  onChange={(e) => setPassword(e.target.value)}
-/>
-<div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '10px 0' }}>
-  <input type="checkbox" id="recordar" defaultChecked style={{ accentColor: '#d4af37' }} />
-  <label htmlFor="recordar" style={{ color: '#666', fontSize: '0.75rem' }}>Mantener sesión iniciada</label>
-</div>
+        {/* INPUT PASSWORD */}
+        <input 
+          type="password" 
+          placeholder="Contraseña" 
+          style={{ 
+            ...styles.input, 
+            width: '100%',
+            maxWidth: '320px', 
+            margin: '10px auto', 
+            display: 'block' 
+          }} 
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+
+        {/* CHECKBOX */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '15px auto', maxWidth: '320px' }}>
+          <input type="checkbox" id="recordar" defaultChecked style={{ accentColor: '#d4af37' }} />
+          <label htmlFor="recordar" style={{ color: '#666', fontSize: '0.75rem', cursor: 'pointer' }}>
+            Mantener sesión iniciada
+          </label>
+        </div>
+
+        {/* BOTÓN PRINCIPAL */}
         <button 
-          style={{...styles.btnGold, marginTop: '10px'}} 
+          style={{
+            ...styles.btnGold, 
+            width: '100%', 
+            maxWidth: '320px', 
+            display: 'block', 
+            margin: '20px auto 10px auto',
+            padding: '12px'
+          }} 
           onClick={esRegistro ? onRegister : onLogin}
         >
           {esRegistro ? 'ENVIAR SOLICITUD' : 'ENTRAR'}
         </button>
 
+        {/* LINK CAMBIO MODO */}
         <button 
           onClick={() => setEsRegistro(!esRegistro)}
-          style={{ background: 'none', border: 'none', color: '#666', fontSize: '0.8rem', cursor: 'pointer', marginTop: '15px' }}
+          style={{ 
+            background: 'none', 
+            border: 'none', 
+            color: '#666', 
+            fontSize: '0.8rem', 
+            cursor: 'pointer', 
+            marginTop: '15px',
+            width: '100%',
+            textAlign: 'center',
+            textDecoration: 'underline'
+          }}
         >
           {esRegistro ? '¿Ya tienes cuenta? Entra' : '¿Eres nuevo? Solicita acceso'}
         </button>
@@ -3289,8 +3356,11 @@ const NotasHubPage = ({ onBack, onNavigateToVideo }) => {
 
 // --- 4. COMPONENTE PRINCIPAL (EXPORT DEFAULT) ---
 export default function App() {
+  // --- 1. ESTADOS ---
+  const [usuario, setUsuario] = React.useState(null);
+  const [cargando, setCargando] = React.useState(true);
   const [page, setPage] = useState('login');
-  const [userRole, setUserRole] = useState('usuario'); // Por defecto usuario hasta que loguee
+  const [userRole, setUserRole] = useState('usuario');
   const [categoriaSel, setCategoriaSel] = useState('DEFENSAS');
   const [autorSel, setAutorSel] = useState(null);
   const [instrSel, setInstrSel] = useState(null);
@@ -3307,76 +3377,49 @@ export default function App() {
     const guardado = localStorage.getItem('lafortuna_last_video');
     return guardado ? JSON.parse(guardado) : null;
   });
-  const [usuario, setUsuario] = useState(null);
+
+  // --- 2. EFECTO DE AUTENTICACIÓN ---
   React.useEffect(() => {
-  const unsub = onAuthStateChanged(auth, async (user) => {
-    if (user) {
-      // FORZAMOS LA CARGA DE FIRESTORE
-      const docRef = doc(db, "usuarios", user.uid);
-      const docSnap = await getDoc(docRef);
-      
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setUsuario({ ...user, ...data }); // Esto pasa el usuario con sus notas a toda la app
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      setCargando(true);
+      if (user) {
+        const docRef = doc(db, "usuarios", user.uid);
+        const docSnap = await getDoc(docRef);
         
-        // Sincronizamos el almacén local global
-        if (data.notas) {
-          localStorage.setItem('lafortuna_notas', JSON.stringify(data.notas));
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setUsuario({ ...user, ...data });
+          setUserRole(data.rol || 'usuario');
+          if (data.vistos) setVistos(data.vistos);
+          if (data.notas) {
+            localStorage.setItem('lafortuna_notas', JSON.stringify(data.notas));
+          }
+          // Si el usuario ya está validado, mandarlo al Hub al refrescar
+          if (data.validado) setPage('hub');
+        } else {
+          setUsuario(user);
         }
       } else {
-        setUsuario(user);
+        setUsuario(null);
+        setPage('login');
       }
-    } else {
-      setUsuario(null);
-    }
-  });
-  return () => unsub();
-}, []);
-  const cargarDatosDesdeFirebase = async (uid) => {
-    try {
-      const userDoc = await getDoc(doc(db, "usuarios", uid));
-      if (userDoc.exists()) {
-        const data = userDoc.data();
-        if (data.vistos) {
-          setVistos(data.vistos); // Ahora sí funcionará
-        }
-      }
-    } catch (error) {
-      console.error("Error cargando datos:", error);
-    }
+      setCargando(false);
+    });
+    return () => unsub();
+  }, []);
+
+  // --- 3. FUNCIONES DE LÓGICA ---
+  const handleLogout = () => {
+    auth.signOut();
+    setUsuario(null);
+    setPage('login');
   };
-
-  const toggleVisto = async (id) => {
-  if (!id) return;
-  
-  const nuevaLista = vistos.includes(id)
-    ? vistos.filter(v => v !== id)
-    : [...vistos, id];
-    
-  // 1. Actualizamos interfaz de inmediato
-  setVistos(nuevaLista);
-  localStorage.setItem('lafortuna_vistos', JSON.stringify(nuevaLista));
-
-  // 2. Guardamos en Firebase para que te siga a otros dispositivos
-  if (auth.currentUser) {
-    try {
-      const userRef = doc(db, "usuarios", auth.currentUser.uid);
-      await updateDoc(userRef, { vistos: nuevaLista });
-    } catch (error) {
-      console.error("Error sincronizando vistos:", error);
-    }
-  }
-};
-
-  // --- 1. LAS FUNCIONES QUE FALTABAN (LOGICA FIREBASE) ---
 
   const handleRegister = async () => {
     try {
       setError('');
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-
-      // REGLA DE ADMIN PARA ZAMNA
       const isAdmin = email === "zamna.ed@gmail.com"; 
 
       await setDoc(doc(db, "usuarios", user.uid), {
@@ -3384,158 +3427,150 @@ export default function App() {
         email: user.email,
         nombre: nombreCompleto,
         rol: isAdmin ? 'admin' : 'usuario',
-        validado: isAdmin ? true : false,
+        validado: isAdmin,
         fechaRegistro: new Date().toISOString()
       });
 
-      alert(isAdmin ? "¡Bienvenido, Zamna! Cuenta de Admin lista." : "Solicitud enviada. Espera validación.");
+      alert(isAdmin ? "¡Bienvenido, Admin!" : "Solicitud enviada. Espera validación.");
       setPage('login');
-    } catch (err) {
-      setError("Error al registrar: " + err.message);
+    } catch (err) { setError("Error al registrar: " + err.message); }
+  };
+
+  const handleLogin = async () => {
+    try {
+      setError('');
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      const userDoc = await getDoc(doc(db, "usuarios", user.uid));
+      
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        if (data.validado) {
+          setUserRole(data.rol);
+          setVistos(data.vistos || []);
+          setPage('hub');
+        } else {
+          alert("Tu cuenta aún no ha sido validada.");
+          auth.signOut();
+        }
+      }
+    } catch (err) { setError("Credenciales incorrectas."); }
+  };
+
+  const toggleVisto = async (id) => {
+    if (!id) return;
+    const nuevaLista = vistos.includes(id) ? vistos.filter(v => v !== id) : [...vistos, id];
+    setVistos(nuevaLista);
+    localStorage.setItem('lafortuna_vistos', JSON.stringify(nuevaLista));
+
+    if (auth.currentUser) {
+      try {
+        const userRef = doc(db, "usuarios", auth.currentUser.uid);
+        await updateDoc(userRef, { vistos: nuevaLista });
+      } catch (error) { console.error("Error sincronizando vistos:", error); }
     }
   };
 
- const handleLogin = async () => {
-  try {
-    setError('');
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
-    const userDoc = await getDoc(doc(db, "usuarios", user.uid));
-    
-    if (userDoc.exists()) {
-      const data = userDoc.data();
-      if (data.validado) {
-        setUserRole(data.rol);
-        
-        // --- NUEVO: Cargamos su progreso de la nube ---
-        await cargarDatosDesdeFirebase(user.uid);
-        
-        setPage('hub');
-      } else {
-        alert("Tu cuenta aún no ha sido validada.");
-        auth.signOut();
-      }
+  // --- 4. RENDERIZADO DE PÁGINAS ---
+  // Extraemos la lógica de qué página mostrar
+  const getContent = () => {
+    // Si no hay usuario, forzamos Login sin importar el estado 'page'
+    if (!usuario) {
+      return (
+        <LoginPage 
+          email={email} setEmail={setEmail} 
+          password={password} setPassword={setPassword} 
+          nombreCompleto={nombreCompleto} setNombreCompleto={setNombreCompleto}
+          onLogin={handleLogin} onRegister={handleRegister} error={error}
+        />
+      );
     }
-  } catch (err) {
-    setError("Credenciales incorrectas.");
-  }
-};
-  // --- 2. RENDERIZADO DE PÁGINAS ---
 
-  const renderPage = () => {
+    // Si hay usuario, navegamos según 'page'
     switch (page) {
-      case 'login':
-        return (
-          <LoginPage 
-            email={email} setEmail={setEmail} 
-            password={password} setPassword={setPassword} 
-            nombreCompleto={nombreCompleto} setNombreCompleto={setNombreCompleto}
-            onLogin={handleLogin} 
-            onRegister={handleRegister} 
-            error={error}
-          />
-        );
-
       case 'hub':
-  return (
-    <HubPage 
-      onNavigate={setPage} 
-      onContinue={() => setPage('estudio')} 
-      hasSession={!!videoActual} 
-      userRole={userRole}
-      onLogout={handleLogout} // <--- PASAMOS LA FUNCIÓN AQUÍ
-    />
-  );
+        return <HubPage onNavigate={setPage} onContinue={() => setPage('estudio')} 
+                hasSession={!!videoActual} userRole={userRole} onLogout={handleLogout} />;
       case 'mapa':
-        return (
-          <MapaPage
-            onBack={() => setPage('hub')}
-            categoriaSel={categoriaSel} setCategoriaSel={setCategoriaSel}
-            autorSel={autorSel} setAutorSel={setAutorSel}
-            instrSel={instrSel} setInstrSel={setInstrSel}
-            volSel={volSel} setVolSel={setVolSel}
-            vistos={vistos}
-            onSelectVideo={(v) => {
-              setVideoActual(v);
-              localStorage.setItem('lafortuna_last_video', JSON.stringify(v));
-              setPage('estudio');
-            }}
-            onNavigateToNotes={() => setPage('notas_hub')}
-            onContinue={() => setPage('estudio')}
-            hasSession={!!videoActual}
-          />
-        );
-
+        return <MapaPage onBack={() => setPage('hub')} vistos={vistos}
+                categoriaSel={categoriaSel} setCategoriaSel={setCategoriaSel}
+                autorSel={autorSel} setAutorSel={setAutorSel}
+                instrSel={instrSel} setInstrSel={setInstrSel}
+                volSel={volSel} setVolSel={setVolSel}
+                onSelectVideo={(v) => { setVideoActual(v); localStorage.setItem('lafortuna_last_video', JSON.stringify(v)); setPage('estudio'); }}
+                onNavigateToNotes={() => setPage('notas_hub')} onContinue={() => setPage('estudio')} hasSession={!!videoActual} />;
       case 'estudio':
-        return (
-          <EstudioPage
-            video={videoActual}
-            onBack={() => setPage('mapa')}
-            vistos={vistos}
-            toggleVisto={toggleVisto}
-            onNavigateToNotes={() => setPage('notas_hub')}
-            onSelectVideo={(v) => {
-              setVideoActual(v);
-              localStorage.setItem('lafortuna_last_video', JSON.stringify(v));
-            }}
-          />
-        );
-
+        return <EstudioPage video={videoActual} onBack={() => setPage('mapa')} vistos={vistos}
+                toggleVisto={toggleVisto} onNavigateToNotes={() => setPage('notas_hub')}
+                onSelectVideo={(v) => { setVideoActual(v); localStorage.setItem('lafortuna_last_video', JSON.stringify(v)); }} />;
       case 'admin':
         return <AdminPage onBack={() => setPage('hub')} />;
-
       case 'notas_hub':
-        return (
-          <NotasHubPage
-            onBack={() => setPage('hub')}
-            onNavigateToVideo={(v) => {
-              setVideoActual(v);
-              localStorage.setItem('lafortuna_last_video', JSON.stringify(v));
-              setPage('estudio');
-            }}
-          />
-        );
-
+        return <NotasHubPage onBack={() => setPage('hub')} onNavigateToVideo={(v) => { setVideoActual(v); setPage('estudio'); }} />;
       case 'busqueda':
-        return (
-          <BusquedaPage
-            onBack={() => setPage('hub')}
-            onSelectVideo={(v) => {
-              setVideoActual(v);
-              setPage('estudio');
-            }}
-          />
-        );
-
+        return <BusquedaPage onBack={() => setPage('hub')} onSelectVideo={(v) => { setVideoActual(v); setPage('estudio'); }} />;
       default:
-        return <LoginPage onLogin={handleLogin} onRegister={handleRegister} />;
+        return <HubPage onNavigate={setPage} userRole={userRole} onLogout={handleLogout} />;
     }
   };
 
+  // --- 5. RENDER FINAL ---
+  if (cargando) {
+    return (
+      <div style={{ 
+        position: 'fixed', // Cambiamos a fixed para ignorar contenedores padres
+        top: 0, 
+        left: 0, 
+        width: '100vw',    // 100% del ancho del visor
+        height: '100vh',   // 100% del alto del visor
+        backgroundColor: '#000', 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        flexDirection: 'column',
+        zIndex: 9999,       // Asegura que esté por encima de todo
+        margin: 0,
+        padding: 0
+      }}>
+        <div className="spinner"></div>
+        <h2 style={{ 
+          color: '#d4af37', 
+          marginTop: '25px', 
+          fontSize: 'clamp(0.8rem, 2vw, 1.2rem)', // Tamaño fluido
+          letterSpacing: '4px',
+          fontWeight: '300',
+          textAlign: 'center'
+        }}>
+          ACCEDIENDO AL VAULT
+        </h2>
+        
+        <style>{`
+          .spinner { 
+            width: 50px; 
+            height: 50px; 
+            border: 3px solid #1a1a1a; 
+            border-top: 3px solid #d4af37; 
+            border-radius: 50%; 
+            animation: spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite; 
+          }
+          @keyframes spin { 
+            0% { transform: rotate(0deg); } 
+            100% { transform: rotate(360deg); } 
+          }
+        `}</style>
+      </div>
+    );
+  }
+
   return (
-    <div style={{
-      backgroundColor: '#0a0a0a',
-      color: '#fff',
-      minHeight: '100vh',
-      width: '100vw',
-      margin: 0,
-      padding: 0,
-      overflowX: 'hidden',
-      fontFamily: 'sans-serif'
-    }}>
-      <style>
-  {`
-  @keyframes float {
-    0% { transform: translate(0px, 0px); }
-    50% { transform: translate(0px, -15px); } /* Movimiento vertical */
-    100% { transform: translate(0px, 0px); }
-  }
-  .floating-node {
-    animation: float 6s ease-in-out infinite;
-  }
-  `}
-</style>
-      {renderPage()}
+    <div className="App" style={{ backgroundColor: '#0a0a0a', color: '#fff', minHeight: '100vh', width: '100vw', fontFamily: 'sans-serif' }}>
+      <style>{`
+        @keyframes float { 0% { transform: translate(0px, 0px); } 50% { transform: translate(0px, -15px); } 100% { transform: translate(0px, 0px); } }
+        .floating-node { animation: float 6s ease-in-out infinite; }
+      `}</style>
+      
+      {/* Llamamos a la función de contenido aquí */}
+      {getContent()}
     </div>
   );
 }
