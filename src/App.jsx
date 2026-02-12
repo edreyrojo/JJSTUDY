@@ -2438,7 +2438,7 @@ const LoginPage = ({
          <p style={{color: '#d4af37', fontSize: '0.8rem', marginTop: '-10px'}}>BRAZILIAN JIU JITSU VAULT</p>
       </div>
 
-      <div style={{...styles.card, width: '350px', border: '1px solid #d4af37',padding: '25px',
+      <div style={{...styles.card, width: '380px', border: '1px solid #d4af37',padding: '25px',
         boxSizing: 'border-box'}}>
         <h2 style={{color: '#fff', fontSize: '1.2rem', marginBottom: '20px'}}>
           {esRegistro ? 'SOLICITAR ACCESO' : 'INICIAR SESIÓN'}
@@ -2457,20 +2457,30 @@ const LoginPage = ({
         )}
 
         <input 
-          type="text" 
-          placeholder="Email" 
-          style={styles.input} 
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        
-        <input 
-          type="password" 
-          placeholder="Contraseña" 
-          style={styles.input} 
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+  type="text" 
+  placeholder="Email" 
+  style={{ 
+    ...styles.input, 
+    maxWidth: '320px',  // Aquí controlas el largo
+    margin: '10px auto', // Las separa y las centra
+    display: 'block'    // Asegura el centrado horizontal
+  }} 
+  value={email}
+  onChange={(e) => setEmail(e.target.value)}
+/>
+
+<input 
+  type="password" 
+  placeholder="Contraseña" 
+  style={{ 
+    ...styles.input, 
+    maxWidth: '320px',  // Mantener el mismo largo para consistencia
+    margin: '10px auto', 
+    display: 'block' 
+  }} 
+  value={password}
+  onChange={(e) => setPassword(e.target.value)}
+/>
 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '10px 0' }}>
   <input type="checkbox" id="recordar" defaultChecked style={{ accentColor: '#d4af37' }} />
   <label htmlFor="recordar" style={{ color: '#666', fontSize: '0.75rem' }}>Mantener sesión iniciada</label>
@@ -2819,16 +2829,43 @@ const MapaPage = ({
 const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos = [], toggleVisto }) => {
   // 1. Inicializamos vacío
 const [nota, setNota] = useState("");
+const [segundosCorriendo, setSegundosCorriendo] = useState(0);
+const [isCronometroActivo, setIsCronometroActivo] = useState(false);
+
+// Efecto para que el tiempo avance
+React.useEffect(() => {
+  let intervalo;
+  if (isCronometroActivo) {
+    intervalo = setInterval(() => {
+      setSegundosCorriendo(s => s + 1);
+    }, 1000);
+  }
+  return () => clearInterval(intervalo);
+}, [isCronometroActivo]);
+
+// Función para convertir segundos a formato 00:00
+const formatearTiempo = (seg) => {
+  const m = Math.floor(seg / 60).toString().padStart(2, '0');
+  const s = (seg % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+};
+
+const capturarTiempoActual = () => {
+  setTimestamp(formatearTiempo(segundosCorriendo));
+};
 
 // 2. Carga forzada desde la Nube
 React.useEffect(() => {
-  const cargarDesdeNube = async () => {
-    // Si no hay video o no hay usuario, no hacemos nada
+  const cargarNotaSincronizada = async () => {
+    // 1. Validaciones iniciales
     if (!video?.id) return;
     
-    console.log("Iniciando búsqueda de nota para video:", video.id);
+    // Limpiamos la nota actual antes de cargar la nueva para evitar "fantasmas" del video anterior
+    setNota(""); 
 
-    // Esperamos un momento a que Firebase confirme el usuario si acaba de loguearse
+    console.log("Iniciando sincronización para:", video.titulo);
+
+    // 2. INTENTO DE CARGA DESDE CLOUD (Prioridad 1)
     if (auth.currentUser) {
       try {
         const userRef = doc(db, "usuarios", auth.currentUser.uid);
@@ -2836,35 +2873,37 @@ React.useEffect(() => {
 
         if (docSnap.exists()) {
           const data = docSnap.data();
-          console.log("Documento de usuario encontrado en Firestore");
-
-          // IMPORTANTE: Verifica si tus notas están dentro de un objeto 'notas'
+          
+          // Verificamos si existe la nota en el mapa 'notas' de Firestore
           if (data.notas && data.notas[video.id]) {
             const notaNube = data.notas[video.id];
-            console.log("¡Nota encontrada en la nube!");
-            setNota(notaNube);
+            console.log("✅ Nota recuperada desde la nube.");
             
-            // Sincronizamos el LocalStorage para el futuro
+            setNota(notaNube);
+
+            // Sincronizamos LocalStorage para que la PC y el móvil hablen el mismo idioma
             localStorage.setItem(`nota_${video.titulo}`, JSON.stringify({
               texto: notaNube,
               videoId: video.id,
               fecha: new Date().toISOString()
             }));
-            return; // Salimos porque ya encontramos la nota
-          } else {
-            console.log("El documento existe pero no tiene nota para este ID de video.");
+            
+            // También actualizamos el almacén global de notas si lo usas
+            const notasGlobales = JSON.parse(localStorage.getItem('lafortuna_notas') || '{}');
+            notasGlobales[video.id] = notaNube;
+            localStorage.setItem('lafortuna_notas', JSON.stringify(notasGlobales));
+            
+            return; // ÉXITO: Salimos de la función
           }
-        } else {
-          console.warn("No existe el documento del usuario en la colección 'usuarios'");
+          console.log("ℹ️ El documento existe pero no hay nota para este video en la nube.");
         }
       } catch (error) {
-        console.error("Error crítico al leer Firestore:", error);
+        console.error("❌ Error al leer Firestore:", error);
       }
-    } else {
-      console.log("No hay usuario autenticado detectado todavía.");
     }
 
-    // Si llegamos aquí y no hay nota de la nube, buscamos en local como respaldo
+    // 3. RESPALDO LOCAL (Prioridad 2 - Solo si falla la nube o no hay internet)
+    console.log("⚠️ Buscando respaldo en almacenamiento local...");
     const localRaw = localStorage.getItem(`nota_${video?.titulo}`);
     if (localRaw) {
       try {
@@ -2876,8 +2915,8 @@ React.useEffect(() => {
     }
   };
 
-  cargarDesdeNube();
-}, [video?.id, auth.currentUser]); // Se dispara al cambiar video o al detectar usuario
+  cargarNotaSincronizada();
+}, [video?.id, auth.currentUser?.uid]); // Usamos el UID específicamente para mayor precisión // Se dispara al cambiar video o al detectar usuario
 
   const [timestamp, setTimestamp] = useState("");
   const [tiempoActivo, setTiempoActivo] = useState("");
@@ -3020,22 +3059,63 @@ React.useEffect(() => {
           <span style={{ fontSize: '0.6rem', color: '#666' }}>ID: {video?.id?.substring(0,6)}</span>
         </div>
         
-        {/* PANEL DE MARCADORES */}
-        <div style={{ backgroundColor: '#181818', padding: '12px', borderRadius: '8px', marginBottom: '20px', border: '1px solid #222' }}>
-          <input 
-            type="text" placeholder="¿Qué viste? (ej. Escape de cadera)" value={nombreMarcador}
-            onChange={(e) => setNombreMarcador(e.target.value)}
-            style={{ width: '100%', backgroundColor: '#0a0a0a', border: '1px solid #333', color: '#fff', padding: '12px', borderRadius: '5px', fontSize: '0.8rem', marginBottom: '8px', outline: 'none' }}
-          />
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <input 
-              type="text" placeholder="Min:Seg" value={timestamp}
-              onChange={(e) => setTimestamp(e.target.value)}
-              style={{ flex: 1, backgroundColor: '#0a0a0a', border: '1px solid #333', color: '#d4af37', textAlign: 'center', borderRadius: '5px', fontWeight: 'bold' }}
-            />
-            <button onClick={insertarMarcaDeTiempo} style={{ ...styles.btnGold, flex: 1.5, fontSize: '0.75rem', fontWeight: 'bold' }}>+ GUARDAR TIEMPO</button>
-          </div>
-        </div>
+        <div style={{ backgroundColor: '#181818', padding: '15px', borderRadius: '8px', marginBottom: '20px', border: '1px solid #222' }}>
+  
+  {/* FILA 1: Control de Sincronización */}
+  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', alignItems: 'center', backgroundColor: '#000', padding: '8px', borderRadius: '5px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: isCronometroActivo ? '#4CAF50' : '#f44336', boxShadow: isCronometroActivo ? '0 0 5px #4CAF50' : 'none' }}></div>
+      <span style={{ fontSize: '0.8rem', color: '#fff', fontWeight: 'bold', fontFamily: 'monospace' }}>
+        {formatearTiempo(segundosCorriendo)}
+      </span>
+    </div>
+    <div style={{ display: 'flex', gap: '5px' }}>
+       <button 
+        onClick={() => setIsCronometroActivo(!isCronometroActivo)}
+        style={{ backgroundColor: isCronometroActivo ? '#333' : '#d4af37', border: 'none', color: isCronometroActivo ? '#fff' : '#000', fontSize: '0.65rem', padding: '5px 10px', borderRadius: '4px', fontWeight: 'bold' }}
+      >
+        {isCronometroActivo ? 'PAUSAR SYNC' : 'INICIAR SYNC'}
+      </button>
+      <button 
+        onClick={() => { setSegundosCorriendo(0); setIsCronometroActivo(false); }}
+        style={{ background: 'none', border: '1px solid #444', color: '#666', fontSize: '0.65rem', padding: '5px 8px', borderRadius: '4px' }}
+      >
+        RESET
+      </button>
+    </div>
+  </div>
+
+  {/* FILA 2: Nombre de la técnica */}
+  <input 
+    type="text" placeholder="¿Qué viste? (ej. Underhook desde media)" value={nombreMarcador}
+    onChange={(e) => setNombreMarcador(e.target.value)}
+    style={{ width: '100%', backgroundColor: '#0a0a0a', border: '1px solid #333', color: '#fff', padding: '12px', borderRadius: '5px', fontSize: '0.8rem', marginBottom: '10px', outline: 'none' }}
+  />
+  
+  {/* FILA 3: Captura y Guardado */}
+  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+    <input 
+      type="text" placeholder="00:00" value={timestamp}
+      onChange={(e) => setTimestamp(e.target.value)}
+      style={{ width: '80px', backgroundColor: '#0a0a0a', border: '1px solid #d4af37', color: '#d4af37', textAlign: 'center', borderRadius: '5px', fontWeight: 'bold', padding: '12px 0', fontSize: '0.9rem' }}
+    />
+    
+    {/* Botón Capturar: Ahora fuera y grande */}
+    <button 
+      onClick={() => setTimestamp(formatearTiempo(segundosCorriendo))}
+      style={{ flex: 1, backgroundColor: '#333', border: '1px solid #d4af37', color: '#d4af37', borderRadius: '5px', padding: '12px 0', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer' }}
+    >
+      ⏱️ CAPTURAR
+    </button>
+
+    <button 
+      onClick={insertarMarcaDeTiempo} 
+      style={{ flex: 1.5, backgroundColor: '#d4af37', border: 'none', color: '#000', borderRadius: '5px', padding: '12px 0', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer' }}
+    >
+      + GUARDAR NOTA
+    </button>
+  </div>
+</div>
 
         {/* BOTONES DE TIEMPO RÁPIDOS */}
         <div style={{ 
@@ -3229,25 +3309,28 @@ export default function App() {
   });
   const [usuario, setUsuario] = useState(null);
   React.useEffect(() => {
-  // Este es el "escucha" oficial de Firebase
-  const deshacerEscucha = onAuthStateChanged(auth, (user) => {
+  const unsub = onAuthStateChanged(auth, async (user) => {
     if (user) {
-      // Si Firebase encuentra al usuario, lo ponemos en el estado
-      setUsuario(user);
+      // FORZAMOS LA CARGA DE FIRESTORE
+      const docRef = doc(db, "usuarios", user.uid);
+      const docSnap = await getDoc(docRef);
       
-      // Cargamos sus datos (vistos, notas, etc)
-      cargarDatosDesdeFirebase(user.uid);
-
-      // ¡IMPORTANTE!: Si estamos en la página de login, lo mandamos al Hub
-      // Esto evita que el refresh te deje atrapado en el login
-      setPage('hub'); 
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setUsuario({ ...user, ...data }); // Esto pasa el usuario con sus notas a toda la app
+        
+        // Sincronizamos el almacén local global
+        if (data.notas) {
+          localStorage.setItem('lafortuna_notas', JSON.stringify(data.notas));
+        }
+      } else {
+        setUsuario(user);
+      }
     } else {
       setUsuario(null);
-      setPage('login');
     }
   });
-
-  return () => deshacerEscucha(); // Limpieza al cerrar
+  return () => unsub();
 }, []);
   const cargarDatosDesdeFirebase = async (uid) => {
     try {
