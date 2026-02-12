@@ -2731,20 +2731,31 @@ const MapaPage = ({
     > 
       ←
     </button>
+    {/* LÓGICA CONDICIONAL: Solo si hay sesión activa */}
+  {hasSession && (
     <button 
       onClick={onContinue} 
-      disabled={!hasSession}
       style={{ 
         ...styles.btnGold, 
-        flex: 1, 
-        fontSize: '0.65rem', 
-        opacity: hasSession ? 1 : 0.5 
+        flex: 2, // Toma más espacio si aparece
+        fontSize: '0.65rem'
       }}
     >
-      {esMovil ? 'CONTINUAR' : '▶ CONTINUAR SESIÓN'}
+      {esMovil ? 'CONTINUAR' : '▶ CONTINUAR'}
     </button>
-    <button onClick={onNavigateToNotes} style={{ ...styles.btnOutline, flex: 1, fontSize: '0.6rem', borderColor: '#d4af37' }}>BITÁCORA</button>
-  </div>
+  )}
+    <button 
+    onClick={onNavigateToNotes} 
+    style={{ 
+      ...styles.btnOutline, 
+      flex: 1, // Se expande automáticamente si 'Continuar' no está
+      fontSize: '0.65rem', 
+      borderColor: '#d4af37' 
+    }}
+  >
+    BITÁCORA
+  </button>
+</div>
 
   {/* FILA 2: BÚSQUEDA */}
   <div style={{ width: '100%' }}>
@@ -3280,10 +3291,17 @@ const HubPage = ({ onNavigate, onContinue, hasSession, userRole, onLogout }) => 
     </button>
     <h1 style={styles.goldTitle}>HUB DE ESTUDIO</h1>
     <div style={styles.grid}>
-      <button style={{ ...styles.hubBtn, opacity: hasSession ? 1 : 0.5 }} onClick={onContinue}>1. CONTINUAR SESIÓN</button>
-      <button style={styles.hubBtn} onClick={() => onNavigate('mapa')}>2. ESTUDIAR (MAPA)</button>
-      <button style={styles.hubBtn} onClick={() => onNavigate('notas_hub')}>3. NOTAS</button>
-      <button style={styles.hubBtn} onClick={() => onNavigate('busqueda')}>4. BUSCAR TÉCNICA</button>
+      {hasSession && (
+  <button 
+    onClick={onContinue} 
+    style={{...styles.btnGold, width: '100%', marginBottom: '10px'}}
+  >
+    ▶ CONTINUAR ÚLTIMA SESIÓN
+  </button>
+)}
+      <button style={styles.hubBtn} onClick={() => onNavigate('mapa')}>MAPA</button>
+      <button style={styles.hubBtn} onClick={() => onNavigate('notas_hub')}>BITACORA</button>
+      <button style={styles.hubBtn} onClick={() => onNavigate('busqueda')}>BUSCAR TÉCNICA</button>
       
       {/* BOTÓN SECRETO PARA TI */}
       {userRole === 'admin' && (
