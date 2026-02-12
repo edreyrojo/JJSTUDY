@@ -180,25 +180,38 @@ const AdminPage = ({ onBack }) => {
   };
 
   React.useEffect(() => {
-  // Este "observer" se ejecuta cada vez que abres la app
-  const desuscribir = onAuthStateChanged(auth, async (user) => {
+  const deshacerEscucha = onAuthStateChanged(auth, async (user) => {
     if (user) {
-      // Si hay usuario, traemos sus datos de Firestore
+      // 1. Obtenemos el documento del usuario desde Firestore
       const userDoc = await getDoc(doc(db, "usuarios", user.uid));
+      
       if (userDoc.exists()) {
-        const data = userDoc.data();
-        if (data.validado) {
-          setUserRole(data.rol);
-          await cargarDatosDesdeFirebase(user.uid);
-          setPage('hub'); // Te manda directo al Hub
+        const userData = userDoc.data();
+        
+        // 2. ACTUALIZAMOS EL PERFIL COMPLETO (Admin incluido)
+        // Esto soluciona que el menú de admin no cargue
+        setUsuario({
+          uid: user.uid,
+          email: user.email,
+          ...userData // Aquí vienen los permisos de admin
+        });
+
+        // 3. SINCRONIZACIÓN DE NOTAS
+        // Si hay notas en la nube, actualizamos el localStorage para que coincidan
+        if (userData.notas) {
+          const notasActuales = JSON.parse(localStorage.getItem('lafortuna_notas') || '{}');
+          const nuevasNotas = { ...notasActuales, ...userData.notas };
+          localStorage.setItem('lafortuna_notas', JSON.stringify(nuevasNotas));
         }
+      } else {
+        // Si el usuario es nuevo y no tiene doc en Firestore todavía
+        setUsuario(user);
       }
     } else {
-      setPage('login'); // Si no hay nadie, al login
+      setUsuario(null);
     }
   });
-
-  return () => desuscribir(); // Limpieza al cerrar
+  return () => deshacerEscucha();
 }, []);
 
   // Función para validar (Cambia el estado en Firebase)
@@ -2804,16 +2817,35 @@ const MapaPage = ({
   );
 };
 const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos = [], toggleVisto }) => {
-  const [nota, setNota] = useState(() => {
-    const raw = localStorage.getItem(`nota_${video?.titulo}`);
-    if (!raw) return "";
-    try {
-      const parsed = JSON.parse(raw);
-      return parsed.texto || "";
-    } catch (e) {
-      return raw;
+  const [nota, setNota] = useState("");
+
+React.useEffect(() => {
+  if (!video?.id) return;
+  
+  // 1. Primero intentamos cargar de Firebase si hay usuario
+  const cargarNotasSincronizadas = async () => {
+    let notaFinal = "";
+    
+    // Prioridad 1: Firebase
+    if (auth.currentUser) {
+      const userRef = doc(db, "usuarios", auth.currentUser.uid);
+      const docSnap = await getDoc(userRef);
+      if (docSnap.exists() && docSnap.data().notas?.[video.id]) {
+        notaFinal = docSnap.data().notas[video.id];
+      }
     }
-  });
+    
+    // Prioridad 2: Si no hubo nada en Firebase, buscamos en LocalStorage
+    if (!notaFinal) {
+      const notasLocales = JSON.parse(localStorage.getItem('lafortuna_notas') || '{}');
+      notaFinal = notasLocales[video.id] || "";
+    }
+    
+    setNota(notaFinal);
+  };
+
+  cargarNotasSincronizadas();
+}, [video?.id]);
 
   const [timestamp, setTimestamp] = useState("");
   const [tiempoActivo, setTiempoActivo] = useState("");
