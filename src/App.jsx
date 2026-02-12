@@ -2502,7 +2502,7 @@ const LoginPage = ({
           style={{ 
             ...styles.input, 
             width: '100%',
-            maxWidth: '320px', 
+            maxWidth: '280px', 
             margin: '10px auto', 
             display: 'block' 
           }} 
@@ -2517,7 +2517,7 @@ const LoginPage = ({
           style={{ 
             ...styles.input, 
             width: '100%',
-            maxWidth: '320px', 
+            maxWidth: '280px', 
             margin: '10px auto', 
             display: 'block' 
           }} 
@@ -2857,35 +2857,50 @@ const MapaPage = ({
         <div style={mapStyles.mainNode}>{tituloCentral}</div>
 
         {nodosAMostrar.map((n, i) => {
-          const total = nodosAMostrar.length;
-          const radio = 260;
-          const angle = (i * (360 / total)) * (Math.PI / 180);
-          const x = Math.cos(angle) * radio;
-          const y = Math.sin(angle) * radio;
-          const visto = n.type === 'parte' ? vistos?.includes(n.id) : n.raw?.partes?.every(p => vistos?.includes(p.id));
+  const total = nodosAMostrar.length;
+  
+  // --- MEJORA: RADIO DINÁMICO ---
+  // Si hay más de 12 nodos, escalonamos el radio para crear dos "órbitas"
+  // Los nodos pares se quedan en el radio base, los impares se alejan.
+  let radioBase = esMovil ? 210 : 260;
+  let radio = radioBase;
+  
+  if (total > 12) {
+    // Si es impar, sumamos distancia para crear la segunda órbita
+    radio = (i % 2 === 0) ? radioBase : radioBase + (esMovil ? 75 : 110);
+  }
+  // ------------------------------
 
-          return (
-            <div key={i} 
-                 onClick={() => handleNodeClick(n)} 
-                 className="floating-node" 
-                 style={{ 
-                   ...mapStyles.subNodeFloating, 
-                   left: `calc(50% + ${x}px - 55px)`, 
-                   top: `calc(50% + ${y}px - 55px)`, 
-                   animationDelay: `${i * -0.8}s`, 
-                   animationDuration: `${5 + (i % 3)}s`, 
-                   borderColor: visto ? '#4CAF50' : '#d4af37', 
-                   color: visto ? '#4CAF50' : '#fff', 
-                   cursor: 'pointer',
-                   // Reducimos el tamaño de los nodos en móvil para que no se amontonen
-                   fontSize: esMovil ? '0.6rem' : '0.75rem',
-                   width: esMovil ? '80px' : '100px',
-                   height: esMovil ? '80px' : '100px'
-                 }}>
-              {visto ? '✅ ' : ''}{n.nombre}
-            </div>
-          );
-        })}
+  const angle = (i * (360 / total)) * (Math.PI / 180);
+  const x = Math.cos(angle) * radio;
+  const y = Math.sin(angle) * radio;
+  
+  const visto = n.type === 'parte' ? vistos?.includes(n.id) : n.raw?.partes?.every(p => vistos?.includes(p.id));
+
+  return (
+    <div key={i} 
+         onClick={() => handleNodeClick(n)} 
+         className="floating-node" 
+         style={{ 
+           ...mapStyles.subNodeFloating, 
+           // Usamos x e y calculados con el radio dinámico
+           left: `calc(50% + ${x}px - ${esMovil ? '40px' : '50px'})`, 
+           top: `calc(50% + ${y}px - ${esMovil ? '40px' : '50px'})`, 
+           animationDelay: `${i * -0.8}s`, 
+           animationDuration: `${5 + (i % 3)}s`, 
+           borderColor: visto ? '#4CAF50' : '#d4af37', 
+           color: visto ? '#4CAF50' : '#fff', 
+           cursor: 'pointer',
+           fontSize: esMovil ? '0.55rem' : '0.75rem',
+           // Reducimos un poco más el tamaño en móvil si hay saturación
+           width: esMovil ? (total > 20 ? '70px' : '80px') : '100px',
+           height: esMovil ? (total > 20 ? '70px' : '80px') : '100px',
+           zIndex: 10
+         }}>
+      {visto ? '✅ ' : ''}{n.nombre}
+    </div>
+  );
+})}
       </>
     )}
   </div>
