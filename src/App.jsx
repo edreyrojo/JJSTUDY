@@ -2920,139 +2920,114 @@ const MapaPage = ({
   );
 };
 const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos = [], toggleVisto }) => {
-  // 1. Inicializamos vacío
-const [nota, setNota] = useState("");
-const [segundosCorriendo, setSegundosCorriendo] = useState(0);
-const [isCronometroActivo, setIsCronometroActivo] = useState(false);
-
-// Efecto para que el tiempo avance
-React.useEffect(() => {
-  let intervalo;
-  if (isCronometroActivo) {
-    intervalo = setInterval(() => {
-      setSegundosCorriendo(s => s + 1);
-    }, 1000);
-  }
-  return () => clearInterval(intervalo);
-}, [isCronometroActivo]);
-
-// Función para convertir segundos a formato 00:00
-const formatearTiempo = (seg) => {
-  const m = Math.floor(seg / 60).toString().padStart(2, '0');
-  const s = (seg % 60).toString().padStart(2, '0');
-  return `${m}:${s}`;
-};
-
-const capturarTiempoActual = () => {
-  setTimestamp(formatearTiempo(segundosCorriendo));
-};
-
-// 2. Carga forzada desde la Nube
-React.useEffect(() => {
-  const cargarNotaSincronizada = async () => {
-    // 1. Validaciones iniciales
-    if (!video?.id) return;
-    
-    // Limpiamos la nota actual antes de cargar la nueva para evitar "fantasmas" del video anterior
-    setNota(""); 
-
-    console.log("Iniciando sincronización para:", video.titulo);
-
-    // 2. INTENTO DE CARGA DESDE CLOUD (Prioridad 1)
-    if (auth.currentUser) {
-      try {
-        const userRef = doc(db, "usuarios", auth.currentUser.uid);
-        const docSnap = await getDoc(userRef);
-
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          
-          // Verificamos si existe la nota en el mapa 'notas' de Firestore
-          if (data.notas && data.notas[video.id]) {
-            const notaNube = data.notas[video.id];
-            console.log("✅ Nota recuperada desde la nube.");
-            
-            setNota(notaNube);
-
-            // Sincronizamos LocalStorage para que la PC y el móvil hablen el mismo idioma
-            localStorage.setItem(`nota_${video.titulo}`, JSON.stringify({
-              texto: notaNube,
-              videoId: video.id,
-              fecha: new Date().toISOString()
-            }));
-            
-            // También actualizamos el almacén global de notas si lo usas
-            const notasGlobales = JSON.parse(localStorage.getItem('lafortuna_notas') || '{}');
-            notasGlobales[video.id] = notaNube;
-            localStorage.setItem('lafortuna_notas', JSON.stringify(notasGlobales));
-            
-            return; // ÉXITO: Salimos de la función
-          }
-          console.log("ℹ️ El documento existe pero no hay nota para este video en la nube.");
-        }
-      } catch (error) {
-        console.error("❌ Error al leer Firestore:", error);
-      }
-    }
-
-    // 3. RESPALDO LOCAL (Prioridad 2 - Solo si falla la nube o no hay internet)
-    console.log("⚠️ Buscando respaldo en almacenamiento local...");
-    const localRaw = localStorage.getItem(`nota_${video?.titulo}`);
-    if (localRaw) {
-      try {
-        const parsed = JSON.parse(localRaw);
-        setNota(parsed.texto || "");
-      } catch (e) {
-        setNota(localRaw);
-      }
-    }
-  };
-
-  cargarNotaSincronizada();
-}, [video?.id, auth.currentUser?.uid]); // Usamos el UID específicamente para mayor precisión // Se dispara al cambiar video o al detectar usuario
-
+  // --- ESTADOS ---
+  const [nota, setNota] = useState("");
+  const [segundosCorriendo, setSegundosCorriendo] = useState(0);
+  const [isCronometroActivo, setIsCronometroActivo] = useState(false);
   const [timestamp, setTimestamp] = useState("");
   const [tiempoActivo, setTiempoActivo] = useState("");
   const [nombreMarcador, setNombreMarcador] = useState("");
-  
-  // --- SENSOR DE MÓVIL ---
   const [esMovil, setEsMovil] = React.useState(window.innerWidth < 768);
+
+  // ESTADOS DEL NUEVO MODAL
+  const [mostrarAlerta, setMostrarAlerta] = useState(false);
+  const [mensajeAlerta, setMensajeAlerta] = useState("");
+
+  // --- EFECTOS ---
+  React.useEffect(() => {
+    let intervalo;
+    if (isCronometroActivo) {
+      intervalo = setInterval(() => {
+        setSegundosCorriendo(s => s + 1);
+      }, 1000);
+    }
+    return () => clearInterval(intervalo);
+  }, [isCronometroActivo]);
+
   React.useEffect(() => {
     const handleResize = () => setEsMovil(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Carga sincronizada
+  React.useEffect(() => {
+    const cargarNotaSincronizada = async () => {
+      if (!video?.id) return;
+      setNota(""); 
+      if (auth.currentUser) {
+        try {
+          const userRef = doc(db, "usuarios", auth.currentUser.uid);
+          const docSnap = await getDoc(userRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.notas && data.notas[video.id]) {
+              const notaNube = data.notas[video.id];
+              setNota(notaNube);
+              localStorage.setItem(`nota_${video.titulo}`, JSON.stringify({
+                texto: notaNube, videoId: video.id, fecha: new Date().toISOString()
+              }));
+              return;
+            }
+          }
+        } catch (error) { console.error("❌ Error al leer Firestore:", error); }
+      }
+      const localRaw = localStorage.getItem(`nota_${video?.titulo}`);
+      if (localRaw) {
+        try {
+          const parsed = JSON.parse(localRaw);
+          setNota(parsed.texto || "");
+        } catch (e) { setNota(localRaw); }
+      }
+    };
+    cargarNotaSincronizada();
+  }, [video?.id, auth.currentUser?.uid]);
+
+  // --- FUNCIONES ---
+  const formatearTiempo = (seg) => {
+    const m = Math.floor(seg / 60).toString().padStart(2, '0');
+    const s = (seg % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
+
   const insertarMarcaDeTiempo = () => {
     if (!timestamp.trim()) {
-      alert("Por favor pon un minuto (ej: 02:45)");
+      setMensajeAlerta("Por favor pon un minuto (ej: 02:45)");
+      setMostrarAlerta(true);
       return;
     }
     const etiqueta = nombreMarcador.trim() || "Punto de interés";
-    const nuevaMarca = `\n[${timestamp.trim()} - ${etiqueta}] `;
-    setNota(nota + nuevaMarca);
+    setNota(nota + `\n[${timestamp.trim()} - ${etiqueta}] `);
     setTimestamp("");
     setNombreMarcador("");
   };
 
-  const isCompletado = vistos.includes(video?.id);
-
   const guardar = async () => {
     if (!video?.id) return;
     const ahora = new Date().toLocaleString();
+    
+    // Guardado local
     const dataNota = { texto: nota, videoId: video.id, fecha: ahora };
     localStorage.setItem(`nota_${video.titulo}`, JSON.stringify(dataNota));
     const notasLocales = JSON.parse(localStorage.getItem('lafortuna_notas') || '{}');
     notasLocales[video.id] = nota;
     localStorage.setItem('lafortuna_notas', JSON.stringify(notasLocales));
 
+    // Guardado en la nube
     if (auth.currentUser) {
       try {
         const userRef = doc(db, "usuarios", auth.currentUser.uid);
         await setDoc(userRef, { notas: { [video.id]: nota } }, { merge: true });
-      } catch (err) { console.error("Error al subir:", err); }
+        
+        // NOTIFICACIÓN PERSONALIZADA
+        setMensajeAlerta(`Bitácora sincronizada en el Vault: ${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`);
+        setMostrarAlerta(true);
+        setTimeout(() => setMostrarAlerta(false), 3000); // Auto-cierre
+      } catch (err) { 
+        setMensajeAlerta("Error al sincronizar con la nube.");
+        setMostrarAlerta(true);
+      }
     }
-    alert(`Bitácora actualizada: ${ahora}`);
   };
 
   const videoSiguiente = getAdjacentVideo(video, 'next');
@@ -3066,202 +3041,86 @@ React.useEffect(() => {
     }
   };
 
+  const isCompletado = vistos.includes(video?.id);
+
   return (
-    <div style={{ 
-      display: 'flex', 
-      flexDirection: esMovil ? 'column' : 'row', 
-      height: '100vh', 
-      width: '100vw', 
-      backgroundColor: '#000', 
-      color: '#fff',
-      overflow: 'hidden'
-    }}>
+    <div style={{ display: 'flex', flexDirection: esMovil ? 'column' : 'row', height: '100vh', width: '100vw', backgroundColor: '#000', color: '#fff', overflow: 'hidden' }}>
 
-      {/* SECCIÓN IZQUIERDA: VIDEO Y NAVEGACIÓN SUPERIOR */}
-      <div style={{ 
-        flex: esMovil ? 'none' : 3, 
-        display: 'flex', 
-        flexDirection: 'column', 
-        borderRight: esMovil ? 'none' : '1px solid #222',
-        borderBottom: esMovil ? '1px solid #222' : 'none',
-        height: esMovil ? 'auto' : '100%' 
-      }}>
-        
-        {/* HEADER DE ESTUDIO */}
-        <div style={{
-          padding: '10px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          backgroundColor: '#0a0a0a',
-          minHeight: '60px'
-        }}>
-          <button onClick={() => videoAnterior && onSelectVideo(videoAnterior)} 
-                  style={{ ...styles.btnOutline, width: '45px', padding: '10px 0', opacity: videoAnterior ? 1 : 0.2 }} disabled={!videoAnterior}>←</button>
-          
+      {/* SECCIÓN IZQUIERDA: VIDEO */}
+      <div style={{ flex: esMovil ? 'none' : 3, display: 'flex', flexDirection: 'column', borderRight: esMovil ? 'none' : '1px solid #222', borderBottom: esMovil ? '1px solid #222' : 'none', height: esMovil ? 'auto' : '100%' }}>
+        <div style={{ padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#0a0a0a', minHeight: '60px' }}>
+          <button onClick={() => videoAnterior && onSelectVideo(videoAnterior)} style={{ ...styles.btnOutline, width: '45px', padding: '10px 0', opacity: videoAnterior ? 1 : 0.2 }} disabled={!videoAnterior}>←</button>
           <div style={{ textAlign: 'center', flex: 1, padding: '0 10px', overflow: 'hidden' }}>
-            <h2 style={{ 
-              fontSize: esMovil ? '0.8rem' : '1rem', 
-              color: '#d4af37', 
-              margin: 0, 
-              whiteSpace: 'nowrap', 
-              textOverflow: 'ellipsis', 
-              overflow: 'hidden',
-              fontWeight: 'bold'
-            }}>
-              {video?.titulo}
-            </h2>
-            <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#888', fontSize: '0.65rem', textDecoration: 'underline', cursor: 'pointer' }}>
-              CERRAR ESTUDIO
-            </button>
+            <h2 style={{ fontSize: esMovil ? '0.8rem' : '1rem', color: '#d4af37', margin: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', fontWeight: 'bold' }}>{video?.titulo}</h2>
+            <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#888', fontSize: '0.65rem', textDecoration: 'underline' }}>CERRAR ESTUDIO</button>
           </div>
-
-          <button onClick={() => videoSiguiente && onSelectVideo(videoSiguiente)} 
-                  style={{ ...styles.btnGold, width: '45px', padding: '10px 0', opacity: videoSiguiente ? 1 : 0.2 }} disabled={!videoSiguiente}>→</button>
+          <button onClick={() => videoSiguiente && onSelectVideo(videoSiguiente)} style={{ ...styles.btnGold, width: '45px', padding: '10px 0', opacity: videoSiguiente ? 1 : 0.2 }} disabled={!videoSiguiente}>→</button>
         </div>
-
-        {/* CONTENEDOR VIDEO (RESPONSIVE) */}
-        <div style={{ 
-          width: '100%', 
-          aspectRatio: '16/9', 
-          backgroundColor: '#000',
-          position: 'relative',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
-        }}>
-          <iframe
-            key={`${video?.id}-${tiempoActivo}`}
-            src={`https://drive.google.com/file/d/${video?.id}/preview${tiempoActivo ? `?t=${tiempoActivo}` : ''}`}
-            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
-            allowFullScreen
-          ></iframe>
+        <div style={{ width: '100%', aspectRatio: '16/9', backgroundColor: '#000', position: 'relative', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}>
+          <iframe key={`${video?.id}-${tiempoActivo}`} src={`https://drive.google.com/file/d/${video?.id}/preview${tiempoActivo ? `?t=${tiempoActivo}` : ''}`} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }} allowFullScreen></iframe>
         </div>
       </div>
 
-      {/* SECCIÓN DERECHA: BITÁCORA TÉCNICA (SCROLLABLE) */}
-      <div style={{ 
-        flex: 1, 
-        overflowY: 'auto', 
-        padding: '20px', 
-        backgroundColor: '#0f0f0f',
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: esMovil ? 'none' : '-5px 0 15px rgba(0,0,0,0.3)'
-      }}>
+      {/* SECCIÓN DERECHA: NOTAS */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '20px', backgroundColor: '#0f0f0f', display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-          <h3 style={{ color: '#d4af37', fontSize: '1rem', margin: 0, letterSpacing: '1px' }}>BITÁCORA TÉCNICA</h3>
+          <h3 style={{ color: '#d4af37', fontSize: '1rem', margin: 0 }}>BITÁCORA TÉCNICA</h3>
           <span style={{ fontSize: '0.6rem', color: '#666' }}>ID: {video?.id?.substring(0,6)}</span>
         </div>
         
         <div style={{ backgroundColor: '#181818', padding: '15px', borderRadius: '8px', marginBottom: '20px', border: '1px solid #222' }}>
-  
-  {/* FILA 1: Control de Sincronización */}
-  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', alignItems: 'center', backgroundColor: '#000', padding: '8px', borderRadius: '5px' }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-      <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: isCronometroActivo ? '#4CAF50' : '#f44336', boxShadow: isCronometroActivo ? '0 0 5px #4CAF50' : 'none' }}></div>
-      <span style={{ fontSize: '0.8rem', color: '#fff', fontWeight: 'bold', fontFamily: 'monospace' }}>
-        {formatearTiempo(segundosCorriendo)}
-      </span>
-    </div>
-    <div style={{ display: 'flex', gap: '5px' }}>
-       <button 
-        onClick={() => setIsCronometroActivo(!isCronometroActivo)}
-        style={{ backgroundColor: isCronometroActivo ? '#333' : '#d4af37', border: 'none', color: isCronometroActivo ? '#fff' : '#000', fontSize: '0.65rem', padding: '5px 10px', borderRadius: '4px', fontWeight: 'bold' }}
-      >
-        {isCronometroActivo ? 'PAUSAR SYNC' : 'INICIAR SYNC'}
-      </button>
-      <button 
-        onClick={() => { setSegundosCorriendo(0); setIsCronometroActivo(false); }}
-        style={{ background: 'none', border: '1px solid #444', color: '#666', fontSize: '0.65rem', padding: '5px 8px', borderRadius: '4px' }}
-      >
-        RESET
-      </button>
-    </div>
-  </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', alignItems: 'center', backgroundColor: '#000', padding: '8px', borderRadius: '5px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: isCronometroActivo ? '#4CAF50' : '#f44336' }}></div>
+              <span style={{ fontSize: '0.8rem', color: '#fff', fontWeight: 'bold' }}>{formatearTiempo(segundosCorriendo)}</span>
+            </div>
+            <div style={{ display: 'flex', gap: '5px' }}>
+              <button onClick={() => setIsCronometroActivo(!isCronometroActivo)} style={{ backgroundColor: isCronometroActivo ? '#333' : '#d4af37', border: 'none', color: isCronometroActivo ? '#fff' : '#000', fontSize: '0.65rem', padding: '5px 10px', borderRadius: '4px', fontWeight: 'bold' }}>{isCronometroActivo ? 'PAUSAR' : 'SYNC'}</button>
+              <button onClick={() => { setSegundosCorriendo(0); setIsCronometroActivo(false); }} style={{ background: 'none', border: '1px solid #444', color: '#666', fontSize: '0.65rem', padding: '5px 8px', borderRadius: '4px' }}>RESET</button>
+            </div>
+          </div>
+          <input type="text" placeholder="¿Qué viste?..." value={nombreMarcador} onChange={(e) => setNombreMarcador(e.target.value)} style={{ width: '100%', backgroundColor: '#0a0a0a', border: '1px solid #333', color: '#fff', padding: '12px', borderRadius: '5px', fontSize: '0.8rem', marginBottom: '10px' }} />
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <input type="text" placeholder="00:00" value={timestamp} onChange={(e) => setTimestamp(e.target.value)} style={{ width: '80px', backgroundColor: '#0a0a0a', border: '1px solid #d4af37', color: '#d4af37', textAlign: 'center', borderRadius: '5px', padding: '12px 0' }} />
+            <button onClick={() => setTimestamp(formatearTiempo(segundosCorriendo))} style={{ flex: 1, backgroundColor: '#333', border: '1px solid #d4af37', color: '#d4af37', borderRadius: '5px', padding: '12px 0', fontSize: '0.7rem' }}>⏱️ CAPTURAR</button>
+            <button onClick={insertarMarcaDeTiempo} style={{ flex: 1.5, backgroundColor: '#d4af37', border: 'none', color: '#000', borderRadius: '5px', padding: '12px 0', fontSize: '0.75rem' }}>+ NOTA</button>
+          </div>
+        </div>
 
-  {/* FILA 2: Nombre de la técnica */}
-  <input 
-    type="text" placeholder="¿Qué viste? (ej. Underhook desde media)" value={nombreMarcador}
-    onChange={(e) => setNombreMarcador(e.target.value)}
-    style={{ width: '100%', backgroundColor: '#0a0a0a', border: '1px solid #333', color: '#fff', padding: '12px', borderRadius: '5px', fontSize: '0.8rem', marginBottom: '10px', outline: 'none' }}
-  />
-  
-  {/* FILA 3: Captura y Guardado */}
-  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-    <input 
-      type="text" placeholder="00:00" value={timestamp}
-      onChange={(e) => setTimestamp(e.target.value)}
-      style={{ width: '80px', backgroundColor: '#0a0a0a', border: '1px solid #d4af37', color: '#d4af37', textAlign: 'center', borderRadius: '5px', fontWeight: 'bold', padding: '12px 0', fontSize: '0.9rem' }}
-    />
-    
-    {/* Botón Capturar: Ahora fuera y grande */}
-    <button 
-      onClick={() => setTimestamp(formatearTiempo(segundosCorriendo))}
-      style={{ flex: 1, backgroundColor: '#333', border: '1px solid #d4af37', color: '#d4af37', borderRadius: '5px', padding: '12px 0', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer' }}
-    >
-      ⏱️ CAPTURAR
-    </button>
-
-    <button 
-      onClick={insertarMarcaDeTiempo} 
-      style={{ flex: 1.5, backgroundColor: '#d4af37', border: 'none', color: '#000', borderRadius: '5px', padding: '12px 0', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer' }}
-    >
-      + GUARDAR NOTA
-    </button>
-  </div>
-</div>
-
-        {/* BOTONES DE TIEMPO RÁPIDOS */}
-        <div style={{ 
-          display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '15px', scrollbarWidth: 'none'
-        }}>
+        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '15px' }}>
           {(nota.match(/\[\d+:\d+ - .*?\]/g) || []).map((marca, i) => {
             const partes = marca.replace('[', '').replace(']', '').split(' - ');
             return (
-              <button key={i} onClick={() => saltarATiempo(partes[0])} 
-                style={{ fontSize: '0.65rem', padding: '10px 14px', backgroundColor: '#d4af3722', color: '#d4af37', border: '1px solid #d4af37', borderRadius: '20px', whiteSpace: 'nowrap', cursor: 'pointer' }}>
-                📍 {partes[1]}
-              </button>
+              <button key={i} onClick={() => saltarATiempo(partes[0])} style={{ fontSize: '0.65rem', padding: '10px 14px', backgroundColor: '#d4af3722', color: '#d4af37', border: '1px solid #d4af37', borderRadius: '20px', whiteSpace: 'nowrap' }}>📍 {partes[1]}</button>
             );
           })}
         </div>
 
-        {/* ÁREA DE TEXTO */}
-        <textarea
-          value={nota} onChange={(e) => setNota(e.target.value)}
-          placeholder="Escribe tus observaciones detalladas aquí..."
-          style={{ 
-            flex: 'none', 
-            height: esMovil ? '180px' : '350px', 
-            backgroundColor: '#0a0a0a', 
-            color: '#ddd', 
-            padding: '15px', 
-            borderRadius: '8px', 
-            border: '1px solid #333', 
-            marginBottom: '20px', 
-            fontSize: '0.9rem',
-            lineHeight: '1.5',
-            outline: 'none',
-            resize: 'none'
-          }}
-        />
+        <textarea value={nota} onChange={(e) => setNota(e.target.value)} style={{ flex: 'none', height: esMovil ? '180px' : '350px', backgroundColor: '#0a0a0a', color: '#ddd', padding: '15px', borderRadius: '8px', border: '1px solid #333', marginBottom: '20px', fontSize: '0.9rem', resize: 'none' }} />
 
-        {/* ACCIONES FINALES */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '40px' }}>
-          <button style={{ ...styles.btnGold, padding: '15px', fontWeight: 'bold', letterSpacing: '1px' }} onClick={guardar}>
-            💾 ACTUALIZAR BITÁCORA
-          </button>
-          <button onClick={() => toggleVisto(video?.id)} 
-                  style={{ 
-                    ...styles.btnOutline, 
-                    borderColor: isCompletado ? '#4CAF50' : '#444', 
-                    color: isCompletado ? '#4CAF50' : '#fff', 
-                    padding: '15px',
-                    backgroundColor: isCompletado ? '#4CAF5011' : 'transparent'
-                  }}>
-            {isCompletado ? 'TÉCNICA COMPLETADA ✅' : 'MARCAR COMO VISTA'}
-          </button>
+          <button style={{ ...styles.btnGold, padding: '15px', fontWeight: 'bold' }} onClick={guardar}>💾 ACTUALIZAR BITÁCORA</button>
+          <button onClick={() => toggleVisto(video?.id)} style={{ ...styles.btnOutline, borderColor: isCompletado ? '#4CAF50' : '#444', color: isCompletado ? '#4CAF50' : '#fff', padding: '15px' }}>{isCompletado ? 'TÉCNICA COMPLETADA ✅' : 'MARCAR COMO VISTA'}</button>
         </div>
       </div>
+
+      {/* --- MODAL DE NOTIFICACIÓN PERSONALIZADO --- */}
+      {mostrarAlerta && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999, backdropFilter: 'blur(5px)' }}>
+          <div style={{ backgroundColor: '#111', border: '1px solid #d4af37', padding: '30px', borderRadius: '15px', textAlign: 'center', maxWidth: '320px', boxShadow: '0 0 30px rgba(212, 175, 55, 0.3)', animation: 'fadeIn 0.3s ease' }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>{mensajeAlerta.includes("Error") ? '❌' : '🛡️'}</div>
+            <h3 style={{ color: '#d4af37', margin: '0 0 10px 0', fontSize: '1.2rem', letterSpacing: '1px' }}>{mensajeAlerta.includes("Error") ? 'ALERTA' : 'VAULT ACTUALIZADO'}</h3>
+            <p style={{ color: '#eee', fontSize: '0.9rem', marginBottom: '25px', lineHeight: '1.4' }}>{mensajeAlerta}</p>
+            <button onClick={() => setMostrarAlerta(false)} style={{ ...styles.btnGold, padding: '12px', width: '100%', fontWeight: 'bold' }}>ENTENDIDO</button>
+          </div>
+          <style>{`
+            @keyframes fadeIn {
+              from { opacity: 0; transform: scale(0.9); }
+              to { opacity: 1; transform: scale(1); }
+            }
+          `}</style>
+        </div>
+      )}
     </div>
   );
 };
