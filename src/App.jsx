@@ -141,23 +141,30 @@ const BusquedaPage = ({ onBack, onSelectVideo }) => {
 // Importamos las herramientas de Firestore necesarias (Asegúrate de tenerlas arriba en App.jsx)
 const cargarDatosDesdeFirebase = async (uid) => {
   try {
-    const userDoc = await getDoc(doc(db, "usuarios", uid));
+    const userRef = doc(db, "usuarios", uid);
+    const userDoc = await getDoc(userRef);
+    
     if (userDoc.exists()) {
       const data = userDoc.data();
       
-      // Sincronizamos Vistos
+      // 1. Sincronizamos VISTOS
       if (data.vistos) {
         setVistos(data.vistos);
         localStorage.setItem('lafortuna_vistos', JSON.stringify(data.vistos));
       }
       
-      // Sincronizamos Notas (Si ya las tienes en Firebase)
+      // 2. Sincronizamos NOTAS GLOBALES
+      // Esto hará que la PC recupere lo que escribiste en el iPhone
       if (data.notas) {
-        // Aquí podrías cargar tus notas globales si decides moverlas a Firebase luego
+        localStorage.setItem('lafortuna_notas', JSON.stringify(data.notas));
+        // Opcional: Si tienes un estado global de notas, actualízalo aquí
+        // setNotas(data.notas); 
       }
+      
+      console.log("✅ Datos de la nube sincronizados con éxito");
     }
   } catch (error) {
-    console.error("Error cargando datos de nube:", error);
+    console.error("❌ Error cargando datos de nube:", error);
   }
 };
 const AdminPage = ({ onBack }) => {
@@ -180,38 +187,58 @@ const AdminPage = ({ onBack }) => {
   };
 
   React.useEffect(() => {
-  const deshacerEscucha = onAuthStateChanged(auth, async (user) => {
+  const deshacerEscuchaAuth = onAuthStateChanged(auth, (user) => {
     if (user) {
-      // 1. Obtenemos el documento del usuario desde Firestore
-      const userDoc = await getDoc(doc(db, "usuarios", user.uid));
+      // 1. En lugar de getDoc, usamos onSnapshot para ESCUCHA ACTIVA
+      const userRef = doc(db, "usuarios", user.uid);
       
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        
-        // 2. ACTUALIZAMOS EL PERFIL COMPLETO (Admin incluido)
-        // Esto soluciona que el menú de admin no cargue
-        setUsuario({
-          uid: user.uid,
-          email: user.email,
-          ...userData // Aquí vienen los permisos de admin
-        });
+      const deshacerEscuchaDoc = onSnapshot(userRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const userData = docSnap.data();
+          
+          // 2. SINCRONIZACIÓN DE PERFIL Y ROLES (Admin incluido)
+          setUsuario({
+            uid: user.uid,
+            email: user.email,
+            ...userData 
+          });
 
-        // 3. SINCRONIZACIÓN DE NOTAS
-        // Si hay notas en la nube, actualizamos el localStorage para que coincidan
-        if (userData.notas) {
-          const notasActuales = JSON.parse(localStorage.getItem('lafortuna_notas') || '{}');
-          const nuevasNotas = { ...notasActuales, ...userData.notas };
-          localStorage.setItem('lafortuna_notas', JSON.stringify(nuevasNotas));
+          // 3. SINCRONIZACIÓN DE VISTOS (Para que los checks verdes aparezcan solos)
+          if (userData.vistos) {
+            setVistos(userData.vistos);
+            localStorage.setItem('lafortuna_vistos', JSON.stringify(userData.vistos));
+          }
+
+          // 4. SINCRONIZACIÓN DE NOTAS
+          if (userData.notas) {
+            // Unificamos lo local con lo que viene de la nube
+            const notasLocales = JSON.parse(localStorage.getItem('lafortuna_notas') || '{}');
+            const notasSincronizadas = { ...notasLocales, ...userData.notas };
+            localStorage.setItem('lafortuna_notas', JSON.stringify(notasSincronizadas));
+          }
+          
+          console.log("☁️ Vault sincronizado en tiempo real");
+        } else {
+          setUsuario(user);
         }
-      } else {
-        // Si el usuario es nuevo y no tiene doc en Firestore todavía
-        setUsuario(user);
-      }
+        // Una vez que tenemos los datos, dejamos de mostrar la pantalla de carga
+        setCargando(false);
+      }, (error) => {
+        console.error("Error en la escucha de datos:", error);
+        setCargando(false);
+      });
+
+      // Limpiamos la escucha del documento si el usuario cierra sesión
+      return () => deshacerEscuchaDoc();
+
     } else {
       setUsuario(null);
+      setCargando(false);
+      setPage('login');
     }
   });
-  return () => deshacerEscucha();
+
+  return () => deshacerEscuchaAuth();
 }, []);
 
   // Función para validar (Cambia el estado en Firebase)
@@ -3398,18 +3425,28 @@ export default function App() {
   };
 
   const toggleVisto = async (id) => {
-    if (!id) return;
-    const nuevaLista = vistos.includes(id) ? vistos.filter(v => v !== id) : [...vistos, id];
-    setVistos(nuevaLista);
-    localStorage.setItem('lafortuna_vistos', JSON.stringify(nuevaLista));
+  if (!id) return;
 
-    if (auth.currentUser) {
-      try {
-        const userRef = doc(db, "usuarios", auth.currentUser.uid);
-        await updateDoc(userRef, { vistos: nuevaLista });
-      } catch (error) { console.error("Error sincronizando vistos:", error); }
+  const nuevaLista = vistos.includes(id)
+    ? vistos.filter(v => v !== id)
+    : [...vistos, id];
+
+  // 1. Actualización Instantánea (UI local)
+  setVistos(nuevaLista);
+  localStorage.setItem('lafortuna_vistos', JSON.stringify(nuevaLista));
+
+  // 2. Sincronización con la Nube
+  if (auth.currentUser) {
+    try {
+      const userRef = doc(db, "usuarios", auth.currentUser.uid);
+      // Usamos setDoc con merge para asegurar que no borre otros datos (como las notas)
+      await setDoc(userRef, { vistos: nuevaLista }, { merge: true });
+      console.log("Vistos sincronizados en la nube");
+    } catch (error) {
+      console.error("Error sincronizando vistos:", error);
     }
-  };
+  }
+};
 
   // --- 4. RENDERIZADO DE PÁGINAS ---
   // Extraemos la lógica de qué página mostrar
