@@ -17,6 +17,7 @@ import {
   getDocs, 
   updateDoc 
 } from 'firebase/firestore';
+import GestionAlumnosPage from './GestionAlumnosPage';
 // --- 1. CONFIGURACIÓN DE ESTILOS ---
 const styles = {
   containerCenter: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh' },
@@ -3223,31 +3224,42 @@ const HubPage = ({ onNavigate, onContinue, hasSession, userRole, onLogout }) => 
     >
       CERRAR SESIÓN
     </button>
+    
     <h1 style={styles.goldTitle}>HUB DE ESTUDIO</h1>
+    
     <div style={styles.grid}>
       {hasSession && (
-  <button 
-    onClick={onContinue} 
-    style={{...styles.btnGold, width: '100%', marginBottom: '10px'}}
-  >
-    ▶ CONTINUAR ÚLTIMA SESIÓN
-  </button>
-)}
+        <button 
+          onClick={onContinue} 
+          style={{...styles.btnGold, width: '100%', marginBottom: '10px', gridColumn: 'span 2'}}
+        >
+          ▶ CONTINUAR ÚLTIMA SESIÓN
+        </button>
+      )}
+
       <button style={styles.hubBtn} onClick={() => onNavigate('mapa')}>MAPA</button>
       <button style={styles.hubBtn} onClick={() => onNavigate('notas_hub')}>BITACORA</button>
       <button style={styles.hubBtn} onClick={() => onNavigate('busqueda')}>BUSCAR TÉCNICA</button>
-      
-      {/* BOTÓN SECRETO PARA TI */}
-      {userRole === 'admin' && (
-        <button 
-          style={{ ...styles.hubBtn, border: '2px solid #d4af37', marginTop: '20px', gridColumn: 'span 2' }} 
-          onClick={() => onNavigate('admin')}
-        >
-          ⚙️ ADMINISTRAR ACCESOS
-        </button>
-      )} 
-      {/* Quitamos el ";" que estaba después del </button> y cerramos con ")}" */}
 
+      {/* SECCIÓN ADMINISTRATIVA PARA EL PROFESOR */}
+      {userRole === 'admin' && (
+        <>
+          <button 
+            style={{ ...styles.hubBtn, border: '1px solid #d4af37', backgroundColor: '#111' }} 
+            onClick={() => onNavigate('alumnos')}
+          >
+            <div style={{ fontSize: '1.5rem', marginBottom: '5px' }}></div>
+            GESTIÓN DE DOJO
+          </button>
+
+          <button 
+            style={{ ...styles.hubBtn, border: '1px solid #444', marginTop: '10px', gridColumn: 'span 2', fontSize: '0.8rem', opacity: 0.7 }} 
+            onClick={() => onNavigate('admin')}
+          >
+            ⚙️ ADMINISTRAR ACCESOS
+          </button>
+        </>
+      )}
     </div>
   </div>
 );
@@ -3488,6 +3500,8 @@ export default function App() {
         return <BusquedaPage onBack={() => setPage('hub')} onSelectVideo={(v) => { setVideoActual(v); setPage('estudio'); }} />;
       default:
         return <HubPage onNavigate={setPage} userRole={userRole} onLogout={handleLogout} />;
+      case 'alumnos':
+        return <GestionAlumnosPage onBack={() => setPage('hub')} styles={styles} />;
     }
   };
 
