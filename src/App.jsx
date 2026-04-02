@@ -18,6 +18,7 @@ import {
   updateDoc 
 } from 'firebase/firestore';
 import GestionAlumnosPage from './GestionAlumnosPage';
+import PlaneadorClasesPage from './PlaneadorClasesPage';
 // --- 1. CONFIGURACIÓN DE ESTILOS ---
 const styles = {
   containerCenter: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh' },
@@ -3251,6 +3252,10 @@ const HubPage = ({ onNavigate, onContinue, hasSession, userRole, onLogout }) => 
             <div style={{ fontSize: '1.5rem', marginBottom: '5px' }}></div>
             GESTIÓN DE DOJO
           </button>
+          <button style={styles.hubBtn} onClick={() => onNavigate('planeador')}>
+  <div style={{ fontSize: '1.5rem' }}></div>
+  PLANEAR CLASE
+</button>
 
           <button 
             style={{ ...styles.hubBtn, border: '1px solid #444', marginTop: '10px', gridColumn: 'span 2', fontSize: '0.8rem', opacity: 0.7 }} 
@@ -3502,6 +3507,8 @@ export default function App() {
         return <HubPage onNavigate={setPage} userRole={userRole} onLogout={handleLogout} />;
       case 'alumnos':
         return <GestionAlumnosPage onBack={() => setPage('hub')} styles={styles} />;
+      case 'planeador':
+        return <PlaneadorClasesPage onBack={() => setPage('hub')} styles={styles} />;
     }
   };
 
