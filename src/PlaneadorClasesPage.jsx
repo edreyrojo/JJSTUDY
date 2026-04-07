@@ -17,9 +17,9 @@ const PlaneadorClasesPage = ({ onBack, styles }) => {
             interval = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
         } else if (timeLeft === 0) {
             setTimerActive(false);
-            clearInterval(interval);
+            if (interval) clearInterval(interval);
         }
-        return () => clearInterval(interval);
+        return () => { if (interval) clearInterval(interval); };
     }, [timerActive, timeLeft]);
 
     const formatTime = (seconds) => {
@@ -28,7 +28,7 @@ const PlaneadorClasesPage = ({ onBack, styles }) => {
         return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
     };
 
-    // --- ESTADO INICIAL CON BLOQUES FIJOS (RECONSTRUIDO) ---
+    // --- ESTADO INICIAL ---
     const estadoInicial = {
         titulo: '',
         fecha: new Date().toISOString().split('T')[0],
@@ -39,15 +39,28 @@ const PlaneadorClasesPage = ({ onBack, styles }) => {
     };
     const [nuevaClase, setNuevaClase] = useState(estadoInicial);
 
+    // --- CARGA DE DATOS (CON PARCHE DE ERROR) ---
     useEffect(() => {
+        let isMounted = true;
+
         const qClases = query(collection(db, "clases"), orderBy("fecha", "desc"));
-        const unsubClases = onSnapshot(qClases, (snap) => setClases(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+        const unsubClases = onSnapshot(qClases, (snap) => {
+            if (isMounted) setClases(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        }, (err) => console.error("Error Clases:", err));
+
         const qAlumnos = query(collection(db, "alumnos"), orderBy("nombre", "asc"));
-        const unsubAlumnos = onSnapshot(qAlumnos, (snap) => setAlumnos(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(a => a.activo)));
-        return () => { unsubClases(); unsubAlumnos(); };
+        const unsubAlumnos = onSnapshot(qAlumnos, (snap) => {
+            if (isMounted) setAlumnos(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(a => a.activo));
+        }, (err) => console.error("Error Alumnos:", err));
+
+        return () => {
+            isMounted = false;
+            unsubClases();
+            unsubAlumnos();
+        };
     }, []);
 
-    // --- FUNCIONES ESENCIALES (RE-INSTALADAS) ---
+    // --- FUNCIONES DE EDICIÓN ---
     const agregarBloqueCLA = () => {
         const nuevosBloques = [...nuevaClase.bloques];
         const bloqueCLA = { 
@@ -74,9 +87,11 @@ const PlaneadorClasesPage = ({ onBack, styles }) => {
 
     const guardarClase = async () => {
         if (!nuevaClase.titulo) return alert("Falta título");
-        await addDoc(collection(db, "clases"), nuevaClase);
-        setModo('lista');
-        setNuevaClase(estadoInicial);
+        try {
+            await addDoc(collection(db, "clases"), nuevaClase);
+            setModo('lista');
+            setNuevaClase(estadoInicial);
+        } catch (e) { alert("Error al guardar clase"); }
     };
 
     const eliminarClaseDB = async (id) => {
@@ -84,12 +99,14 @@ const PlaneadorClasesPage = ({ onBack, styles }) => {
     };
 
     const registrarAsistenciaConNota = async (alumnoId, nota) => {
-        const alumnoRef = doc(db, "alumnos", alumnoId);
-        await updateDoc(alumnoRef, {
-            asistencias: arrayUnion(claseSeleccionada.fecha),
-            historialTecnico: arrayUnion({ fecha: claseSeleccionada.fecha, clase: claseSeleccionada.titulo, nota: nota || "Asistió" })
-        });
-        alert("Nota guardada");
+        try {
+            const alumnoRef = doc(db, "alumnos", alumnoId);
+            await updateDoc(alumnoRef, {
+                asistencias: arrayUnion(claseSeleccionada.fecha),
+                historialTecnico: arrayUnion({ fecha: claseSeleccionada.fecha, clase: claseSeleccionada.titulo, nota: nota || "Asistió" })
+            });
+            alert("Nota guardada");
+        } catch (e) { alert("Error de permisos en Firestore"); }
     };
 
     return (
@@ -139,7 +156,7 @@ const PlaneadorClasesPage = ({ onBack, styles }) => {
                     </div>
                 )}
 
-                {/* VISTA: CREAR (RECONSTRUIDA) */}
+                {/* VISTA: CREAR */}
                 {modo === 'crear' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', paddingBottom: '100px' }}>
                         <input placeholder="TÍTULO DE LA SESIÓN" style={{ ...styles.input, width: '100%', boxSizing: 'border-box', textAlign: 'center', borderBottom: '2px solid #d4af37' }} onChange={e => setNuevaClase({ ...nuevaClase, titulo: e.target.value })} />
@@ -188,7 +205,7 @@ const PlaneadorClasesPage = ({ onBack, styles }) => {
                     </div>
                 )}
 
-                {/* VISTA: CLASE ACTIVA (RECONSTRUIDA) */}
+                {/* VISTA: CLASE ACTIVA */}
                 {modo === 'clase_activa' && claseSeleccionada && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', paddingBottom: '100px' }}>
                         {claseSeleccionada.bloques.map((b, i) => (
@@ -220,7 +237,6 @@ const PlaneadorClasesPage = ({ onBack, styles }) => {
                             </div>
                         ))}
 
-                        {/* ASISTENCIA */}
                         <div style={{ backgroundColor: '#111', padding: '20px', borderRadius: '15px', border: '1px solid #333' }}>
                             <p style={{ color: '#d4af37', fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '15px' }}>ASISTENCIA Y SCOUTING</p>
                             {alumnos.map(a => (

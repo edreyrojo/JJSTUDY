@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
-// Importa la conexión que creamos en firebase.js
+import React, { useState, useEffect } from 'react';
+// 1. Conexión principal
 import { auth, db } from './firebase';
-// Importa las funciones específicas de Autenticación
+// 2. Funciones de Autenticación
 import {
   createUserWithEmailAndPassword,
-  signInWithEmailAndPassword, onAuthStateChanged
+  signInWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut
 } from 'firebase/auth';
-// Importa las funciones específicas de la Base de Datos (Firestore)
+// 3. Funciones de Firestore (Asegúrate de que no falte ninguna)
 import {
   doc,
   setDoc,
@@ -16,10 +18,17 @@ import {
   where,
   getDocs,
   updateDoc,
-  onSnapshot
+  onSnapshot,
+  orderBy,   // <-- VITAL para que Notas no se quede cargando
+  deleteDoc, // <-- VITAL para borrar notas
+  addDoc,
+  arrayUnion
 } from 'firebase/firestore';
+// 4. Tus otros archivos (Solo los que sí son archivos separados)
 import GestionAlumnosPage from './GestionAlumnosPage';
 import PlaneadorClasesPage from './PlaneadorClasesPage';
+
+// NOTA: No pongas el import de NotasHubPage aquí si el código está abajo.
 // --- 1. CONFIGURACIÓN DE ESTILOS ---
 const styles = {
   containerCenter: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh' },
@@ -2641,14 +2650,6 @@ const MapaPage = ({
   // 1. ESTADOS
   const [terminoBusqueda, setTerminoBusqueda] = React.useState("");
   const [esMovil, setEsMovil] = React.useState(window.innerWidth < 768);
-
-  // 2. EFECTOS
-  React.useEffect(() => {
-    const handleResize = () => setEsMovil(window.innerWidth < 768);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
   // 3. EL CAZADOR DE TÉCNICAS (Primero declaramos la variable)
   const todasLasTecnicas = React.useMemo(() => {
     return Object.keys(DB_INSTRUCCIONALES).flatMap(cursoKey =>
@@ -3002,30 +3003,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
 
   // Carga sincronizada
   // UBICACIÓN: Dentro de App(), reemplaza el useEffect actual por este:
-  React.useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        // Escucha activa al documento del usuario
-        const userRef = doc(db, "usuarios", user.uid);
-        const unsubDoc = onSnapshot(userRef, (docSnap) => {
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            setUsuario({ uid: user.uid, email: user.email, ...data });
-            setUserRole(data.rol || 'usuario');
-            if (data.vistos) setVistos(data.vistos);
-            if (data.validado) setPage(prev => prev === 'login' ? 'hub' : prev);
-          }
-          setCargando(false);
-        });
-        return () => unsubDoc();
-      } else {
-        setUsuario(null);
-        setPage('login');
-        setCargando(false);
-      }
-    });
-    return () => unsub();
-  }, []);
+  
 
   // --- FUNCIONES ---
   const formatearTiempo = (seg) => {
@@ -3271,71 +3249,111 @@ const HubPage = ({ onNavigate, onContinue, hasSession, userRole, onLogout }) => 
     </button>
   </div>
 );
-const NotasHubPage = ({ onBack, onNavigateToVideo }) => {
-  // Estado local para manejar las notas y que se actualice al borrar
-  const [notas, setNotas] = React.useState([]);
+const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles }) => {
+  const [notas, setNotas] = useState([]);
+  const [cargando, setCargando] = useState(true);
 
-  const cargarNotas = () => {
-    const lista = Object.keys(localStorage)
-      .filter(k => k.startsWith('nota_'))
-      .map(k => {
-        const rawData = localStorage.getItem(k);
-        let contenido = { texto: "", videoId: "" };
-        try { contenido = JSON.parse(rawData); }
-        catch (e) { contenido = { texto: rawData, videoId: null }; }
-        return {
-          titulo: k.replace('nota_', ''),
-          texto: contenido.texto,
-          videoId: contenido.videoId,
-          fecha: contenido.fecha, // <--- Nueva propiedad
-          key: k
-        };
+  useEffect(() => {
+    // 1. Esperamos a que el usuario esté cargado
+    if (!usuario) {
+      const timer = setTimeout(() => setCargando(false), 2000);
+      return () => clearTimeout(timer);
+    }
+
+    // 2. Si el usuario tiene el objeto 'notas' en su perfil (según tu captura de Firestore)
+    if (usuario.notas) {
+      // Convertimos el objeto de notas en un Array para poder usar .map()
+      const listaConvertida = Object.entries(usuario.notas).map(([id, data]) => ({
+        id: id,
+        // Si la nota es solo un string, lo manejamos. Si es objeto, extraemos campos.
+        titulo: data.titulo || "NOTA TÉCNICA",
+        texto: typeof data === 'string' ? data : data.texto,
+        fecha: data.fecha || "Reciente",
+        videoId: data.videoId || null
+      }));
+
+      // Ordenar por fecha (opcional, si tienes el campo fecha)
+      listaConvertida.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+      
+      setNotas(listaConvertida);
+    } else {
+      setNotas([]);
+    }
+
+    setCargando(false);
+  }, [usuario]);
+
+  const eliminarNota = async (notaId) => {
+    if (!window.confirm("¿Eliminar esta nota del Vault?")) return;
+    
+    try {
+      const userRef = doc(db, "usuarios", usuario.uid);
+      // Eliminamos la nota específica dentro del objeto 'notas' del usuario
+      await updateDoc(userRef, {
+        [`notas.${notaId}`]: deleteField()
       });
-    setNotas(lista);
-  };
-
-  React.useEffect(() => { cargarNotas(); }, []);
-
-  const eliminarNota = (key) => {
-    if (window.confirm("¿Seguro que quieres eliminar esta nota técnica?")) {
-      localStorage.removeItem(key);
-      cargarNotas(); // Recargar la lista
+      // La UI se actualizará sola si App.js vuelve a cargar al usuario, 
+      // o puedes filtrar el estado local aquí:
+      setNotas(prev => prev.filter(n => n.id !== notaId));
+    } catch (e) {
+      console.error("Error al eliminar:", e);
+      alert("No se pudo eliminar la nota.");
     }
   };
 
+  if (cargando) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: '#0a0a0a', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <div style={{ color: '#d4af37', fontFamily: 'monospace', letterSpacing: '2px' }}>ACCEDIENDO AL VAULT...</div>
+      </div>
+    );
+  }
+
   return (
-    <div style={{ padding: '40px', minHeight: '100vh', backgroundColor: '#0a0a0a' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <button onClick={onBack} style={{ ...styles.btnOutline, width: 'auto' }}>← VOLVER</button>
-        <h2 style={styles.goldTitle}>MI VAULT DE NOTAS</h2>
+    <div style={{ padding: '20px', minHeight: '100vh', backgroundColor: '#0a0a0a', color: '#fff' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+        <button onClick={onBack} style={{ ...(styles?.btnOutline || {}), width: 'auto', padding: '10px 20px' }}>← VOLVER</button>
+        <h2 style={{ ...(styles?.goldTitle || {}), margin: 0, fontSize: '1.2rem' }}>BITÁCORA TÉCNICA</h2>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px', marginTop: '30px' }}>
-        {notas.map((n) => (
-          <div key={n.key} style={{ ...styles.card, width: 'auto', textAlign: 'left', border: '1px solid #333', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <h4 style={{ color: '#d4af37', margin: 0 }}>{n.titulo}</h4>
-              {n.fecha && <small style={{ color: '#666', fontSize: '0.65rem' }}>{n.fecha}</small>}
-              <button
-                onClick={() => eliminarNota(n.key)}
-                style={{ background: 'none', border: 'none', color: '#ff4444', cursor: 'pointer', fontSize: '1.2rem' }}
-              >
-                ×
-              </button>
-            </div>
-            <p style={{ fontSize: '0.85rem', color: '#aaa', margin: '15px 0', flexGrow: 1, whiteSpace: 'pre-wrap' }}>
-              {n.texto}
-            </p>
-            {n.videoId && (
-              <button
-                onClick={() => onNavigateToVideo({ titulo: n.titulo, id: n.videoId })}
-                style={{ ...styles.btnGold, padding: '8px', fontSize: '0.8rem' }}
-              >
-                IR A LA TÉCNICA →
-              </button>
-            )}
+      {/* Grid de Notas */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+        {notas.length === 0 ? (
+          <div style={{ gridColumn: '1/-1', textAlign: 'center', marginTop: '50px' }}>
+            <p style={{ color: '#444' }}>No hay registros en tu bitácora personal.</p>
           </div>
-        ))}
+        ) : (
+          notas.map((n) => (
+            <div key={n.id} style={{ ...(styles?.card || {}), border: '1px solid #222', padding: '20px', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                <h4 style={{ color: '#d4af37', margin: 0, fontSize: '0.9rem', paddingRight: '20px' }}>{n.titulo.toUpperCase()}</h4>
+                <button 
+                  onClick={() => eliminarNota(n.id)} 
+                  style={{ color: '#ff4444', background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', position: 'absolute', top: '15px', right: '15px' }}
+                >
+                  ×
+                </button>
+              </div>
+              
+              <p style={{ color: '#ccc', fontSize: '0.85rem', flexGrow: 1, whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
+                {n.texto}
+              </p>
+              
+              <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #1a1a1a', paddingTop: '15px' }}>
+                <span style={{ fontSize: '0.65rem', color: '#444' }}>{n.fecha}</span>
+                {n.videoId && (
+                  <button 
+                    onClick={() => onNavigateToVideo({ titulo: n.titulo, id: n.videoId })}
+                    style={{ ...(styles?.btnGold || {}), padding: '6px 12px', fontSize: '0.6rem', width: 'auto' }}
+                  >
+                    REVISAR TÉCNICA
+                  </button>
+                )}
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
@@ -3365,36 +3383,68 @@ export default function App() {
     const guardado = localStorage.getItem('lafortuna_last_video');
     return guardado ? JSON.parse(guardado) : null;
   });
-
-  // --- 2. EFECTO DE AUTENTICACIÓN ---
-  React.useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      setCargando(true);
-      if (user) {
+ // --- 2. EFECTO DE AUTENTICACIÓN ---
+React.useEffect(() => {
+  const unsub = onAuthStateChanged(auth, async (user) => {
+    // Iniciamos carga para bloquear la UI mientras verificamos
+    setCargando(true);
+    
+    if (user) {
+      try {
         const docRef = doc(db, "usuarios", user.uid);
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
           const data = docSnap.data();
-          setUsuario({ ...user, ...data });
+          
+          // Guardamos todo el perfil
+          setUsuario({ 
+            uid: user.uid,
+            email: user.email,
+            ...data 
+          });
+
           setUserRole(data.rol || 'usuario');
           if (data.vistos) setVistos(data.vistos);
+          
+          // Sincronizamos notas localmente
           if (data.notas) {
             localStorage.setItem('lafortuna_notas', JSON.stringify(data.notas));
           }
-          // Si el usuario ya está validado, mandarlo al Hub al refrescar
-          if (data.validado) setPage('hub');
+
+          // REDIRECCIÓN INTELIGENTE
+          if (data.validado) {
+            // Solo mandamos al Hub si el usuario estaba en la pantalla de Login
+            // Esto evita que si refrescas estando en 'estudio' o 'notas_hub', te saque de ahí.
+            setPage(prev => (prev === 'login' || prev === 'espera' ? 'hub' : prev));
+          } else {
+            setPage('espera');
+          }
+          
         } else {
+          // Si el usuario existe en Auth pero borraste su documento en Firestore
+          console.warn("Usuario sin documento en Firestore");
           setUsuario(user);
+          setPage('espera');
         }
-      } else {
-        setUsuario(null);
-        setPage('login');
+      } catch (error) {
+        console.error("Error en el flujo de Auth/Firestore:", error);
+        if (error.message?.includes("ASSERTION")) {
+          console.warn("Error interno de Firebase detectado.");
+        }
       }
-      setCargando(false);
-    });
-    return () => unsub();
-  }, []);
+    } else {
+      // No hay sesión activa
+      setUsuario(null);
+      setPage('login');
+    }
+    
+    // Quitamos la pantalla de carga
+    setCargando(false);
+  });
+
+  return () => unsub();
+}, []);
 
   // --- 3. FUNCIONES DE LÓGICA ---
   const handleLogout = () => {
@@ -3481,7 +3531,7 @@ export default function App() {
   // --- 4. RENDERIZADO DE PÁGINAS ---
   // Extraemos la lógica de qué página mostrar
   const getContent = () => {
-    // 1. SI NO HAY USUARIO: Pantalla de Login
+    // 1. Si no hay usuario, directo a Login
     if (!usuario) {
       return (
         <LoginPage
@@ -3493,27 +3543,15 @@ export default function App() {
       );
     }
 
-    // 2. SI EL USUARIO NO ESTÁ VALIDADO: Pantalla de "Sala de Espera"
-    // Esto bloquea todo el contenido delicado automáticamente.
+    // 2. Si hay usuario pero NO está validado, mostrar Sala de Espera
     if (!usuario.validado) {
       return (
         <div style={{ ...styles.containerCenter, padding: '20px', background: 'radial-gradient(circle, #1a1a1a 0%, #000 100%)' }}>
           <div style={{ ...styles.card, width: '100%', maxWidth: '400px', border: '1px solid #d4af37' }}>
             <h2 style={styles.goldTitle}>SOLICITUD ENVIADA</h2>
-            <p style={{ color: '#fff', fontSize: '1rem', lineHeight: '1.6', marginBottom: '20px' }}>
-              Hola <span style={{ color: '#d4af37', fontWeight: 'bold' }}>{usuario.nombre || 'Guerrero'}</span>,
-            </p>
-            <p style={{ color: '#ccc', fontSize: '0.9rem', marginBottom: '25px' }}>
-              El acceso al Vault de <strong>La Fortuna</strong> es restringido. Tu cuenta está en proceso de validación por el administrador.
-            </p>
-            <div style={{ backgroundColor: '#000', padding: '15px', borderRadius: '8px', border: '1px solid #222', marginBottom: '20px' }}>
-              <p style={{ color: '#666', fontSize: '0.75rem', margin: 0 }}>
-                Recibirás acceso a las técnicas una vez que verifiquemos tu perfil.
-              </p>
-            </div>
-            <button onClick={handleLogout} style={styles.btnOutline}>
-              SALIR / CERRAR SESIÓN
-            </button>
+            <p style={{ color: '#fff' }}>Hola <span style={{ color: '#d4af37' }}>{usuario.nombre || 'Guerrero'}</span>,</p>
+            <p style={{ color: '#ccc', fontSize: '0.9rem' }}>Tu cuenta está en proceso de validación.</p>
+            <button onClick={handleLogout} style={{...styles.btnOutline, marginTop: '20px'}}>CERRAR SESIÓN</button>
           </div>
         </div>
       );
@@ -3552,12 +3590,30 @@ export default function App() {
           onNavigateToNotes={() => setPage('notas_hub')} onContinue={() => setPage('estudio')} hasSession={!!videoActual} />;
 
       case 'estudio':
-        return <EstudioPage video={videoActual} onBack={() => setPage('mapa')} vistos={vistos}
-          toggleVisto={toggleVisto} onNavigateToNotes={() => setPage('notas_hub')}
-          onSelectVideo={(v) => { setVideoActual(v); localStorage.setItem('lafortuna_last_video', JSON.stringify(v)); }} />;
+  return (
+    <EstudioPage 
+      video={videoActual} 
+      onBack={() => setPage('mapa')} 
+      vistos={vistos}
+      toggleVisto={toggleVisto} 
+      usuario={usuario} // <-- Le pasas el usuario que ya tienes en App
+      onSelectVideo={(v) => { 
+        setVideoActual(v); 
+        localStorage.setItem('lafortuna_last_video', JSON.stringify(v)); 
+      }} 
+    />
+  );
 
-      case 'notas_hub':
-        return <NotasHubPage onBack={() => setPage('hub')} onNavigateToVideo={(v) => { setVideoActual(v); setPage('estudio'); }} />;
+      // CÓDIGO CORREGIDO
+case 'notas_hub':
+  return (
+    <NotasHubPage 
+      onBack={() => setPage('hub')} 
+      onNavigateToVideo={(v) => { setVideoActual(v); setPage('estudio'); }} 
+      usuario={usuario} 
+      styles={styles} 
+    />
+  );
 
       case 'busqueda':
         return <BusquedaPage onBack={() => setPage('hub')} onSelectVideo={(v) => { setVideoActual(v); setPage('estudio'); }} />;
