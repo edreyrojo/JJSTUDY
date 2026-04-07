@@ -3708,7 +3708,18 @@ case 'notas_hub':
         }
         return <HubPage onNavigate={setPage} userRole={userRole} onLogout={handleLogout} />;
 
-      case 'planeador':
+case 'planeador':
+    if (['admin', 'profesor', 'instructor'].includes(userRole)) {
+        return (
+            <PlaneadorClasesPage 
+                onBack={() => setPage('hub')} 
+                styles={styles} 
+                usuario={usuario} // <-- Si en tu App.jsx usas "user", cámbialo aquí
+            />
+        );
+    }
+    return <HubPage onNavigate={setPage} userRole={userRole} onLogout={handleLogout} />;
+
         // Admin, profesor e instructor pueden planear clases
         if (['admin', 'profesor', 'instructor'].includes(userRole)) {
           return <PlaneadorClasesPage onBack={() => setPage('hub')} styles={styles} />;

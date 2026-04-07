@@ -401,7 +401,85 @@ const toggleDia = (index) => {
             </div>
           </div>
         </div>
-      )}
+      )}{editandoConfig && (
+    <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.98)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1200, padding: '20px', boxSizing: 'border-box' }}>
+      <div style={{ ...styles.card, width: '100%', maxWidth: '450px', maxHeight: '95vh', overflowY: 'auto', padding: '25px', boxSizing: 'border-box' }}>
+        <h3 style={styles.goldTitle}>CONFIGURACIÓN DE SEDE</h3>
+
+        <div style={{ marginBottom: '20px', textAlign: 'center' }}>
+            <div onClick={() => document.getElementById('logoInput').click()} style={{ width: '80px', height: '80px', borderRadius: '10px', backgroundColor: '#222', margin: '0 auto 8px', border: '1px dashed #d4af37', overflow: 'hidden', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {config.logoBase64 ? <img src={config.logoBase64} style={{width:'100%', height:'100%', objectFit:'cover'}} alt="" /> : <span style={{fontSize:'1.2rem'}}>🏯</span>}
+            </div>
+            <input id="logoInput" type="file" accept="image/*" hidden onChange={handleLogoChange} />
+            <p style={{fontSize: '0.5rem', color: '#d4af37'}}>LOGO ACADEMIA</p>
+        </div>
+
+        {/* INPUTS PRINCIPALES CON BOX-SIZING */}
+        <input placeholder="Nombre Academia" style={{...styles.input, width: '100%', boxSizing: 'border-box'}} value={config.nombreAcademia} onChange={e => setConfig({...config, nombreAcademia: e.target.value})} />
+        <input placeholder="Sede / Ciudad" style={{...styles.input, width: '100%', boxSizing: 'border-box'}} value={config.sede} onChange={e => setConfig({...config, sede: e.target.value})} />
+        
+        {/* GESTOR DE HORARIOS */}
+        <div style={{ border: '1px solid #222', padding: '15px', borderRadius: '10px', marginTop: '15px', boxSizing: 'border-box' }}>
+          <p style={{ color: '#d4af37', fontSize: '0.7rem', textAlign: 'left', marginBottom: '10px' }}>GESTIÓN DE CLASES:</p>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+            <input type="time" style={{ ...styles.input, width: '120px', margin: 0, boxSizing: 'border-box' }} value={tempHora} onChange={e => setTempHora(e.target.value)} />
+            <input placeholder="Nombre clase" style={{ ...styles.input, flex: 1, margin: 0, boxSizing: 'border-box' }} value={tempNombreClase} onChange={e => setTempNombreClase(e.target.value)} />
+          </div>
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', gap: '4px' }}>
+            {["L", "M", "M", "J", "V", "S", "D"].map((dia, i) => (
+              <button key={i} onClick={() => toggleDia(i)} style={{ 
+                flex: 1, height: '35px', borderRadius: '5px', border: '1px solid #333', 
+                backgroundColor: tempDias.includes(i) ? '#d4af37' : '#000',
+                color: tempDias.includes(i) ? '#000' : '#fff',
+                fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer'
+              }}>{dia}</button>
+            ))}
+          </div>
+          <button onClick={agregarHorario} style={{ ...styles.btnGold, width: '100%', margin: 0 }}>AÑADIR CLASE</button>
+
+          <div style={{ marginTop: '15px', maxHeight: '150px', overflowY: 'auto', borderTop: '1px solid #111' }}>
+            {config.horarios.map((h, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #111', fontSize: '0.75rem' }}>
+                <span style={{textAlign: 'left'}}>
+                  <strong style={{color: '#d4af37'}}>{h.hora}</strong> - {h.nombre} <br/>
+                  <small style={{color: '#666'}}>{h.dias?.map(d => ["L","M","M","J","V","S","D"][d]).join(', ')}</small>
+                </span>
+                <button onClick={() => eliminarHorario(i)} style={{ color: '#ff4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}>×</button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* GESTOR DE PROGRAMAS */}
+        <div style={{ border: '1px solid #222', padding: '15px', borderRadius: '10px', marginTop: '15px', boxSizing: 'border-box' }}>
+          <p style={{ color: '#d4af37', fontSize: '0.7rem', textAlign: 'left', marginBottom: '10px' }}>PROGRAMAS ACTIVOS:</p>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '15px' }}>
+            <input placeholder="Nuevo programa" style={{ ...styles.input, flex: 1, margin: 0, boxSizing: 'border-box' }} value={tempNuevoPrograma} onChange={e => setTempNuevoPrograma(e.target.value)} />
+            <button onClick={agregarPrograma} style={{ ...styles.btnGold, width: '50px', margin: 0 }}>+</button>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {config.programas.map((p, i) => (
+              <div key={i} style={{ 
+                backgroundColor: '#d4af3711', border: '1px solid #d4af37', color: '#d4af37', 
+                padding: '5px 12px', borderRadius: '15px', fontSize: '0.65rem', display: 'flex', alignItems: 'center', gap: '8px'
+              }}>
+                {p} <span onClick={() => eliminarPrograma(i)} style={{ cursor: 'pointer', fontWeight: 'bold', color: '#fff' }}>×</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <p style={{ color: '#d4af37', fontSize: '0.7rem', textAlign: 'left', marginTop: '15px' }}>PROGRAMAS (Edición rápida):</p>
+        <textarea style={{...styles.input, height: '60px', width: '100%', boxSizing: 'border-box', fontSize: '0.8rem'}} value={config.programas.join(', ')} onChange={e => setConfig({...config, programas: e.target.value.split(',').map(s => s.trim())})} />
+        
+        <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+            <button onClick={handleUpdateConfig} style={{...styles.btnGold, flex: 1}}>GUARDAR TODO</button>
+            <button onClick={() => setEditandoConfig(false)} style={{...styles.btnOutline, flex: 1}}>CERRAR</button>
+        </div>
+      </div>
+    </div>
+  )}
     </div>
   );
 };

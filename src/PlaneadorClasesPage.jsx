@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
-import { collection, addDoc, onSnapshot, query, orderBy, doc, updateDoc, arrayUnion, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, orderBy, doc, updateDoc, arrayUnion, deleteDoc, where } from 'firebase/firestore';
 
-const PlaneadorClasesPage = ({ onBack, styles }) => {
+const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
     const [clases, setClases] = useState([]);
     const [alumnos, setAlumnos] = useState([]);
     const [modo, setModo] = useState('lista'); 
@@ -28,7 +28,6 @@ const PlaneadorClasesPage = ({ onBack, styles }) => {
         return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
     };
 
-    // --- ESTADO INICIAL ---
     const estadoInicial = {
         titulo: '',
         fecha: new Date().toISOString().split('T')[0],
@@ -39,28 +38,51 @@ const PlaneadorClasesPage = ({ onBack, styles }) => {
     };
     const [nuevaClase, setNuevaClase] = useState(estadoInicial);
 
-    // --- CARGA DE DATOS (CON PARCHE DE ERROR) ---
-    useEffect(() => {
+    // --- CARGA DE DATOS (BLINDADA) ---
+    // --- CARGA DE DATOS (VERSIÓN DE TRANSICIÓN SEGURA) ---
+useEffect(() => {
+        // SEGURIDAD: Si no hay usuario, abortamos para evitar colapsos al navegar
+        if (!usuario?.uid) return;
+
         let isMounted = true;
+        const idParaFiltrar = usuario.academiaId || usuario.uid;
 
-        const qClases = query(collection(db, "clases"), orderBy("fecha", "desc"));
+        // 1. CARGA DE CLASES (General por ahora para recuperar tus datos viejos)
+        // Quitamos el 'where' solo aquí para que aparezca "MONTURA CLA"
+        const qClases = query(
+            collection(db, "clases"), 
+            orderBy("fecha", "desc")
+        );
+        
         const unsubClases = onSnapshot(qClases, (snap) => {
-            if (isMounted) setClases(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        }, (err) => console.error("Error Clases:", err));
+            if (isMounted) {
+                const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                setClases(docs);
+            }
+        }, (err) => console.error("Error en Clases:", err));
 
-        const qAlumnos = query(collection(db, "alumnos"), orderBy("nombre", "asc"));
+        // 2. CARGA DE ALUMNOS (Filtrada por academiaId y Activos)
+        const qAlumnos = query(
+            collection(db, "alumnos"), 
+            where("academiaId", "==", idParaFiltrar),
+            orderBy("nombre", "asc")
+        );
+
         const unsubAlumnos = onSnapshot(qAlumnos, (snap) => {
-            if (isMounted) setAlumnos(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(a => a.activo));
-        }, (err) => console.error("Error Alumnos:", err));
+            if (isMounted) {
+                // Aprovechamos el campo 'activo' que ya tienes
+                setAlumnos(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(a => a.activo));
+            }
+        }, (err) => console.error("Error en Alumnos:", err));
 
         return () => {
             isMounted = false;
             unsubClases();
             unsubAlumnos();
         };
-    }, []);
+    }, [usuario]);
 
-    // --- FUNCIONES DE EDICIÓN ---
+    // --- FUNCIONES DE EDICIÓN (SIN CAMBIOS) ---
     const agregarBloqueCLA = () => {
         const nuevosBloques = [...nuevaClase.bloques];
         const bloqueCLA = { 
@@ -85,39 +107,61 @@ const PlaneadorClasesPage = ({ onBack, styles }) => {
         setNuevaClase({ ...nuevaClase, bloques: nuevos });
     };
 
+    // --- GUARDAR CLASE (AHORA CON INYECCIÓN DE ID) ---
     const guardarClase = async () => {
         if (!nuevaClase.titulo) return alert("Falta título");
+        if (!usuario?.uid) return alert("Error: Sesión no encontrada");
+
         try {
-            await addDoc(collection(db, "clases"), nuevaClase);
+            await addDoc(collection(db, "clases"), {
+                ...nuevaClase,
+                // Inyectamos el ID para que las clases nuevas ya vengan "etiquetadas"
+                academiaId: usuario.academiaId || usuario.uid,
+                fechaRegistro: new Date().toISOString()
+            });
             setModo('lista');
             setNuevaClase(estadoInicial);
-        } catch (e) { alert("Error al guardar clase"); }
+        } catch (e) { 
+            console.error("Error al guardar:", e);
+            alert("Error al guardar clase en la Bóveda."); 
+        }
     };
 
     const eliminarClaseDB = async (id) => {
-        if (window.confirm("¿Borrar permanentemente?")) await deleteDoc(doc(db, "clases", id));
+        if (window.confirm("¿Borrar permanentemente?")) {
+            try {
+                await deleteDoc(doc(db, "clases", id));
+            } catch (e) { console.error(e); }
+        }
     };
 
     const registrarAsistenciaConNota = async (alumnoId, nota) => {
+        if (!claseSeleccionada) return;
         try {
             const alumnoRef = doc(db, "alumnos", alumnoId);
             await updateDoc(alumnoRef, {
                 asistencias: arrayUnion(claseSeleccionada.fecha),
-                historialTecnico: arrayUnion({ fecha: claseSeleccionada.fecha, clase: claseSeleccionada.titulo, nota: nota || "Asistió" })
+                historialTecnico: arrayUnion({ 
+                    fecha: claseSeleccionada.fecha, 
+                    clase: claseSeleccionada.titulo, 
+                    nota: nota || "Asistió" 
+                })
             });
             alert("Nota guardada");
-        } catch (e) { alert("Error de permisos en Firestore"); }
+        } catch (e) { 
+            console.error(e);
+            alert("Error de permisos en Firestore"); 
+        }
     };
 
+    // --- RENDER SEGURO ---
+    if (!usuario) return <div style={{color: 'white', padding: '50px'}}>Cargando sesión...</div>;
+
     return (
-        <div style={{ 
-            backgroundColor: '#000', minHeight: '100vh', color: '#fff', 
-            width: '100%', margin: 0, padding: 0, boxSizing: 'border-box', overflowX: 'hidden' 
-        }}>
+        <div style={{ backgroundColor: '#000', minHeight: '100vh', color: '#fff', width: '100%', margin: 0, padding: 0, boxSizing: 'border-box', overflowX: 'hidden' }}>
             
-            {/* TIMER STICKY */}
             {modo === 'clase_activa' && (
-                <div style={{ position: 'sticky', top: 0, zIndex: 100, backgroundColor: '#d4af37', color: '#000', padding: '15px', borderRadius: '0 0 15px 15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.5)' }}>
+                <div style={{ position: 'sticky', top: 0, zIndex: 100, backgroundColor: '#d4af37', color: '#000', padding: '15px', borderRadius: '0 0 15px 15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '1.8rem', fontWeight: 'bold' }}>{formatTime(timeLeft)}</span>
                     <div style={{ display: 'flex', gap: '8px' }}>
                         <button onClick={() => setTimerActive(!timerActive)} style={{ backgroundColor: '#000', color: '#d4af37', border: 'none', padding: '10px 15px', borderRadius: '8px', fontWeight: 'bold' }}>
@@ -129,8 +173,6 @@ const PlaneadorClasesPage = ({ onBack, styles }) => {
             )}
 
             <div style={{ padding: '15px', boxSizing: 'border-box', width: '100%' }}>
-                
-                {/* HEADER */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
                     <button onClick={onBack} style={{ ...styles.btnOutline, width: '45px', height: '45px' }}>←</button>
                     <div style={{ textAlign: 'right' }}>
@@ -158,9 +200,8 @@ const PlaneadorClasesPage = ({ onBack, styles }) => {
 
                 {/* VISTA: CREAR */}
                 {modo === 'crear' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', paddingBottom: '100px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', paddingBottom: '100px', maxWidth: '100%', boxSizing: 'border-box' }}>
                         <input placeholder="TÍTULO DE LA SESIÓN" style={{ ...styles.input, width: '100%', boxSizing: 'border-box', textAlign: 'center', borderBottom: '2px solid #d4af37' }} onChange={e => setNuevaClase({ ...nuevaClase, titulo: e.target.value })} />
-                        
                         {nuevaClase.bloques.map((bloque, index) => (
                             <div key={bloque.id} style={{ ...styles.card, width: '100%', maxWidth: 'none', boxSizing: 'border-box', border: '1px solid #333', padding: '15px', textAlign: 'left' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
@@ -175,11 +216,12 @@ const PlaneadorClasesPage = ({ onBack, styles }) => {
                                         )}
                                     </div>
                                 </div>
-
                                 {bloque.tipo === 'Calentamiento' ? (
                                     <>
-                                        <textarea placeholder="Calentamiento Ligero (Movilidad)..." style={{...styles.input, width: '100%', height: '60px', marginBottom: '10px'}} onChange={e => { const b = [...nuevaClase.bloques]; b[index].ligero = e.target.value; setNuevaClase({ ...nuevaClase, bloques: b }); }} />
-                                        <textarea placeholder="Drills Intensos..." style={{...styles.input, width: '100%', height: '60px'}} onChange={e => { const b = [...nuevaClase.bloques]; b[index].intenso = e.target.value; setNuevaClase({ ...nuevaClase, bloques: b }); }} />
+                                        <textarea placeholder="Calentamiento Ligero (Movilidad)..." style={{...styles.input, width: '100%',maxWidth: '100%', height: '80px', marginBottom: '10px', boxSizing: 'border-box', // 🛠 Clave: incluye el padding en el cálculo del ancho
+        resize: 'none'}} onChange={e => { const b = [...nuevaClase.bloques]; b[index].ligero = e.target.value; setNuevaClase({ ...nuevaClase, bloques: b }); }} />
+                                        <textarea placeholder="Drills Intensos..." style={{...styles.input, width: '100%', height: '60px', maxWidth: '100%', boxSizing: 'border-box', // 🛠 Clave: incluye el padding en el cálculo del ancho
+        resize: 'none'}} onChange={e => { const b = [...nuevaClase.bloques]; b[index].intenso = e.target.value; setNuevaClase({ ...nuevaClase, bloques: b }); }} />
                                     </>
                                 ) : bloque.tipo === 'CLA' ? (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -192,7 +234,8 @@ const PlaneadorClasesPage = ({ onBack, styles }) => {
                                         </div>
                                     </div>
                                 ) : (
-                                    <textarea placeholder="Detalles Sparring..." style={{...styles.input, height: '80px'}} onChange={e => { const b = [...nuevaClase.bloques]; b[index].contenido = e.target.value; setNuevaClase({ ...nuevaClase, bloques: b }); }} />
+                                    <textarea placeholder="Detalles Sparring..." style={{...styles.input, height: '80px', maxWidth: '100%', boxSizing: 'border-box', // 🛠 Clave: incluye el padding en el cálculo del ancho
+        resize: 'none'}} onChange={e => { const b = [...nuevaClase.bloques]; b[index].contenido = e.target.value; setNuevaClase({ ...nuevaClase, bloques: b }); }} />
                                 )}
                                 <div style={{marginTop: '10px', display:'flex', alignItems:'center', gap:'10px'}}>
                                     <span style={{fontSize:'0.7rem', color:'#666'}}>DURACIÓN (MIN):</span>
