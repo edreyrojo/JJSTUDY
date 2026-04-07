@@ -3621,7 +3621,13 @@ case 'notas_hub':
       case 'alumnos':
         // Protección extra: solo admin y profesor entran aquí
         if (['admin', 'profesor'].includes(userRole)) {
-          return <GestionAlumnosPage onBack={() => setPage('hub')} styles={styles} />;
+          return (
+            <GestionAlumnosPage 
+              onBack={() => setPage('hub')} 
+              styles={styles} 
+              usuario={usuario} // <--- ESTA ES LA PIEZA QUE FALTABA
+            />
+          );
         }
         return <HubPage onNavigate={setPage} userRole={userRole} onLogout={handleLogout} />;
 
