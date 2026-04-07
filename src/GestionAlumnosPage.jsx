@@ -215,7 +215,7 @@ const GestionAlumnosPage = ({ onBack, styles, usuario }) => {
             <button onClick={() => setVerArchivados(!verArchivados)} style={{ background: 'none', border: 'none', color: '#d4af37', textDecoration: 'underline', fontSize: '0.8rem', cursor: 'pointer' }}>
                 {verArchivados ? "Ver alumnos activos" : "Ver alumnos inactivos (Archivo)"}
             </button>
-            <button onClick={() => setMostrarForm(true)} style={{ ...styles.btnGold, width: 'auto', padding: '10px 25px' }}>+ NUEVO GUERRERO</button>
+            <button onClick={() => setMostrarForm(true)} style={{ ...styles.btnGold, width: 'auto', padding: '10px 25px' }}>+ NUEVO ALUMNO</button>
         </div>
       </div>
 

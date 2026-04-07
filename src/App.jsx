@@ -2970,27 +2970,39 @@ const MapaPage = ({
     </div>
   );
 };
-const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos = [], toggleVisto }) => {
+const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos = [], toggleVisto, usuario, styles = {} }) => {
   // --- ESTADOS ---
   const [nota, setNota] = useState("");
   const [segundosCorriendo, setSegundosCorriendo] = useState(0);
   const [isCronometroActivo, setIsCronometroActivo] = useState(false);
   const [timestamp, setTimestamp] = useState("");
-  const [tiempoActivo, setTiempoActivo] = useState("");
+  const [tiempoActivo, setTiempoActivo] = useState(video?.startTime || 0);
   const [nombreMarcador, setNombreMarcador] = useState("");
   const [esMovil, setEsMovil] = React.useState(window.innerWidth < 768);
-
-  // ESTADOS DEL NUEVO MODAL
   const [mostrarAlerta, setMostrarAlerta] = useState(false);
   const [mensajeAlerta, setMensajeAlerta] = useState("");
 
   // --- EFECTOS ---
   React.useEffect(() => {
+    if (video) {
+      const notaExistente = usuario?.notas?.[video.id];
+      const textoCargado = typeof notaExistente === 'string' ? notaExistente : (notaExistente?.texto || "");
+      setNota(textoCargado);
+
+      if (video.startTime !== undefined) {
+        setTiempoActivo(video.startTime);
+        setSegundosCorriendo(video.startTime);
+      } else {
+        setTiempoActivo(0);
+        setSegundosCorriendo(0);
+      }
+    }
+  }, [video, usuario]);
+
+  React.useEffect(() => {
     let intervalo;
     if (isCronometroActivo) {
-      intervalo = setInterval(() => {
-        setSegundosCorriendo(s => s + 1);
-      }, 1000);
+      intervalo = setInterval(() => setSegundosCorriendo(s => s + 1), 1000);
     }
     return () => clearInterval(intervalo);
   }, [isCronometroActivo]);
@@ -3001,10 +3013,6 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Carga sincronizada
-  // UBICACIÓN: Dentro de App(), reemplaza el useEffect actual por este:
-  
-
   // --- FUNCIONES ---
   const formatearTiempo = (seg) => {
     const m = Math.floor(seg / 60).toString().padStart(2, '0');
@@ -3013,53 +3021,40 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
   };
 
   const insertarMarcaDeTiempo = () => {
-    if (!timestamp.trim()) {
-      setMensajeAlerta("Por favor pon un minuto (ej: 02:45)");
-      setMostrarAlerta(true);
-      return;
-    }
+    const tiempoAUsar = timestamp.trim() || formatearTiempo(segundosCorriendo);
     const etiqueta = nombreMarcador.trim() || "Punto de interés";
-    setNota(nota + `\n[${timestamp.trim()} - ${etiqueta}] `);
+    const nuevaLinea = `\n[${tiempoAUsar}] - ${etiqueta}`;
+    setNota(prev => prev + nuevaLinea);
     setTimestamp("");
     setNombreMarcador("");
   };
 
   const guardar = async () => {
-    if (!video?.id) return;
-    const ahora = new Date().toLocaleString();
-
-    // Guardado local
-    const dataNota = { texto: nota, videoId: video.id, fecha: ahora };
-    localStorage.setItem(`nota_${video.titulo}`, JSON.stringify(dataNota));
-    const notasLocales = JSON.parse(localStorage.getItem('lafortuna_notas') || '{}');
-    notasLocales[video.id] = nota;
-    localStorage.setItem('lafortuna_notas', JSON.stringify(notasLocales));
-
-    // Guardado en la nube
-    if (auth.currentUser) {
-      try {
-        const userRef = doc(db, "usuarios", auth.currentUser.uid);
-        await setDoc(userRef, { notas: { [video.id]: nota } }, { merge: true });
-
-        // NOTIFICACIÓN PERSONALIZADA
-        setMensajeAlerta(`Bitácora sincronizada en el Vault: ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
-        setMostrarAlerta(true);
-        setTimeout(() => setMostrarAlerta(false), 3000); // Auto-cierre
-      } catch (err) {
-        setMensajeAlerta("Error al sincronizar con la nube.");
-        setMostrarAlerta(true);
-      }
-    }
+    if (!video?.id || !usuario?.uid) return;
+    try {
+      const userRef = doc(db, "usuarios", usuario.uid);
+      await setDoc(userRef, { 
+        notas: { 
+          [video.id]: {
+            texto: nota,
+            titulo: video.titulo,
+            fecha: new Date().toLocaleString(),
+            videoId: video.id
+          }
+        } 
+      }, { merge: true });
+      setMensajeAlerta("Vault Sincronizado 🛡️");
+      setMostrarAlerta(true);
+      setTimeout(() => setMostrarAlerta(false), 2000);
+    } catch (err) { setMensajeAlerta("Error al guardar."); setMostrarAlerta(true); }
   };
 
-  const videoSiguiente = getAdjacentVideo(video, 'next');
-  const videoAnterior = getAdjacentVideo(video, 'prev');
-
-  const saltarATiempo = (minutoTexto) => {
-    const coincidencia = minutoTexto.match(/(\d+):(\d+)/);
+  const saltarATiempo = (marcaTexto) => {
+    const coincidencia = marcaTexto.match(/(\d+):(\d+)/);
     if (coincidencia) {
-      const segundos = parseInt(coincidencia[1]) * 60 + parseInt(coincidencia[2]);
-      setTiempoActivo(segundos);
+      const segs = parseInt(coincidencia[1]) * 60 + parseInt(coincidencia[2]);
+      setTiempoActivo(segs);
+      setSegundosCorriendo(segs);
     }
   };
 
@@ -3069,78 +3064,100 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
     <div style={{ display: 'flex', flexDirection: esMovil ? 'column' : 'row', height: '100vh', width: '100vw', backgroundColor: '#000', color: '#fff', overflow: 'hidden' }}>
 
       {/* SECCIÓN IZQUIERDA: VIDEO */}
-      <div style={{ flex: esMovil ? 'none' : 3, display: 'flex', flexDirection: 'column', borderRight: esMovil ? 'none' : '1px solid #222', borderBottom: esMovil ? '1px solid #222' : 'none', height: esMovil ? 'auto' : '100%' }}>
-        <div style={{ padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#0a0a0a', minHeight: '60px' }}>
-          <button onClick={() => videoAnterior && onSelectVideo(videoAnterior)} style={{ ...styles.btnOutline, width: '45px', padding: '10px 0', opacity: videoAnterior ? 1 : 0.2 }} disabled={!videoAnterior}>←</button>
-          <div style={{ textAlign: 'center', flex: 1, padding: '0 10px', overflow: 'hidden' }}>
-            <h2 style={{ fontSize: esMovil ? '0.8rem' : '1rem', color: '#d4af37', margin: 0, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', fontWeight: 'bold' }}>{video?.titulo}</h2>
-            <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#888', fontSize: '0.65rem', textDecoration: 'underline' }}>CERRAR ESTUDIO</button>
+      <div style={{ flex: esMovil ? 'none' : 3, display: 'flex', flexDirection: 'column', borderRight: '1px solid #222' }}>
+        <div style={{ padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#0a0a0a', minHeight: '70px' }}>
+          <button onClick={onBack} style={{ ...(styles.btnOutline || {}), width: 'auto', padding: '8px 15px' }}>← VOLVER</button>
+          
+          <div style={{ textAlign: 'center', flex: 1, padding: '0 10px' }}>
+            <span style={{ fontSize: '0.6rem', color: '#666', letterSpacing: '2px', display: 'block' }}>MODO ESTUDIO</span>
+            <h2 style={{ fontSize: '0.9rem', color: '#d4af37', margin: 0, fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{video?.titulo}</h2>
           </div>
-          <button onClick={() => videoSiguiente && onSelectVideo(videoSiguiente)} style={{ ...styles.btnGold, width: '45px', padding: '10px 0', opacity: videoSiguiente ? 1 : 0.2 }} disabled={!videoSiguiente}>→</button>
+
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <button onClick={onNavigateToNotes} style={{ background: 'none', border: '1px solid #d4af37', color: '#d4af37', borderRadius: '4px', fontSize: '0.6rem', padding: '5px 10px', cursor: 'pointer', fontWeight: 'bold' }}>BITÁCORA</button>
+            <div style={{ cursor: 'pointer', fontSize: '1.2rem' }} onClick={() => toggleVisto(video?.id)}>{isCompletado ? '✅' : '⚪'}</div>
+          </div>
         </div>
-        <div style={{ width: '100%', aspectRatio: '16/9', backgroundColor: '#000', position: 'relative', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}>
-          <iframe key={`${video?.id}-${tiempoActivo}`} src={`https://drive.google.com/file/d/${video?.id}/preview${tiempoActivo ? `?t=${tiempoActivo}` : ''}`} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }} allowFullScreen></iframe>
+        
+        <div style={{ width: '100%', aspectRatio: '16/9', backgroundColor: '#000', position: 'relative' }}>
+          <iframe 
+            key={`${video?.id}-${tiempoActivo}`} 
+            src={`https://drive.google.com/file/d/${video?.id}/preview${tiempoActivo ? `?t=${tiempoActivo}` : ''}`} 
+            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }} 
+            allowFullScreen
+          ></iframe>
         </div>
       </div>
 
       {/* SECCIÓN DERECHA: NOTAS */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px', backgroundColor: '#0f0f0f', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-          <h3 style={{ color: '#d4af37', fontSize: '1rem', margin: 0 }}>BITÁCORA TÉCNICA</h3>
-          <span style={{ fontSize: '0.6rem', color: '#666' }}>ID: {video?.id?.substring(0, 6)}</span>
+        
+        <div style={{ marginBottom: '15px' }}>
+          <h3 style={{ color: '#d4af37', fontSize: '0.8rem', margin: '0 0 5px 0', letterSpacing: '1px' }}>OBSERVACIONES TÉCNICAS:</h3>
+          <p style={{ color: '#555', fontSize: '0.7rem', margin: 0, fontStyle: 'italic' }}>{video?.titulo}</p>
         </div>
 
-        <div style={{ backgroundColor: '#181818', padding: '15px', borderRadius: '8px', marginBottom: '20px', border: '1px solid #222' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', alignItems: 'center', backgroundColor: '#000', padding: '8px', borderRadius: '5px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: isCronometroActivo ? '#4CAF50' : '#f44336' }}></div>
-              <span style={{ fontSize: '0.8rem', color: '#fff', fontWeight: 'bold' }}>{formatearTiempo(segundosCorriendo)}</span>
-            </div>
-            <div style={{ display: 'flex', gap: '5px' }}>
-              <button onClick={() => setIsCronometroActivo(!isCronometroActivo)} style={{ backgroundColor: isCronometroActivo ? '#333' : '#d4af37', border: 'none', color: isCronometroActivo ? '#fff' : '#000', fontSize: '0.65rem', padding: '5px 10px', borderRadius: '4px', fontWeight: 'bold' }}>{isCronometroActivo ? 'PAUSAR' : 'SYNC'}</button>
-              <button onClick={() => { setSegundosCorriendo(0); setIsCronometroActivo(false); }} style={{ background: 'none', border: '1px solid #444', color: '#666', fontSize: '0.65rem', padding: '5px 8px', borderRadius: '4px' }}>RESET</button>
-            </div>
+        {/* PANEL DE CONTROL */}
+        <div style={{ backgroundColor: '#111', padding: '15px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #222' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', alignItems: 'center' }}>
+            <span style={{ fontSize: '1.1rem', color: '#d4af37', fontWeight: 'bold', fontFamily: 'monospace' }}>{formatearTiempo(segundosCorriendo)}</span>
+            <button onClick={() => setIsCronometroActivo(!isCronometroActivo)} style={{ ...(styles.btnGold || {}), width: 'auto', padding: '6px 15px', fontSize: '0.65rem' }}>
+              {isCronometroActivo ? 'PAUSAR SYNC' : 'INICIAR SYNC'}
+            </button>
           </div>
-          <input type="text" placeholder="¿Qué viste?..." value={nombreMarcador} onChange={(e) => setNombreMarcador(e.target.value)} style={{ width: '100%', backgroundColor: '#0a0a0a', border: '1px solid #333', color: '#fff', padding: '12px', borderRadius: '5px', fontSize: '0.8rem', marginBottom: '10px' }} />
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <input type="text" placeholder="00:00" value={timestamp} onChange={(e) => setTimestamp(e.target.value)} style={{ width: '80px', backgroundColor: '#0a0a0a', border: '1px solid #d4af37', color: '#d4af37', textAlign: 'center', borderRadius: '5px', padding: '12px 0' }} />
-            <button onClick={() => setTimestamp(formatearTiempo(segundosCorriendo))} style={{ flex: 1, backgroundColor: '#333', border: '1px solid #d4af37', color: '#d4af37', borderRadius: '5px', padding: '12px 0', fontSize: '0.7rem' }}>⏱️ CAPTURAR</button>
-            <button onClick={insertarMarcaDeTiempo} style={{ flex: 1.5, backgroundColor: '#d4af37', border: 'none', color: '#000', borderRadius: '5px', padding: '12px 0', fontSize: '0.75rem' }}>+ NOTA</button>
+          <input placeholder="Nombre de la posición o detalle..." value={nombreMarcador} onChange={(e) => setNombreMarcador(e.target.value)} style={{ ...(styles.input || {}), marginBottom: '10px', fontSize: '0.8rem' }} />
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input placeholder="00:00" value={timestamp} onChange={(e) => setTimestamp(e.target.value)} style={{ width: '75px', backgroundColor: '#000', border: '1px solid #333', color: '#d4af37', textAlign: 'center', borderRadius: '5px', fontWeight: 'bold' }} />
+            <button onClick={insertarMarcaDeTiempo} style={{ flex: 1, ...(styles.btnGold || {}), fontSize: '0.7rem', fontWeight: 'bold' }}>+ AÑADIR A BITÁCORA</button>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '15px' }}>
-          {(nota.match(/\[\d+:\d+ - .*?\]/g) || []).map((marca, i) => {
-            const partes = marca.replace('[', '').replace(']', '').split(' - ');
-            return (
-              <button key={i} onClick={() => saltarATiempo(partes[0])} style={{ fontSize: '0.65rem', padding: '10px 14px', backgroundColor: '#d4af3722', color: '#d4af37', border: '1px solid #d4af37', borderRadius: '20px', whiteSpace: 'nowrap' }}>📍 {partes[1]}</button>
-            );
-          })}
-        </div>
+        {/* TRACKER DE MARCAS DINÁMICO */}
+        <p style={{ fontSize: '0.6rem', color: '#444', margin: '0 0 8px 5px', letterSpacing: '1px' }}>MARCADORES EN ESTE VIDEO:</p>
+        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '15px', scrollbarWidth: 'none' }}>
+  {/* Regex más flexible: detecta [00:00] y lo que sigue después de un espacio o guion */}
+  {(nota.match(/\[\d+:\d+\]\s*(?:-?\s*([^[\n]*))?/g) || []).map((marcaCompleta, i) => {
+    const tiempoMatch = marcaCompleta.match(/\[\d+:\d+\]/);
+    if (!tiempoMatch) return null;
+    
+    const tiempo = tiempoMatch[0];
+    // Limpia el nombre quitando el corchete de tiempo y el guion inicial
+    const nombre = marcaCompleta.replace(tiempo, "").replace(/^\s*-\s*/, "").trim() || "Marca";
+    
+    return (
+      <button 
+        key={i} 
+        onClick={() => saltarATiempo(tiempo)} 
+        style={{ 
+          fontSize: '0.65rem', 
+          padding: '8px 14px', 
+          backgroundColor: '#d4af3711', 
+          color: '#d4af37', 
+          border: '1px solid #d4af37', 
+          borderRadius: '20px', 
+          whiteSpace: 'nowrap' 
+        }}
+      >
+        📍 {tiempo} {nombre}
+      </button>
+    );
+  })}
+</div>
 
-        <textarea value={nota} onChange={(e) => setNota(e.target.value)} style={{ flex: 'none', height: esMovil ? '180px' : '350px', backgroundColor: '#0a0a0a', color: '#ddd', padding: '15px', borderRadius: '8px', border: '1px solid #333', marginBottom: '20px', fontSize: '0.9rem', resize: 'none' }} />
+        <textarea 
+          value={nota} 
+          onChange={(e) => setNota(e.target.value)} 
+          style={{ flex: 1, minHeight: '200px', backgroundColor: '#0a0a0a', color: '#ddd', padding: '15px', borderRadius: '8px', border: '1px solid #222', fontSize: '0.85rem', resize: 'none', lineHeight: '1.6' }} 
+          placeholder="Escribe aquí los detalles del sistema..."
+        />
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '40px' }}>
-          <button style={{ ...styles.btnGold, padding: '15px', fontWeight: 'bold' }} onClick={guardar}>💾 ACTUALIZAR BITÁCORA</button>
-          <button onClick={() => toggleVisto(video?.id)} style={{ ...styles.btnOutline, borderColor: isCompletado ? '#4CAF50' : '#444', color: isCompletado ? '#4CAF50' : '#fff', padding: '15px' }}>{isCompletado ? 'TÉCNICA COMPLETADA ✅' : 'MARCAR COMO VISTA'}</button>
-        </div>
+        <button style={{ ...(styles.btnGold || {}), marginTop: '15px', padding: '15px', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(212, 175, 55, 0.1)' }} onClick={guardar}>GUARDAR</button>
       </div>
 
-      {/* --- MODAL DE NOTIFICACIÓN PERSONALIZADO --- */}
+      {/* MODAL ALERTA */}
       {mostrarAlerta && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999, backdropFilter: 'blur(5px)' }}>
-          <div style={{ backgroundColor: '#111', border: '1px solid #d4af37', padding: '30px', borderRadius: '15px', textAlign: 'center', maxWidth: '320px', boxShadow: '0 0 30px rgba(212, 175, 55, 0.3)', animation: 'fadeIn 0.3s ease' }}>
-            <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>{mensajeAlerta.includes("Error") ? '❌' : '🛡️'}</div>
-            <h3 style={{ color: '#d4af37', margin: '0 0 10px 0', fontSize: '1.2rem', letterSpacing: '1px' }}>{mensajeAlerta.includes("Error") ? 'ALERTA' : 'VAULT ACTUALIZADO'}</h3>
-            <p style={{ color: '#eee', fontSize: '0.9rem', marginBottom: '25px', lineHeight: '1.4' }}>{mensajeAlerta}</p>
-            <button onClick={() => setMostrarAlerta(false)} style={{ ...styles.btnGold, padding: '12px', width: '100%', fontWeight: 'bold' }}>ENTENDIDO</button>
-          </div>
-          <style>{`
-            @keyframes fadeIn {
-              from { opacity: 0; transform: scale(0.9); }
-              to { opacity: 1; transform: scale(1); }
-            }
-          `}</style>
+        <div style={{ position: 'fixed', bottom: '30px', left: '50%', transform: 'translateX(-50%)', backgroundColor: '#d4af37', color: '#000', padding: '12px 25px', borderRadius: '30px', fontWeight: 'bold', zIndex: 9999, boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}>
+          {mensajeAlerta}
         </div>
       )}
     </div>
@@ -3254,105 +3271,163 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles }) => {
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
-    // 1. Esperamos a que el usuario esté cargado
     if (!usuario) {
       const timer = setTimeout(() => setCargando(false), 2000);
       return () => clearTimeout(timer);
     }
 
-    // 2. Si el usuario tiene el objeto 'notas' en su perfil (según tu captura de Firestore)
     if (usuario.notas) {
-      // Convertimos el objeto de notas en un Array para poder usar .map()
       const listaConvertida = Object.entries(usuario.notas).map(([id, data]) => ({
         id: id,
-        // Si la nota es solo un string, lo manejamos. Si es objeto, extraemos campos.
         titulo: data.titulo || "NOTA TÉCNICA",
-        texto: typeof data === 'string' ? data : data.texto,
+        texto: typeof data === 'string' ? data : (data.texto || ""),
         fecha: data.fecha || "Reciente",
-        videoId: data.videoId || null
+        videoId: data.videoId || id 
       }));
 
-      // Ordenar por fecha (opcional, si tienes el campo fecha)
       listaConvertida.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-      
       setNotas(listaConvertida);
     } else {
       setNotas([]);
     }
-
     setCargando(false);
   }, [usuario]);
 
   const eliminarNota = async (notaId) => {
     if (!window.confirm("¿Eliminar esta nota del Vault?")) return;
-    
     try {
       const userRef = doc(db, "usuarios", usuario.uid);
-      // Eliminamos la nota específica dentro del objeto 'notas' del usuario
-      await updateDoc(userRef, {
-        [`notas.${notaId}`]: deleteField()
-      });
-      // La UI se actualizará sola si App.js vuelve a cargar al usuario, 
-      // o puedes filtrar el estado local aquí:
+      await updateDoc(userRef, { [`notas.${notaId}`]: deleteField() });
       setNotas(prev => prev.filter(n => n.id !== notaId));
-    } catch (e) {
-      console.error("Error al eliminar:", e);
-      alert("No se pudo eliminar la nota.");
-    }
+    } catch (e) { alert("Error al eliminar."); }
   };
 
   if (cargando) {
     return (
-      <div style={{ minHeight: '100vh', backgroundColor: '#0a0a0a', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-        <div style={{ color: '#d4af37', fontFamily: 'monospace', letterSpacing: '2px' }}>ACCEDIENDO AL VAULT...</div>
+      <div style={{ minHeight: '100vh', backgroundColor: '#000', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <div style={{ color: '#d4af37', fontFamily: 'monospace' }}>ACCEDIENDO AL VAULT...</div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: '20px', minHeight: '100vh', backgroundColor: '#0a0a0a', color: '#fff' }}>
+    <div style={{ padding: '20px', minHeight: '100vh', backgroundColor: '#000', color: '#fff', boxSizing: 'border-box' }}>
+      
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-        <button onClick={onBack} style={{ ...(styles?.btnOutline || {}), width: 'auto', padding: '10px 20px' }}>← VOLVER</button>
-        <h2 style={{ ...(styles?.goldTitle || {}), margin: 0, fontSize: '1.2rem' }}>BITÁCORA TÉCNICA</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', maxWidth: '1200px', margin: '0 auto 30px auto' }}>
+        <button onClick={onBack} style={{ ...styles.btnOutline, width: 'auto', padding: '10px 20px' }}>← VOLVER</button>
+        <h2 style={{ ...styles.goldTitle, margin: 0, fontSize: '1.2rem' }}>BITÁCORA TÉCNICA</h2>
       </div>
 
-      {/* Grid de Notas */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+      {/* Grid de Notas con responsive corregido */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', // Un poco más ancho el mínimo para escritorio
+        gap: '25px', // Más espacio entre notas
+        maxWidth: '1200px', 
+        margin: '0 auto',
+        paddingBottom: '40px'
+      }}>
         {notas.length === 0 ? (
           <div style={{ gridColumn: '1/-1', textAlign: 'center', marginTop: '50px' }}>
             <p style={{ color: '#444' }}>No hay registros en tu bitácora personal.</p>
           </div>
         ) : (
-          notas.map((n) => (
-            <div key={n.id} style={{ ...(styles?.card || {}), border: '1px solid #222', padding: '20px', display: 'flex', flexDirection: 'column', position: 'relative' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                <h4 style={{ color: '#d4af37', margin: 0, fontSize: '0.9rem', paddingRight: '20px' }}>{n.titulo.toUpperCase()}</h4>
-                <button 
-                  onClick={() => eliminarNota(n.id)} 
-                  style={{ color: '#ff4444', background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', position: 'absolute', top: '15px', right: '15px' }}
-                >
-                  ×
-                </button>
+          notas.map((n) => {
+            const match = n.texto.match(/\[(\d+):(\d+)\]/);
+            const segs = match ? (parseInt(match[1]) * 60 + parseInt(match[2])) : 0;
+
+            return (
+              <div key={n.id} style={{ 
+                ...(styles?.card || {}), 
+                border: '1px solid #222', 
+                padding: '20px', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                height: '300px', // Un poco más de altura para evitar desbordes de botones
+                justifyContent: 'space-between',
+                backgroundColor: '#0a0a0a',
+                boxSizing: 'border-box',
+                position: 'relative',
+                overflow: 'hidden' // Evita que el contenido salga de la card
+              }}>
+                <div style={{ overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                    <h4 style={{ 
+                      color: '#d4af37', 
+                      margin: 0, 
+                      fontSize: '0.85rem', 
+                      paddingRight: '25px',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis' 
+                    }}>
+                      {n.titulo.toUpperCase()}
+                    </h4>
+                    <button 
+                      onClick={() => eliminarNota(n.id)} 
+                      style={{ 
+                        color: '#444', 
+                        background: 'none', 
+                        border: 'none', 
+                        fontSize: '1.2rem', 
+                        cursor: 'pointer',
+                        position: 'absolute',
+                        top: '15px',
+                        right: '15px',
+                        zIndex: 2
+                      }}
+                    >×</button>
+                  </div>
+                  
+                  {/* Contenedor de texto con scroll interno si es muy largo, pero limitado visualmente */}
+                  <p style={{ 
+                    color: '#aaa', 
+                    fontSize: '0.8rem', 
+                    lineHeight: '1.6', 
+                    display: '-webkit-box', 
+                    WebkitLineClamp: '6', // Mostramos hasta 6 líneas
+                    WebkitBoxOrient: 'vertical', 
+                    overflow: 'hidden',
+                    whiteSpace: 'pre-wrap',
+                    margin: 0
+                  }}>
+                    {n.texto}
+                  </p>
+                </div>
+                
+                <div style={{ 
+                  marginTop: '15px', 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  borderTop: '1px solid #1a1a1a', 
+                  paddingTop: '15px',
+                  backgroundColor: '#0a0a0a' // Fondo sólido para que no se transparente el texto atrás
+                }}>
+                  <span style={{ fontSize: '0.65rem', color: '#444', fontWeight: 'bold' }}>
+                    {n.fecha.split(',')[0]}
+                  </span>
+                  
+                  {n.videoId && (
+                    <button 
+                      onClick={() => onNavigateToVideo({ id: n.videoId, titulo: n.titulo, startTime: segs })}
+                      style={{ 
+                        ...styles.btnGold, 
+                        width: 'auto', 
+                        padding: '8px 15px', 
+                        fontSize: '0.65rem',
+                        fontWeight: 'bold',
+                        boxShadow: '0 4px 10px rgba(0,0,0,0.3)' 
+                      }}
+                    >
+                      VER TÉCNICA {match ? `(${match[0]})` : ''}
+                    </button>
+                  )}
+                </div>
               </div>
-              
-              <p style={{ color: '#ccc', fontSize: '0.85rem', flexGrow: 1, whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
-                {n.texto}
-              </p>
-              
-              <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #1a1a1a', paddingTop: '15px' }}>
-                <span style={{ fontSize: '0.65rem', color: '#444' }}>{n.fecha}</span>
-                {n.videoId && (
-                  <button 
-                    onClick={() => onNavigateToVideo({ titulo: n.titulo, id: n.videoId })}
-                    style={{ ...(styles?.btnGold || {}), padding: '6px 12px', fontSize: '0.6rem', width: 'auto' }}
-                  >
-                    REVISAR TÉCNICA
-                  </button>
-                )}
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
@@ -3590,19 +3665,21 @@ React.useEffect(() => {
           onNavigateToNotes={() => setPage('notas_hub')} onContinue={() => setPage('estudio')} hasSession={!!videoActual} />;
 
       case 'estudio':
-  return (
-    <EstudioPage 
-      video={videoActual} 
-      onBack={() => setPage('mapa')} 
-      vistos={vistos}
-      toggleVisto={toggleVisto} 
-      usuario={usuario} // <-- Le pasas el usuario que ya tienes en App
-      onSelectVideo={(v) => { 
-        setVideoActual(v); 
-        localStorage.setItem('lafortuna_last_video', JSON.stringify(v)); 
-      }} 
-    />
-  );
+        return (
+          <EstudioPage
+            video={videoActual}
+            onBack={() => setPage('mapa')}
+            vistos={vistos}
+            toggleVisto={toggleVisto}
+            styles={styles}
+            usuario={usuario} // <-- Le pasas el usuario que ya tienes en App
+            onNavigateToNotes={() => setPage('notas_hub')}
+            onSelectVideo={(v) => {
+              setVideoActual(v);
+              localStorage.setItem('lafortuna_last_video', JSON.stringify(v));
+            }}
+          />
+        );
 
       // CÓDIGO CORREGIDO
 case 'notas_hub':
