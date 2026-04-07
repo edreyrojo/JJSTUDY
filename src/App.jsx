@@ -1,21 +1,22 @@
 import React, { useState } from 'react';
 // Importa la conexión que creamos en firebase.js
-import { auth, db } from './firebase'; 
+import { auth, db } from './firebase';
 // Importa las funciones específicas de Autenticación
-import { 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, onAuthStateChanged 
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword, onAuthStateChanged
 } from 'firebase/auth';
 // Importa las funciones específicas de la Base de Datos (Firestore)
-import { 
-  doc, 
-  setDoc, 
-  getDoc, 
-  collection, 
-  query, 
-  where, 
-  getDocs, 
-  updateDoc 
+import {
+  doc,
+  setDoc,
+  getDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+  updateDoc,
+  onSnapshot
 } from 'firebase/firestore';
 import GestionAlumnosPage from './GestionAlumnosPage';
 import PlaneadorClasesPage from './PlaneadorClasesPage';
@@ -36,50 +37,50 @@ const BusquedaPage = ({ onBack, onSelectVideo }) => {
 
   // Aplanamos la DB para buscar en todos los videos de todos los cursos
   const todasLasTecnicas = React.useMemo(() => {
-  return Object.keys(DB_INSTRUCCIONALES).flatMap(cursoKey =>
-    DB_INSTRUCCIONALES[cursoKey].volumenes.flatMap(vol =>
-      vol.partes.map(parte => {
-        let sub = parte.subcategoria || ""; // Si ya tiene en la DB, lo respetamos
-        const n = parte.nombre.toLowerCase();
-        const cursoNom = cursoKey.toLowerCase();
-        
-        if (!sub) {
-          const esCursoDefensa = cursoNom.includes('pillars of defense') || cursoNom.includes('escapes');
+    return Object.keys(DB_INSTRUCCIONALES).flatMap(cursoKey =>
+      DB_INSTRUCCIONALES[cursoKey].volumenes.flatMap(vol =>
+        vol.partes.map(parte => {
+          let sub = parte.subcategoria || ""; // Si ya tiene en la DB, lo respetamos
+          const n = parte.nombre.toLowerCase();
+          const cursoNom = cursoKey.toLowerCase();
 
-          // 1. FILTRO DE DEFENSAS
-          if (n.includes('escape') || n.includes('defensa') || n.includes('defense') || n.includes('counter') || esCursoDefensa) {
-            if (n.includes('mount') || n.includes('montada')) sub = "ESCAPES MONTADA";
-            else if (n.includes('side') || n.includes('lateral')) sub = "ESCAPES LATERAL";
-            else if (n.includes('back') || n.includes('espalda')) sub = "DEFENSA ESPALDA";
-            else if (n.includes('leg lock') || n.includes('heel hook')) sub = "DEFENSA LEG LOCKS";
-            else if (n.includes('triang')) sub = "DEFENSA TRIANGULO";
-            else if (n.includes('arm bar') || n.includes('armbar') || n.includes('joint lock') || n.includes('armlock')) sub = "DEFENSA ARM BAR";
-            else if (n.includes('darce') || n.includes('guillotine') || n.includes('choke') || n.includes('strangle')) sub = "DEFENSA STRANGLES";
-            else sub = "RE-GUARDIA"; 
-          } 
-          // 2. FILTRO DE DERRIBOS (Ahora sí está afuera del if anterior)
-          else if (n.includes('takedown') || n.includes('take down') || n.includes('standing') || n.includes('derribo') || cursoNom.includes('feet to floor')) {
-            sub = "DERRIBOS";
+          if (!sub) {
+            const esCursoDefensa = cursoNom.includes('pillars of defense') || cursoNom.includes('escapes');
+
+            // 1. FILTRO DE DEFENSAS
+            if (n.includes('escape') || n.includes('defensa') || n.includes('defense') || n.includes('counter') || esCursoDefensa) {
+              if (n.includes('mount') || n.includes('montada')) sub = "ESCAPES MONTADA";
+              else if (n.includes('side') || n.includes('lateral')) sub = "ESCAPES LATERAL";
+              else if (n.includes('back') || n.includes('espalda')) sub = "DEFENSA ESPALDA";
+              else if (n.includes('leg lock') || n.includes('heel hook')) sub = "DEFENSA LEG LOCKS";
+              else if (n.includes('triang')) sub = "DEFENSA TRIANGULO";
+              else if (n.includes('arm bar') || n.includes('armbar') || n.includes('joint lock') || n.includes('armlock')) sub = "DEFENSA ARM BAR";
+              else if (n.includes('darce') || n.includes('guillotine') || n.includes('choke') || n.includes('strangle')) sub = "DEFENSA STRANGLES";
+              else sub = "RE-GUARDIA";
+            }
+            // 2. FILTRO DE DERRIBOS (Ahora sí está afuera del if anterior)
+            else if (n.includes('takedown') || n.includes('take down') || n.includes('standing') || n.includes('derribo') || cursoNom.includes('feet to floor')) {
+              sub = "DERRIBOS";
+            }
+            // 3. POSICIONES DE CONTROL
+            else if (n.includes('side control') || n.includes('lateral') || n.includes('100 kilos')) sub = "CONTROL LATERAL";
+            else if (n.includes('half guard') || n.includes('media guardia') || n.includes('z-guard')) sub = "MEDIA GUARDIA";
+            else if (n.includes('closed guard') || n.includes('guardia cerrada')) sub = "GUARDIA CERRADA";
+            else if (n.includes('mount') || n.includes('montada')) sub = "MONTADA";
+            else if (n.includes('back') || n.includes('espalda') || n.includes('rear mount')) sub = "ESPALDA";
+            else if (n.includes('turtle') || n.includes('tortuga')) sub = "TORTUGA";
+            // 4. SISTEMAS ESPECÍFICOS (Re-agregados)
+            else if (n.includes('berimbolo') || n.includes('bolo')) sub = "BERIMBOLO";
+            else if (n.includes('buggy')) sub = "BUGGY CHOKE";
+            else if (n.includes('crucifix') || n.includes('crucifijo')) sub = "CRUCIFIX";
+            else if (n.includes('octopus')) sub = "OCTOPUS GUARD";
           }
-          // 3. POSICIONES DE CONTROL
-          else if (n.includes('side control') || n.includes('lateral') || n.includes('100 kilos')) sub = "CONTROL LATERAL";
-          else if (n.includes('half guard') || n.includes('media guardia') || n.includes('z-guard')) sub = "MEDIA GUARDIA";
-          else if (n.includes('closed guard') || n.includes('guardia cerrada')) sub = "GUARDIA CERRADA";
-          else if (n.includes('mount') || n.includes('montada')) sub = "MONTADA";
-          else if (n.includes('back') || n.includes('espalda') || n.includes('rear mount')) sub = "ESPALDA";
-          else if (n.includes('turtle') || n.includes('tortuga')) sub = "TORTUGA";
-          // 4. SISTEMAS ESPECÍFICOS (Re-agregados)
-          else if (n.includes('berimbolo') || n.includes('bolo')) sub = "BERIMBOLO";
-          else if (n.includes('buggy')) sub = "BUGGY CHOKE";
-          else if (n.includes('crucifix') || n.includes('crucifijo')) sub = "CRUCIFIX";
-          else if (n.includes('octopus')) sub = "OCTOPUS GUARD";
-        }
 
-        return { ...parte, subcategoria: sub, curso: cursoKey, volNombre: vol.nombre };
-      })
-    )
-  );
-}, [DB_INSTRUCCIONALES]);// [] significa que solo se calcula una vez al cargar la app
+          return { ...parte, subcategoria: sub, curso: cursoKey, volNombre: vol.nombre };
+        })
+      )
+    );
+  }, [DB_INSTRUCCIONALES]);// [] significa que solo se calcula una vez al cargar la app
 
   const resultados = todasLasTecnicas.filter(t =>
     t.nombre.toLowerCase().includes(termino.toLowerCase())
@@ -145,16 +146,16 @@ const cargarDatosDesdeFirebase = async (uid) => {
   try {
     const userRef = doc(db, "usuarios", uid);
     const userDoc = await getDoc(userRef);
-    
+
     if (userDoc.exists()) {
       const data = userDoc.data();
-      
+
       // 1. Sincronizamos VISTOS
       if (data.vistos) {
         setVistos(data.vistos);
         localStorage.setItem('lafortuna_vistos', JSON.stringify(data.vistos));
       }
-      
+
       // 2. Sincronizamos NOTAS GLOBALES
       // Esto hará que la PC recupere lo que escribiste en el iPhone
       if (data.notas) {
@@ -162,7 +163,7 @@ const cargarDatosDesdeFirebase = async (uid) => {
         // Opcional: Si tienes un estado global de notas, actualízalo aquí
         // setNotas(data.notas); 
       }
-      
+
       console.log("✅ Datos de la nube sincronizados con éxito");
     }
   } catch (error) {
@@ -170,139 +171,111 @@ const cargarDatosDesdeFirebase = async (uid) => {
   }
 };
 const AdminPage = ({ onBack }) => {
-  const [solicitudes, setSolicitudes] = React.useState([]);
+  const [usuarios, setUsuarios] = React.useState([]);
   const [cargando, setCargando] = React.useState(true);
 
-  // Función para traer usuarios pendientes de la nube
-  const obtenerPendientes = async () => {
+  // 1. Cargamos TODOS los usuarios registrados
+  const obtenerUsuarios = async () => {
     try {
       setCargando(true);
-      const q = query(collection(db, "usuarios"), where("validado", "==", false));
-      const querySnapshot = await getDocs(q);
+      const querySnapshot = await getDocs(collection(db, "usuarios"));
       const lista = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setSolicitudes(lista);
+      setUsuarios(lista);
     } catch (error) {
-      console.error("Error al obtener pendientes:", error);
+      console.error("Error al obtener usuarios:", error);
     } finally {
       setCargando(false);
     }
   };
 
   React.useEffect(() => {
-  const deshacerEscuchaAuth = onAuthStateChanged(auth, (user) => {
-    if (user) {
-      // 1. En lugar de getDoc, usamos onSnapshot para ESCUCHA ACTIVA
-      const userRef = doc(db, "usuarios", user.uid);
-      
-      const deshacerEscuchaDoc = onSnapshot(userRef, (docSnap) => {
-        if (docSnap.exists()) {
-          const userData = docSnap.data();
-          
-          // 2. SINCRONIZACIÓN DE PERFIL Y ROLES (Admin incluido)
-          setUsuario({
-            uid: user.uid,
-            email: user.email,
-            ...userData 
-          });
+    obtenerUsuarios();
+  }, []);
 
-          // 3. SINCRONIZACIÓN DE VISTOS (Para que los checks verdes aparezcan solos)
-          if (userData.vistos) {
-            setVistos(userData.vistos);
-            localStorage.setItem('lafortuna_vistos', JSON.stringify(userData.vistos));
-          }
-
-          // 4. SINCRONIZACIÓN DE NOTAS
-          if (userData.notas) {
-            // Unificamos lo local con lo que viene de la nube
-            const notasLocales = JSON.parse(localStorage.getItem('lafortuna_notas') || '{}');
-            const notasSincronizadas = { ...notasLocales, ...userData.notas };
-            localStorage.setItem('lafortuna_notas', JSON.stringify(notasSincronizadas));
-          }
-          
-          console.log("☁️ Vault sincronizado en tiempo real");
-        } else {
-          setUsuario(user);
-        }
-        // Una vez que tenemos los datos, dejamos de mostrar la pantalla de carga
-        setCargando(false);
-      }, (error) => {
-        console.error("Error en la escucha de datos:", error);
-        setCargando(false);
-      });
-
-      // Limpiamos la escucha del documento si el usuario cierra sesión
-      return () => deshacerEscuchaDoc();
-
-    } else {
-      setUsuario(null);
-      setCargando(false);
-      setPage('login');
-    }
-  });
-
-  return () => deshacerEscuchaAuth();
-}, []);
-
-  // Función para validar (Cambia el estado en Firebase)
-  const validarUsuario = async (uid) => {
+  // 2. Función para actualizar cualquier campo (Validación o Rol)
+  const actualizarUsuario = async (uid, nuevosDatos) => {
     try {
       const userRef = doc(db, "usuarios", uid);
-      await updateDoc(userRef, { validado: true });
-      alert("Acceso concedido. El usuario ya puede entrar al Vault.");
-      obtenerPendientes(); // Recargamos la lista
+      await updateDoc(userRef, nuevosDatos);
+      obtenerUsuarios(); // Recargar lista
     } catch (error) {
-      alert("Error al validar: " + error.message);
+      alert("Error al actualizar: " + error.message);
     }
   };
 
   return (
-    <div style={{ padding: '40px', backgroundColor: '#000', minHeight: '100vh', color: '#fff' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
-        <h2 style={styles.goldTitle}>CONTROL DE ACCESOS: LA FORTUNA</h2>
-        <button onClick={onBack} style={styles.btnOutline}>VOLVER AL HUB</button>
+    <div style={{ padding: '40px', backgroundColor: '#000', minHeight: '100vh', color: '#fff', fontFamily: 'monospace' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '40px', borderBottom: '2px solid #d4af37', paddingBottom: '20px' }}>
+        <h2 style={{ color: '#d4af37', margin: 0 }}>GESTIÓN DE ACADEMIA: LA FORTUNA</h2>
+        <button onClick={onBack} style={{ background: 'none', border: '1px solid #d4af37', color: '#d4af37', cursor: 'pointer', padding: '5px 15px' }}>VOLVER</button>
       </div>
 
-      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <h3 style={{ color: '#d4af37', borderBottom: '1px solid #333', paddingBottom: '10px', display: 'flex', justifyContent: 'space-between' }}>
-          SOLICITUDES PENDIENTES 
-          <span>{solicitudes.length}</span>
-        </h3>
-        
-        {cargando ? (
-          <p style={{ color: '#d4af37', textAlign: 'center', marginTop: '20px' }}>Consultando la base de datos...</p>
-        ) : solicitudes.length === 0 ? (
-          <p style={{ color: '#666', marginTop: '20px', textAlign: 'center' }}>No hay nuevos practicantes esperando acceso.</p>
-        ) : (
-          solicitudes.map(s => (
-            <div key={s.id} style={{ 
-              backgroundColor: '#0a0a0a', 
-              padding: '20px', 
-              borderRadius: '8px', 
-              border: '1px solid #222', 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              marginBottom: '10px',
-              boxShadow: '0 4px 10px rgba(0,0,0,0.5)'
-            }}>
-              <div>
-                <div style={{ fontWeight: 'bold', color: '#fff', fontSize: '1.1rem' }}>{s.nombre || "Sin nombre"}</div>
-                <div style={{ fontSize: '0.8rem', color: '#666' }}>{s.email}</div>
-                <div style={{ fontSize: '0.7rem', color: '#444', marginTop: '5px' }}>ID: {s.uid}</div>
-              </div>
-              <button 
-                onClick={() => validarUsuario(s.uid)}
-                style={{ ...styles.btnGold, width: 'auto', padding: '12px 25px', fontSize: '0.8rem', fontWeight: 'bold' }}
-              >
-                AUTORIZAR ENTRADA
-              </button>
-            </div>
-          ))
-        )}
-      </div>
+      {cargando ? (
+        <p style={{ color: '#d4af37' }}>Cargando base de datos...</p>
+      ) : (
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <thead>
+            <tr style={{ color: '#666', fontSize: '0.8rem', borderBottom: '1px solid #222' }}>
+              <th style={{ padding: '10px' }}>USUARIO</th>
+              <th style={{ padding: '10px' }}>ESTADO</th>
+              <th style={{ padding: '10px' }}>ROL</th>
+              <th style={{ padding: '10px' }}>ACCIONES</th>
+            </tr>
+          </thead>
+          <tbody>
+            {usuarios.map(u => (
+              <tr key={u.id} style={{ borderBottom: '1px solid #111' }}>
+                <td style={{ padding: '15px 10px' }}>
+                  <div style={{ fontWeight: 'bold' }}>{u.nombre || 'Sin nombre'}</div>
+                  <div style={{ fontSize: '0.7rem', color: '#555' }}>{u.email}</div>
+                </td>
+                
+                <td style={{ padding: '10px' }}>
+                  {u.validado ? 
+                    <span style={{ color: '#4CAF50', fontSize: '0.8rem' }}>● ACTIVO</span> : 
+                    <span style={{ color: '#FF5252', fontSize: '0.8rem' }}>● PENDIENTE</span>
+                  }
+                </td>
+
+                <td style={{ padding: '10px' }}>
+                  <select
+                    value={u.rol || 'alumno'} // Usamos 'rol' (en español como en tu App.jsx)
+                    onChange={(e) => actualizarUsuario(u.uid, { rol: e.target.value })}
+                    style={{
+                      backgroundColor: '#111',
+                      color: u.rol === 'admin' ? '#d4af37' : u.rol === 'profesor' ? '#4CAF50' : '#fff',
+                      border: '1px solid #333',
+                      padding: '5px',
+                      borderRadius: '4px',
+                      fontSize: '0.8rem'
+                    }}
+                  >
+                    <option value="alumno">Alumno</option>
+                    <option value="instructor">Instructor</option>
+                    <option value="profesor">Profesor</option>
+                    <option value="admin">Administrador</option>
+                  </select>
+                </td>
+
+                <td style={{ padding: '10px' }}>
+                  {!u.validado && (
+                    <button 
+                      onClick={() => actualizarUsuario(u.uid, { validado: true })}
+                      style={{ backgroundColor: '#d4af37', color: '#000', border: 'none', padding: '5px 10px', fontWeight: 'bold', cursor: 'pointer' }}
+                    >
+                      DAR ACCESO
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 };
+
 const mapStyles = {
   layout: { display: 'flex', height: '100vh', backgroundColor: '#050505', overflow: 'hidden' },
   sidebar: { width: '250px', borderRight: '1px solid #222', padding: '20px', backgroundColor: '#0a0a0a' },
@@ -324,7 +297,7 @@ const DB_INSTRUCCIONALES = {
         id: "V1",
         nombre: "Volumen 1",
         partes: [
-          { nombre: "1. Craig The King Jones and Hey She's Hotter", id: "1YtOMvRtLKnFjjMHZWhEFefcdYitHfVkv", subcategoria: ""},
+          { nombre: "1. Craig The King Jones and Hey She's Hotter", id: "1YtOMvRtLKnFjjMHZWhEFefcdYitHfVkv", subcategoria: "" },
           { nombre: "2. Half Guard Vs Side Control", id: "1ybiHRszC99FbUqpYcQHfqCx7AmbN9gae" },
           { nombre: "3. Jiu Jitsu VS Wrestling Cross Face", id: "1AB9Q8Sd69IO-rMm2OscTbYB7ISC_NnaZ" },
           { nombre: "4. Side Control Is Not Real", id: "1ZVumoCDF8ApauLjcQ0dCjPPH48i1pfr5", subcategoria: "SIDE CONTROL" },
@@ -2491,12 +2464,12 @@ const getAdjacentVideo = (currentVideo, direction) => {
 
 // --- 3. SUB-COMPONENTES ---
 
-const LoginPage = ({ 
-  onLogin, onRegister, 
-  email = "", setEmail, 
-  password = "", setPassword, 
+const LoginPage = ({
+  onLogin, onRegister,
+  email = "", setEmail,
+  password = "", setPassword,
   nombreCompleto = "", setNombreCompleto,
-  error 
+  error
 }) => {
   const [esRegistro, setEsRegistro] = React.useState(false);
 
@@ -2507,9 +2480,9 @@ const LoginPage = ({
 
   return (
     <div style={{
-      ...styles.containerCenter, 
+      ...styles.containerCenter,
       background: 'radial-gradient(circle, #1a1a1a 0%, #000 100%)',
-      padding: '20px', 
+      padding: '20px',
       boxSizing: 'border-box',
       minHeight: '100vh',
       display: 'flex',
@@ -2517,23 +2490,23 @@ const LoginPage = ({
       justifyContent: 'center',
       alignItems: 'center'
     }}>
-      
+
       {/* HEADER LOGO */}
       <div style={{ marginBottom: '30px', textAlign: 'center', width: '100%' }}>
-         <h1 style={{
-           ...styles.goldTitle, 
-           fontSize: 'clamp(2rem, 8vw, 3rem)', 
-           letterSpacing: '5px',
-           margin: '0'
-         }}>LA FORTUNA</h1>
-         <p style={{color: '#d4af37', fontSize: '0.8rem', marginTop: '-10px', letterSpacing: '2px'}}>
-           BRAZILIAN JIU JITSU VAULT
-         </p>
+        <h1 style={{
+          ...styles.goldTitle,
+          fontSize: 'clamp(2rem, 8vw, 3rem)',
+          letterSpacing: '5px',
+          margin: '0'
+        }}>LA FORTUNA</h1>
+        <p style={{ color: '#d4af37', fontSize: '0.8rem', marginTop: '-10px', letterSpacing: '2px' }}>
+          BRAZILIAN JIU JITSU VAULT
+        </p>
       </div>
 
       {/* CARD DE LOGIN */}
       <div style={{
-        ...styles.card, 
+        ...styles.card,
         width: '100%',
         maxWidth: '380px', // Limita el ancho en PC
         border: '1px solid #d4af37',
@@ -2543,17 +2516,17 @@ const LoginPage = ({
         borderRadius: '10px',
         boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
       }}>
-        
-        <h2 style={{color: '#fff', fontSize: '1.2rem', marginBottom: '20px', textAlign: 'center'}}>
+
+        <h2 style={{ color: '#fff', fontSize: '1.2rem', marginBottom: '20px', textAlign: 'center' }}>
           {esRegistro ? 'SOLICITAR ACCESO' : 'INICIAR SESIÓN'}
         </h2>
 
         {error && (
           <p style={{
-            color: '#ff4444', 
-            fontSize: '0.8rem', 
-            backgroundColor: 'rgba(255, 68, 68, 0.1)', 
-            padding: '10px', 
+            color: '#ff4444',
+            fontSize: '0.8rem',
+            backgroundColor: 'rgba(255, 68, 68, 0.1)',
+            padding: '10px',
             borderRadius: '5px',
             textAlign: 'center'
           }}>
@@ -2563,41 +2536,41 @@ const LoginPage = ({
 
         {/* INPUT NOMBRE (SOLO REGISTRO) */}
         {esRegistro && (
-          <input 
-            type="text" 
-            placeholder="Nombre completo" 
-            style={{...styles.input, width: '100%', marginBottom: '15px'}} 
+          <input
+            type="text"
+            placeholder="Nombre completo"
+            style={{ ...styles.input, width: '100%', marginBottom: '15px' }}
             value={nombreCompleto}
             onChange={(e) => setNombreCompleto(e.target.value)}
           />
         )}
 
         {/* INPUT EMAIL */}
-        <input 
+        <input
           type="email" // Usar "email" ayuda al teclado del cel a mostrar el "@"
-          placeholder="Email" 
-          style={{ 
-            ...styles.input, 
+          placeholder="Email"
+          style={{
+            ...styles.input,
             width: '100%',
-            maxWidth: '280px', 
-            margin: '10px auto', 
-            display: 'block' 
-          }} 
+            maxWidth: '280px',
+            margin: '10px auto',
+            display: 'block'
+          }}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
 
         {/* INPUT PASSWORD */}
-        <input 
-          type="password" 
-          placeholder="Contraseña" 
-          style={{ 
-            ...styles.input, 
+        <input
+          type="password"
+          placeholder="Contraseña"
+          style={{
+            ...styles.input,
             width: '100%',
-            maxWidth: '280px', 
-            margin: '10px auto', 
-            display: 'block' 
-          }} 
+            maxWidth: '280px',
+            margin: '10px auto',
+            display: 'block'
+          }}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
@@ -2611,29 +2584,29 @@ const LoginPage = ({
         </div>
 
         {/* BOTÓN PRINCIPAL */}
-        <button 
+        <button
           style={{
-            ...styles.btnGold, 
-            width: '100%', 
-            maxWidth: '320px', 
-            display: 'block', 
+            ...styles.btnGold,
+            width: '100%',
+            maxWidth: '320px',
+            display: 'block',
             margin: '20px auto 10px auto',
             padding: '12px'
-          }} 
+          }}
           onClick={esRegistro ? onRegister : onLogin}
         >
           {esRegistro ? 'ENVIAR SOLICITUD' : 'ENTRAR'}
         </button>
 
         {/* LINK CAMBIO MODO */}
-        <button 
+        <button
           onClick={() => setEsRegistro(!esRegistro)}
-          style={{ 
-            background: 'none', 
-            border: 'none', 
-            color: '#666', 
-            fontSize: '0.8rem', 
-            cursor: 'pointer', 
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#666',
+            fontSize: '0.8rem',
+            cursor: 'pointer',
             marginTop: '15px',
             width: '100%',
             textAlign: 'center',
@@ -2648,7 +2621,7 @@ const LoginPage = ({
 };
 // 1. CONSTANTES MAESTRAS (Fuera del componente para que siempre estén disponibles)
 const SUB_POSICIONES = [
-  'GUARDIA CERRADA', 'MEDIA GUARDIA', 'GUARDIA ABIERTA', 'PASES', 
+  'GUARDIA CERRADA', 'MEDIA GUARDIA', 'GUARDIA ABIERTA', 'PASES',
   'CONTROL LATERAL', 'MONTADA', 'ESPALDA', 'NORTE-SUR'
 ];
 
@@ -2684,7 +2657,7 @@ const MapaPage = ({
           let sub = parte.subcategoria || "";
           const n = parte.nombre.toLowerCase();
           const cursoNom = cursoKey.toLowerCase();
-          
+
           if (!sub) {
             const esCursoDefensa = cursoNom.includes('pillars') || cursoNom.includes('escapes') || cursoNom.includes('retention');
 
@@ -2697,8 +2670,8 @@ const MapaPage = ({
               else if (n.includes('triang')) sub = "DEFENSA TRIANGULO";
               else if (n.includes('arm bar') || n.includes('armbar') || n.includes('joint lock') || n.includes('armlock')) sub = "DEFENSA ARM BAR";
               else if (n.includes('darce') || n.includes('guillotine') || n.includes('choke')) sub = "DEFENSA STRANGLES";
-              else sub = "RE-GUARDIA"; 
-            } 
+              else sub = "RE-GUARDIA";
+            }
             // --- FILTRO DE DERRIBOS ---
             else if (n.includes('takedown') || n.includes('take down') || n.includes('standing') || n.includes('derribo') || cursoNom.includes('feet to floor')) {
               sub = "DERRIBOS";
@@ -2747,7 +2720,7 @@ const MapaPage = ({
     if (categoriaSel === 'POSICIÓN' || categoriaSel === 'DEFENSAS') {
       const lista = categoriaSel === 'POSICIÓN' ? SUB_POSICIONES : SUB_DEFENSAS;
       nodosAMostrar = lista.map(item => ({ nombre: item, type: 'subcategoria' }));
-    } 
+    }
     else if (SUB_POSICIONES.includes(categoriaSel) || SUB_DEFENSAS.includes(categoriaSel)) {
       // FILTRO CRÍTICO: Usamos trim() para limpiar espacios
       nodosAMostrar = todasLasTecnicas
@@ -2763,7 +2736,7 @@ const MapaPage = ({
     } else {
       const cursosFiltrados = Object.keys(DB_INSTRUCCIONALES).filter(key => DB_INSTRUCCIONALES[key].categorias?.includes(categoriaSel));
       nodosAMostrar = cursosFiltrados.map(key => ({ id: key, nombre: DB_INSTRUCCIONALES[key].titulo, type: 'curso' }));
-    } 
+    }
   }
 
   // ... (Siguen handleNodeClick, irAtras y el return del Aside/Main igual que antes)
@@ -2789,210 +2762,210 @@ const MapaPage = ({
   return (
     <div style={{ ...mapStyles.layout, flexDirection: esMovil ? 'column' : 'row' }}>
       <aside style={{
-  ...mapStyles.sidebar,
-  width: esMovil ? '100%' : '250px',
-  height: esMovil ? 'auto' : '100vh',
-  position: esMovil ? 'relative' : 'fixed',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '10px',
-  zIndex: 100,
-  padding: '15px',
-  boxSizing: 'border-box'
-}}>
-  {/* FILA 1: NAVEGACIÓN */}
-  <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'space-between' }}>
-    <button 
-      onClick={irAtras} 
-      style={{ ...styles.btnOutline, flex: '0 0 40px', padding: '10px 0' }}
-    > 
-      ←
-    </button>
-    {/* LÓGICA CONDICIONAL: Solo si hay sesión activa */}
-  {hasSession && (
-    <button 
-      onClick={onContinue} 
-      style={{ 
-        ...styles.btnGold, 
-        flex: 2, // Toma más espacio si aparece
-        fontSize: '0.65rem'
-      }}
-    >
-      {esMovil ? 'CONTINUAR' : '▶ CONTINUAR'}
-    </button>
-  )}
-    <button 
-    onClick={onNavigateToNotes} 
-    style={{ 
-      ...styles.btnOutline, 
-      flex: 1, // Se expande automáticamente si 'Continuar' no está
-      fontSize: '0.65rem', 
-      borderColor: '#d4af37' 
-    }}
-  >
-    BITÁCORA
-  </button>
-</div>
-
-  {/* FILA 2: BÚSQUEDA */}
-  <div style={{ width: '100%' }}>
-    <input
-      type="text"
-      placeholder="Buscar técnica..."
-      value={terminoBusqueda}
-      onChange={(e) => setTerminoBusqueda(e.target.value)}
-      style={{
-        width: '100%',
-        padding: '12px',
-        backgroundColor: '#111',
-        border: '1px solid #d4af37',
-        color: '#fff',
-        borderRadius: '5px',
-        fontSize: '0.85rem',
-        outline: 'none',
+        ...mapStyles.sidebar,
+        width: esMovil ? '100%' : '250px',
+        height: esMovil ? 'auto' : '100vh',
+        position: esMovil ? 'relative' : 'fixed',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px',
+        zIndex: 100,
+        padding: '15px',
         boxSizing: 'border-box'
-      }}
-    />
-  </div>
-
-  {/* FILA 3: CATEGORÍAS (Híbrido PC/Móvil) */}
-  <div style={{ marginTop: esMovil ? '0' : '20px' }}>
-    {!esMovil && <h3 style={{ color: '#d4af37', marginBottom: '15px', fontSize: '0.9rem' }}>FILTRAR POR</h3>}
-    
-    <div style={{ 
-      display: 'flex', 
-      flexDirection: esMovil ? 'row' : 'column',
-      overflowX: esMovil ? 'auto' : 'visible',
-      gap: '8px',
-      scrollbarWidth: 'none'
-    }}>
-      {['DEFENSAS', 'POSICIÓN', 'DERRIBOS', 'AUTORES', 'JUEGOS'].map(cat => {
-        // Lógica para mantener encendido el botón si estamos en una subcategoría
-        const estaActivo = categoriaSel === cat || 
-          (cat === 'POSICIÓN' && SUB_POSICIONES.includes(categoriaSel)) ||
-          (cat === 'DEFENSAS' && SUB_DEFENSAS.includes(categoriaSel));
-
-        return (
-          <div 
-            key={cat}
-            onClick={() => { 
-              setCategoriaSel(cat); 
-              setAutorSel(null); 
-              setInstrSel(null); 
-              setVolSel(null); 
-              setTerminoBusqueda(""); 
-            }}
-            style={{ 
-              ...mapStyles.sideItem, 
-              backgroundColor: estaActivo ? '#d4af37' : '#111', 
-              color: estaActivo ? '#000' : '#fff',
-              border: '1px solid #d4af37',
-              whiteSpace: 'nowrap',
-              padding: esMovil ? '8px 15px' : '12px',
-              borderRadius: esMovil ? '20px' : '5px',
-              fontSize: esMovil ? '0.65rem' : '0.85rem',
-              cursor: 'pointer'
+      }}>
+        {/* FILA 1: NAVEGACIÓN */}
+        <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'space-between' }}>
+          <button
+            onClick={irAtras}
+            style={{ ...styles.btnOutline, flex: '0 0 40px', padding: '10px 0' }}
+          >
+            ←
+          </button>
+          {/* LÓGICA CONDICIONAL: Solo si hay sesión activa */}
+          {hasSession && (
+            <button
+              onClick={onContinue}
+              style={{
+                ...styles.btnGold,
+                flex: 2, // Toma más espacio si aparece
+                fontSize: '0.65rem'
+              }}
+            >
+              {esMovil ? 'CONTINUAR' : '▶ CONTINUAR'}
+            </button>
+          )}
+          <button
+            onClick={onNavigateToNotes}
+            style={{
+              ...styles.btnOutline,
+              flex: 1, // Se expande automáticamente si 'Continuar' no está
+              fontSize: '0.65rem',
+              borderColor: '#d4af37'
             }}
           >
-            {cat}
+            BITÁCORA
+          </button>
+        </div>
+
+        {/* FILA 2: BÚSQUEDA */}
+        <div style={{ width: '100%' }}>
+          <input
+            type="text"
+            placeholder="Buscar técnica..."
+            value={terminoBusqueda}
+            onChange={(e) => setTerminoBusqueda(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '12px',
+              backgroundColor: '#111',
+              border: '1px solid #d4af37',
+              color: '#fff',
+              borderRadius: '5px',
+              fontSize: '0.85rem',
+              outline: 'none',
+              boxSizing: 'border-box'
+            }}
+          />
+        </div>
+
+        {/* FILA 3: CATEGORÍAS (Híbrido PC/Móvil) */}
+        <div style={{ marginTop: esMovil ? '0' : '20px' }}>
+          {!esMovil && <h3 style={{ color: '#d4af37', marginBottom: '15px', fontSize: '0.9rem' }}>FILTRAR POR</h3>}
+
+          <div style={{
+            display: 'flex',
+            flexDirection: esMovil ? 'row' : 'column',
+            overflowX: esMovil ? 'auto' : 'visible',
+            gap: '8px',
+            scrollbarWidth: 'none'
+          }}>
+            {['DEFENSAS', 'POSICIÓN', 'DERRIBOS', 'AUTORES', 'JUEGOS'].map(cat => {
+              // Lógica para mantener encendido el botón si estamos en una subcategoría
+              const estaActivo = categoriaSel === cat ||
+                (cat === 'POSICIÓN' && SUB_POSICIONES.includes(categoriaSel)) ||
+                (cat === 'DEFENSAS' && SUB_DEFENSAS.includes(categoriaSel));
+
+              return (
+                <div
+                  key={cat}
+                  onClick={() => {
+                    setCategoriaSel(cat);
+                    setAutorSel(null);
+                    setInstrSel(null);
+                    setVolSel(null);
+                    setTerminoBusqueda("");
+                  }}
+                  style={{
+                    ...mapStyles.sideItem,
+                    backgroundColor: estaActivo ? '#d4af37' : '#111',
+                    color: estaActivo ? '#000' : '#fff',
+                    border: '1px solid #d4af37',
+                    whiteSpace: 'nowrap',
+                    padding: esMovil ? '8px 15px' : '12px',
+                    borderRadius: esMovil ? '20px' : '5px',
+                    fontSize: esMovil ? '0.65rem' : '0.85rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {cat}
+                </div>
+              );
+            })}
           </div>
-        );
-      })}
-    </div>
-  </div>
-</aside>
+        </div>
+      </aside>
 
-      <main style={{ 
-  ...mapStyles.mapArea, 
-  flex: 1, 
-  display: 'flex', 
-  flexDirection: 'column', 
-  justifyContent: esMovil ? 'flex-start' : 'center', // Alinea arriba en móvil
-  alignItems: 'center',
-  paddingTop: esMovil ? '0px' : '20px',
-  overflow: 'hidden' 
-}}>
-  <div style={{ 
-    ...mapStyles.canvas, 
-    // Ajustamos el scale y añadimos marginTop negativo para subirlo
-    transform: esMovil ? 'scale(0.7)' : 'scale(1)', 
-    marginTop: esMovil ? '0px' : '0px', 
-    transformOrigin: 'top center', // Cambiamos el origen para que escale hacia arriba
-    transition: 'all 0.3s ease'
-  }}>
-    {terminoBusqueda ? (
-      <div style={{ zIndex: 10, width: '100%', maxWidth: '500px', maxHeight: '80vh', overflowY: 'auto', padding: '20px' }}>
-        <h2 style={{ color: '#d4af37', textAlign: 'center', marginBottom: '20px' }}>RESULTADOS</h2>
-        {resultadosBusqueda.map((t, i) => (
-          <div key={i} onClick={() => onSelectVideo({ titulo: t.nombre, id: t.id })} style={{ padding: '15px', backgroundColor: '#0a0a0a', border: `1px solid ${vistos?.includes(t.id) ? '#4CAF50' : '#222'}`, margin: '8px 0', borderRadius: '8px', cursor: 'pointer' }}>
-            <div style={{ color: vistos?.includes(t.id) ? '#4CAF50' : '#d4af37', fontWeight: 'bold' }}>{vistos?.includes(t.id) ? '✅ ' : ''}{t.nombre}</div>
-            <div style={{ fontSize: '0.65rem', color: '#666' }}>{t.curso} • {t.volNombre}</div>
-          </div>
-        ))}
-      </div>
-    ) : (
-      <>
-        <svg style={mapStyles.svgLayer}>
-          {nodosAMostrar.map((n, i) => {
-            const total = nodosAMostrar.length;
-            const angle = (i * (360 / total)) * (Math.PI / 180);
-            return (
-              <line key={i} x1="50%" y1="50%" x2={`${50 + (Math.cos(angle) * 35)}%`} y2={`${50 + (Math.sin(angle) * 35)}%`} stroke={vistos?.includes(n.id) ? '#4CAF50' : '#d4af37'} strokeWidth="1" opacity="0.2" className="floating-node" style={{ animationDelay: `${i * -0.8}s`, animationDuration: `${5 + (i % 3)}s` }} />
-            );
-          })}
-        </svg>
+      <main style={{
+        ...mapStyles.mapArea,
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: esMovil ? 'flex-start' : 'center', // Alinea arriba en móvil
+        alignItems: 'center',
+        paddingTop: esMovil ? '0px' : '20px',
+        overflow: 'hidden'
+      }}>
+        <div style={{
+          ...mapStyles.canvas,
+          // Ajustamos el scale y añadimos marginTop negativo para subirlo
+          transform: esMovil ? 'scale(0.7)' : 'scale(1)',
+          marginTop: esMovil ? '0px' : '0px',
+          transformOrigin: 'top center', // Cambiamos el origen para que escale hacia arriba
+          transition: 'all 0.3s ease'
+        }}>
+          {terminoBusqueda ? (
+            <div style={{ zIndex: 10, width: '100%', maxWidth: '500px', maxHeight: '80vh', overflowY: 'auto', padding: '20px' }}>
+              <h2 style={{ color: '#d4af37', textAlign: 'center', marginBottom: '20px' }}>RESULTADOS</h2>
+              {resultadosBusqueda.map((t, i) => (
+                <div key={i} onClick={() => onSelectVideo({ titulo: t.nombre, id: t.id })} style={{ padding: '15px', backgroundColor: '#0a0a0a', border: `1px solid ${vistos?.includes(t.id) ? '#4CAF50' : '#222'}`, margin: '8px 0', borderRadius: '8px', cursor: 'pointer' }}>
+                  <div style={{ color: vistos?.includes(t.id) ? '#4CAF50' : '#d4af37', fontWeight: 'bold' }}>{vistos?.includes(t.id) ? '✅ ' : ''}{t.nombre}</div>
+                  <div style={{ fontSize: '0.65rem', color: '#666' }}>{t.curso} • {t.volNombre}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <>
+              <svg style={mapStyles.svgLayer}>
+                {nodosAMostrar.map((n, i) => {
+                  const total = nodosAMostrar.length;
+                  const angle = (i * (360 / total)) * (Math.PI / 180);
+                  return (
+                    <line key={i} x1="50%" y1="50%" x2={`${50 + (Math.cos(angle) * 35)}%`} y2={`${50 + (Math.sin(angle) * 35)}%`} stroke={vistos?.includes(n.id) ? '#4CAF50' : '#d4af37'} strokeWidth="1" opacity="0.2" className="floating-node" style={{ animationDelay: `${i * -0.8}s`, animationDuration: `${5 + (i % 3)}s` }} />
+                  );
+                })}
+              </svg>
 
-        <div style={mapStyles.mainNode}>{tituloCentral}</div>
+              <div style={mapStyles.mainNode}>{tituloCentral}</div>
 
-        {nodosAMostrar.map((n, i) => {
-  const total = nodosAMostrar.length;
-  
-  // --- MEJORA: RADIO DINÁMICO ---
-  // Si hay más de 12 nodos, escalonamos el radio para crear dos "órbitas"
-  // Los nodos pares se quedan en el radio base, los impares se alejan.
-  let radioBase = esMovil ? 210 : 260;
-  let radio = radioBase;
-  
-  if (total > 12) {
-    // Si es impar, sumamos distancia para crear la segunda órbita
-    radio = (i % 2 === 0) ? radioBase : radioBase + (esMovil ? 75 : 110);
-  }
-  // ------------------------------
+              {nodosAMostrar.map((n, i) => {
+                const total = nodosAMostrar.length;
 
-  const angle = (i * (360 / total)) * (Math.PI / 180);
-  const x = Math.cos(angle) * radio;
-  const y = Math.sin(angle) * radio;
-  
-  const visto = n.type === 'parte' ? vistos?.includes(n.id) : n.raw?.partes?.every(p => vistos?.includes(p.id));
+                // --- MEJORA: RADIO DINÁMICO ---
+                // Si hay más de 12 nodos, escalonamos el radio para crear dos "órbitas"
+                // Los nodos pares se quedan en el radio base, los impares se alejan.
+                let radioBase = esMovil ? 210 : 260;
+                let radio = radioBase;
 
-  return (
-    <div key={i} 
-         onClick={() => handleNodeClick(n)} 
-         className="floating-node" 
-         style={{ 
-           ...mapStyles.subNodeFloating, 
-           // Usamos x e y calculados con el radio dinámico
-           left: `calc(50% + ${x}px - ${esMovil ? '40px' : '50px'})`, 
-           top: `calc(50% + ${y}px - ${esMovil ? '40px' : '50px'})`, 
-           animationDelay: `${i * -0.8}s`, 
-           animationDuration: `${5 + (i % 3)}s`, 
-           borderColor: visto ? '#4CAF50' : '#d4af37', 
-           color: visto ? '#4CAF50' : '#fff', 
-           cursor: 'pointer',
-           fontSize: esMovil ? '0.55rem' : '0.75rem',
-           // Reducimos un poco más el tamaño en móvil si hay saturación
-           width: esMovil ? (total > 20 ? '70px' : '80px') : '100px',
-           height: esMovil ? (total > 20 ? '70px' : '80px') : '100px',
-           zIndex: 10
-         }}>
-      {visto ? '✅ ' : ''}{n.nombre}
-    </div>
-  );
-})}
-      </>
-    )}
-  </div>
-</main>
+                if (total > 12) {
+                  // Si es impar, sumamos distancia para crear la segunda órbita
+                  radio = (i % 2 === 0) ? radioBase : radioBase + (esMovil ? 75 : 110);
+                }
+                // ------------------------------
+
+                const angle = (i * (360 / total)) * (Math.PI / 180);
+                const x = Math.cos(angle) * radio;
+                const y = Math.sin(angle) * radio;
+
+                const visto = n.type === 'parte' ? vistos?.includes(n.id) : n.raw?.partes?.every(p => vistos?.includes(p.id));
+
+                return (
+                  <div key={i}
+                    onClick={() => handleNodeClick(n)}
+                    className="floating-node"
+                    style={{
+                      ...mapStyles.subNodeFloating,
+                      // Usamos x e y calculados con el radio dinámico
+                      left: `calc(50% + ${x}px - ${esMovil ? '40px' : '50px'})`,
+                      top: `calc(50% + ${y}px - ${esMovil ? '40px' : '50px'})`,
+                      animationDelay: `${i * -0.8}s`,
+                      animationDuration: `${5 + (i % 3)}s`,
+                      borderColor: visto ? '#4CAF50' : '#d4af37',
+                      color: visto ? '#4CAF50' : '#fff',
+                      cursor: 'pointer',
+                      fontSize: esMovil ? '0.55rem' : '0.75rem',
+                      // Reducimos un poco más el tamaño en móvil si hay saturación
+                      width: esMovil ? (total > 20 ? '70px' : '80px') : '100px',
+                      height: esMovil ? (total > 20 ? '70px' : '80px') : '100px',
+                      zIndex: 10
+                    }}>
+                    {visto ? '✅ ' : ''}{n.nombre}
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </div>
+      </main>
     </div>
   );
 };
@@ -3028,37 +3001,31 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
   }, []);
 
   // Carga sincronizada
+  // UBICACIÓN: Dentro de App(), reemplaza el useEffect actual por este:
   React.useEffect(() => {
-    const cargarNotaSincronizada = async () => {
-      if (!video?.id) return;
-      setNota(""); 
-      if (auth.currentUser) {
-        try {
-          const userRef = doc(db, "usuarios", auth.currentUser.uid);
-          const docSnap = await getDoc(userRef);
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        // Escucha activa al documento del usuario
+        const userRef = doc(db, "usuarios", user.uid);
+        const unsubDoc = onSnapshot(userRef, (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data();
-            if (data.notas && data.notas[video.id]) {
-              const notaNube = data.notas[video.id];
-              setNota(notaNube);
-              localStorage.setItem(`nota_${video.titulo}`, JSON.stringify({
-                texto: notaNube, videoId: video.id, fecha: new Date().toISOString()
-              }));
-              return;
-            }
+            setUsuario({ uid: user.uid, email: user.email, ...data });
+            setUserRole(data.rol || 'usuario');
+            if (data.vistos) setVistos(data.vistos);
+            if (data.validado) setPage(prev => prev === 'login' ? 'hub' : prev);
           }
-        } catch (error) { console.error("❌ Error al leer Firestore:", error); }
+          setCargando(false);
+        });
+        return () => unsubDoc();
+      } else {
+        setUsuario(null);
+        setPage('login');
+        setCargando(false);
       }
-      const localRaw = localStorage.getItem(`nota_${video?.titulo}`);
-      if (localRaw) {
-        try {
-          const parsed = JSON.parse(localRaw);
-          setNota(parsed.texto || "");
-        } catch (e) { setNota(localRaw); }
-      }
-    };
-    cargarNotaSincronizada();
-  }, [video?.id, auth.currentUser?.uid]);
+    });
+    return () => unsub();
+  }, []);
 
   // --- FUNCIONES ---
   const formatearTiempo = (seg) => {
@@ -3082,7 +3049,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
   const guardar = async () => {
     if (!video?.id) return;
     const ahora = new Date().toLocaleString();
-    
+
     // Guardado local
     const dataNota = { texto: nota, videoId: video.id, fecha: ahora };
     localStorage.setItem(`nota_${video.titulo}`, JSON.stringify(dataNota));
@@ -3095,12 +3062,12 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
       try {
         const userRef = doc(db, "usuarios", auth.currentUser.uid);
         await setDoc(userRef, { notas: { [video.id]: nota } }, { merge: true });
-        
+
         // NOTIFICACIÓN PERSONALIZADA
-        setMensajeAlerta(`Bitácora sincronizada en el Vault: ${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`);
+        setMensajeAlerta(`Bitácora sincronizada en el Vault: ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
         setMostrarAlerta(true);
         setTimeout(() => setMostrarAlerta(false), 3000); // Auto-cierre
-      } catch (err) { 
+      } catch (err) {
         setMensajeAlerta("Error al sincronizar con la nube.");
         setMostrarAlerta(true);
       }
@@ -3142,9 +3109,9 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px', backgroundColor: '#0f0f0f', display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
           <h3 style={{ color: '#d4af37', fontSize: '1rem', margin: 0 }}>BITÁCORA TÉCNICA</h3>
-          <span style={{ fontSize: '0.6rem', color: '#666' }}>ID: {video?.id?.substring(0,6)}</span>
+          <span style={{ fontSize: '0.6rem', color: '#666' }}>ID: {video?.id?.substring(0, 6)}</span>
         </div>
-        
+
         <div style={{ backgroundColor: '#181818', padding: '15px', borderRadius: '8px', marginBottom: '20px', border: '1px solid #222' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', alignItems: 'center', backgroundColor: '#000', padding: '8px', borderRadius: '5px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -3219,53 +3186,40 @@ const handleLogout = async () => {
 };
 const HubPage = ({ onNavigate, onContinue, hasSession, userRole, onLogout }) => (
   <div style={styles.container}>
-    <button 
-      onClick={onLogout} 
-      style={{ position: 'absolute', top: '20px', right: '20px', background: 'none', border: '1px solid #444', color: '#666', padding: '5px 10px', borderRadius: '5px', fontSize: '0.7rem', cursor: 'pointer' }}
-    >
-      CERRAR SESIÓN
-    </button>
-    
-    <h1 style={styles.goldTitle}>HUB DE ESTUDIO</h1>
-    
+    <h1 style={styles.goldTitle}>LA FORTUNA VAULT</h1>
+
     <div style={styles.grid}>
-      {hasSession && (
-        <button 
-          onClick={onContinue} 
-          style={{...styles.btnGold, width: '100%', marginBottom: '10px', gridColumn: 'span 2'}}
-        >
-          ▶ CONTINUAR ÚLTIMA SESIÓN
+      {/* Botones de Contenido (Admin, Profesor, Instructor) */}
+      <button style={styles.hubBtn} onClick={() => onNavigate('mapa')}>MAPA</button>
+      <button style={styles.hubBtn} onClick={() => onNavigate('notas_hub')}>BITÁCORA</button>
+      <button style={styles.hubBtn} onClick={() => onNavigate('busqueda')}>BUSCAR</button>
+
+      {/* Planeador (Admin, Profesor, Instructor) */}
+      <button style={{ ...styles.hubBtn, border: '1px solid #d4af37' }} onClick={() => onNavigate('planeador')}>
+        PLANEAR CLASE
+      </button>
+
+      {/* Gestión de Alumnos (Solo Admin y Profesor) */}
+      {['admin', 'profesor'].includes(userRole) && (
+        <button style={{ ...styles.hubBtn, border: '1px solid #d4af37' }} onClick={() => onNavigate('alumnos')}>
+          GESTIÓN DOJO
         </button>
       )}
 
-      <button style={styles.hubBtn} onClick={() => onNavigate('mapa')}>MAPA</button>
-      <button style={styles.hubBtn} onClick={() => onNavigate('notas_hub')}>BITACORA</button>
-      <button style={styles.hubBtn} onClick={() => onNavigate('busqueda')}>BUSCAR TÉCNICA</button>
-
-      {/* SECCIÓN ADMINISTRATIVA PARA EL PROFESOR */}
+      {/* Control de Accesos (Único para el Admin) */}
       {userRole === 'admin' && (
-        <>
-          <button 
-            style={{ ...styles.hubBtn, border: '1px solid #d4af37', backgroundColor: '#111' }} 
-            onClick={() => onNavigate('alumnos')}
-          >
-            <div style={{ fontSize: '1.5rem', marginBottom: '5px' }}></div>
-            GESTIÓN DE DOJO
-          </button>
-          <button style={styles.hubBtn} onClick={() => onNavigate('planeador')}>
-  <div style={{ fontSize: '1.5rem' }}></div>
-  PLANEAR CLASE
-</button>
-
-          <button 
-            style={{ ...styles.hubBtn, border: '1px solid #444', marginTop: '10px', gridColumn: 'span 2', fontSize: '0.8rem', opacity: 0.7 }} 
-            onClick={() => onNavigate('admin')}
-          >
-            ⚙️ ADMINISTRAR ACCESOS
-          </button>
-        </>
+        <button
+          style={{ ...styles.hubBtn, gridColumn: 'span 2', backgroundColor: '#1a1a1a', color: '#d4af37' }}
+          onClick={() => onNavigate('admin')}
+        >
+          CONTROL DE ACCESOS
+        </button>
       )}
     </div>
+
+    <button onClick={onLogout} style={{ ...styles.btnOutline, marginTop: '40px', width: '200px' }}>
+      CERRAR SESIÓN
+    </button>
   </div>
 );
 const NotasHubPage = ({ onBack, onNavigateToVideo }) => {
@@ -3369,7 +3323,7 @@ export default function App() {
       if (user) {
         const docRef = doc(db, "usuarios", user.uid);
         const docSnap = await getDoc(docRef);
-        
+
         if (docSnap.exists()) {
           const data = docSnap.data();
           setUsuario({ ...user, ...data });
@@ -3400,25 +3354,34 @@ export default function App() {
   };
 
   const handleRegister = async () => {
-    try {
-      setError('');
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      const isAdmin = email === "zamna.ed@gmail.com"; 
+  try {
+    setError('');
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
 
-      await setDoc(doc(db, "usuarios", user.uid), {
-        uid: user.uid,
-        email: user.email,
-        nombre: nombreCompleto,
-        rol: isAdmin ? 'admin' : 'usuario',
-        validado: isAdmin,
-        fechaRegistro: new Date().toISOString()
-      });
+    // Tu correo maestro sigue siendo el único Admin automático
+    const isAdmin = email === "zamna.ed@gmail.com";
 
-      alert(isAdmin ? "¡Bienvenido, Admin!" : "Solicitud enviada. Espera validación.");
-      setPage('login');
-    } catch (err) { setError("Error al registrar: " + err.message); }
-  };
+    await setDoc(doc(db, "usuarios", user.uid), {
+      uid: user.uid,
+      email: user.email,
+      nombre: nombreCompleto,
+      // CAMBIO AQUÍ: Usamos 'alumno' para que coincida con el resto de la app
+      rol: isAdmin ? 'admin' : 'alumno', 
+      validado: isAdmin, 
+      fechaRegistro: new Date().toISOString()
+    });
+
+    alert(isAdmin 
+      ? "¡Bienvenido, Ngasi! Acceso total concedido." 
+      : "Solicitud enviada a La Fortuna. Espera a que el profesor valide tu perfil."
+    );
+    
+    setPage('login');
+  } catch (err) { 
+    setError("Error al registrar: " + err.message); 
+  }
+};
 
   const handleLogin = async () => {
     try {
@@ -3426,7 +3389,7 @@ export default function App() {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       const userDoc = await getDoc(doc(db, "usuarios", user.uid));
-      
+
       if (userDoc.exists()) {
         const data = userDoc.data();
         if (data.validado) {
@@ -3442,98 +3405,144 @@ export default function App() {
   };
 
   const toggleVisto = async (id) => {
-  if (!id) return;
+    if (!id) return;
 
-  const nuevaLista = vistos.includes(id)
-    ? vistos.filter(v => v !== id)
-    : [...vistos, id];
+    const nuevaLista = vistos.includes(id)
+      ? vistos.filter(v => v !== id)
+      : [...vistos, id];
 
-  // 1. Actualización Instantánea (UI local)
-  setVistos(nuevaLista);
-  localStorage.setItem('lafortuna_vistos', JSON.stringify(nuevaLista));
+    // 1. Actualización Instantánea (UI local)
+    setVistos(nuevaLista);
+    localStorage.setItem('lafortuna_vistos', JSON.stringify(nuevaLista));
 
-  // 2. Sincronización con la Nube
-  if (auth.currentUser) {
-    try {
-      const userRef = doc(db, "usuarios", auth.currentUser.uid);
-      // Usamos setDoc con merge para asegurar que no borre otros datos (como las notas)
-      await setDoc(userRef, { vistos: nuevaLista }, { merge: true });
-      console.log("Vistos sincronizados en la nube");
-    } catch (error) {
-      console.error("Error sincronizando vistos:", error);
+    // 2. Sincronización con la Nube
+    if (auth.currentUser) {
+      try {
+        const userRef = doc(db, "usuarios", auth.currentUser.uid);
+        // Usamos setDoc con merge para asegurar que no borre otros datos (como las notas)
+        await setDoc(userRef, { vistos: nuevaLista }, { merge: true });
+        console.log("Vistos sincronizados en la nube");
+      } catch (error) {
+        console.error("Error sincronizando vistos:", error);
+      }
     }
-  }
-};
+  };
 
   // --- 4. RENDERIZADO DE PÁGINAS ---
   // Extraemos la lógica de qué página mostrar
   const getContent = () => {
-    // Si no hay usuario, forzamos Login sin importar el estado 'page'
+    // 1. SI NO HAY USUARIO: Pantalla de Login
     if (!usuario) {
       return (
-        <LoginPage 
-          email={email} setEmail={setEmail} 
-          password={password} setPassword={setPassword} 
+        <LoginPage
+          email={email} setEmail={setEmail}
+          password={password} setPassword={setPassword}
           nombreCompleto={nombreCompleto} setNombreCompleto={setNombreCompleto}
           onLogin={handleLogin} onRegister={handleRegister} error={error}
         />
       );
     }
 
-    // Si hay usuario, navegamos según 'page'
+    // 2. SI EL USUARIO NO ESTÁ VALIDADO: Pantalla de "Sala de Espera"
+    // Esto bloquea todo el contenido delicado automáticamente.
+    if (!usuario.validado) {
+      return (
+        <div style={{ ...styles.containerCenter, padding: '20px', background: 'radial-gradient(circle, #1a1a1a 0%, #000 100%)' }}>
+          <div style={{ ...styles.card, width: '100%', maxWidth: '400px', border: '1px solid #d4af37' }}>
+            <h2 style={styles.goldTitle}>SOLICITUD ENVIADA</h2>
+            <p style={{ color: '#fff', fontSize: '1rem', lineHeight: '1.6', marginBottom: '20px' }}>
+              Hola <span style={{ color: '#d4af37', fontWeight: 'bold' }}>{usuario.nombre || 'Guerrero'}</span>,
+            </p>
+            <p style={{ color: '#ccc', fontSize: '0.9rem', marginBottom: '25px' }}>
+              El acceso al Vault de <strong>La Fortuna</strong> es restringido. Tu cuenta está en proceso de validación por el administrador.
+            </p>
+            <div style={{ backgroundColor: '#000', padding: '15px', borderRadius: '8px', border: '1px solid #222', marginBottom: '20px' }}>
+              <p style={{ color: '#666', fontSize: '0.75rem', margin: 0 }}>
+                Recibirás acceso a las técnicas una vez que verifiquemos tu perfil.
+              </p>
+            </div>
+            <button onClick={handleLogout} style={styles.btnOutline}>
+              SALIR / CERRAR SESIÓN
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // 3. SI EL USUARIO ESTÁ VALIDADO: Navegación según Rol
     switch (page) {
       case 'hub':
-        return <HubPage onNavigate={setPage} onContinue={() => setPage('estudio')} 
-                hasSession={!!videoActual} userRole={userRole} onLogout={handleLogout} />;
+        return <HubPage onNavigate={setPage} onContinue={() => setPage('estudio')}
+          hasSession={!!videoActual} userRole={userRole} onLogout={handleLogout} />;
+
       case 'mapa':
         return <MapaPage onBack={() => setPage('hub')} vistos={vistos}
-                categoriaSel={categoriaSel} setCategoriaSel={setCategoriaSel}
-                autorSel={autorSel} setAutorSel={setAutorSel}
-                instrSel={instrSel} setInstrSel={setInstrSel}
-                volSel={volSel} setVolSel={setVolSel}
-                onSelectVideo={(v) => { setVideoActual(v); localStorage.setItem('lafortuna_last_video', JSON.stringify(v)); setPage('estudio'); }}
-                onNavigateToNotes={() => setPage('notas_hub')} onContinue={() => setPage('estudio')} hasSession={!!videoActual} />;
+          categoriaSel={categoriaSel} setCategoriaSel={setCategoriaSel}
+          autorSel={autorSel} setAutorSel={setAutorSel}
+          instrSel={instrSel} setInstrSel={setInstrSel}
+          volSel={volSel} setVolSel={setVolSel}
+          onSelectVideo={(v) => { setVideoActual(v); localStorage.setItem('lafortuna_last_video', JSON.stringify(v)); setPage('estudio'); }}
+          onNavigateToNotes={() => setPage('notas_hub')} onContinue={() => setPage('estudio')} hasSession={!!videoActual} />;
+
       case 'estudio':
         return <EstudioPage video={videoActual} onBack={() => setPage('mapa')} vistos={vistos}
-                toggleVisto={toggleVisto} onNavigateToNotes={() => setPage('notas_hub')}
-                onSelectVideo={(v) => { setVideoActual(v); localStorage.setItem('lafortuna_last_video', JSON.stringify(v)); }} />;
-      case 'admin':
-        return <AdminPage onBack={() => setPage('hub')} />;
+          toggleVisto={toggleVisto} onNavigateToNotes={() => setPage('notas_hub')}
+          onSelectVideo={(v) => { setVideoActual(v); localStorage.setItem('lafortuna_last_video', JSON.stringify(v)); }} />;
+
       case 'notas_hub':
         return <NotasHubPage onBack={() => setPage('hub')} onNavigateToVideo={(v) => { setVideoActual(v); setPage('estudio'); }} />;
+
       case 'busqueda':
         return <BusquedaPage onBack={() => setPage('hub')} onSelectVideo={(v) => { setVideoActual(v); setPage('estudio'); }} />;
+
+      case 'alumnos':
+        // Protección extra: solo admin y profesor entran aquí
+        if (['admin', 'profesor'].includes(userRole)) {
+          return <GestionAlumnosPage onBack={() => setPage('hub')} styles={styles} />;
+        }
+        return <HubPage onNavigate={setPage} userRole={userRole} onLogout={handleLogout} />;
+
+      case 'planeador':
+        // Admin, profesor e instructor pueden planear clases
+        if (['admin', 'profesor', 'instructor'].includes(userRole)) {
+          return <PlaneadorClasesPage onBack={() => setPage('hub')} styles={styles} />;
+        }
+        return <HubPage onNavigate={setPage} userRole={userRole} onLogout={handleLogout} />;
+
+      case 'admin':
+        // Únicamente tú como Admin puedes ver las solicitudes
+        if (userRole === 'admin') {
+          return <AdminPage onBack={() => setPage('hub')} />;
+        }
+        return <HubPage onNavigate={setPage} userRole={userRole} onLogout={handleLogout} />;
+
       default:
         return <HubPage onNavigate={setPage} userRole={userRole} onLogout={handleLogout} />;
-      case 'alumnos':
-        return <GestionAlumnosPage onBack={() => setPage('hub')} styles={styles} />;
-      case 'planeador':
-        return <PlaneadorClasesPage onBack={() => setPage('hub')} styles={styles} />;
     }
   };
 
   // --- 5. RENDER FINAL ---
   if (cargando) {
     return (
-      <div style={{ 
+      <div style={{
         position: 'fixed', // Cambiamos a fixed para ignorar contenedores padres
-        top: 0, 
-        left: 0, 
+        top: 0,
+        left: 0,
         width: '100vw',    // 100% del ancho del visor
         height: '100vh',   // 100% del alto del visor
-        backgroundColor: '#000', 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
+        backgroundColor: '#000',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
         flexDirection: 'column',
         zIndex: 9999,       // Asegura que esté por encima de todo
         margin: 0,
         padding: 0
       }}>
         <div className="spinner"></div>
-        <h2 style={{ 
-          color: '#d4af37', 
-          marginTop: '25px', 
+        <h2 style={{
+          color: '#d4af37',
+          marginTop: '25px',
           fontSize: 'clamp(0.8rem, 2vw, 1.2rem)', // Tamaño fluido
           letterSpacing: '4px',
           fontWeight: '300',
@@ -3541,7 +3550,7 @@ export default function App() {
         }}>
           ACCEDIENDO AL VAULT
         </h2>
-        
+
         <style>{`
           .spinner { 
             width: 50px; 
@@ -3566,7 +3575,7 @@ export default function App() {
         @keyframes float { 0% { transform: translate(0px, 0px); } 50% { transform: translate(0px, -15px); } 100% { transform: translate(0px, 0px); } }
         .floating-node { animation: float 6s ease-in-out infinite; }
       `}</style>
-      
+
       {/* Llamamos a la función de contenido aquí */}
       {getContent()}
     </div>
