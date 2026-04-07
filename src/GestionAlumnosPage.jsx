@@ -20,6 +20,8 @@ const GestionAlumnosPage = ({ onBack, styles, usuario }) => {
   // Estados para el constructor de horarios intuitivo
   const [tempHora, setTempHora] = useState("19:00");
   const [tempNombreClase, setTempNombreClase] = useState("");
+  const [tempDias, setTempDias] = useState([]); // Nuevo: para los días de la clase
+  const [tempNuevoPrograma, setTempNuevoPrograma] = useState(""); // Nuevo: para añadir programas uno a uno
 
   const estadoInicial = {
     nombre: '',
@@ -119,17 +121,31 @@ const GestionAlumnosPage = ({ onBack, styles, usuario }) => {
   };
 
   // 5. GESTIÓN DE HORARIOS INTUITIVA
-  const agregarHorario = () => {
-    if (!tempNombreClase) return alert("Escribe el nombre de la clase");
-    const nuevoH = { hora: tempHora, nombre: tempNombreClase };
-    const nuevosHorarios = [...config.horarios, nuevoH].sort((a,b) => a.hora.localeCompare(b.hora));
-    setConfig(prev => ({ ...prev, horarios: nuevosHorarios }));
-    setTempNombreClase("");
+const toggleDia = (index) => {
+    setTempDias(prev => prev.includes(index) ? prev.filter(d => d !== index) : [...prev, index]);
   };
 
-  const eliminarHorario = (index) => {
-    const nuevos = config.horarios.filter((_, i) => i !== index);
-    setConfig(prev => ({ ...prev, horarios: nuevos }));
+  const agregarHorario = () => {
+    if (!tempNombreClase || tempDias.length === 0) return alert("Escribe el nombre y selecciona días");
+    const nuevoH = { 
+      hora: tempHora, 
+      nombre: tempNombreClase, 
+      dias: tempDias.sort() 
+    };
+    setConfig(prev => ({ ...prev, horarios: [...prev.horarios, nuevoH].sort((a,b) => a.hora.localeCompare(b.hora)) }));
+    setTempNombreClase("");
+    setTempDias([]);
+  };
+
+  const agregarPrograma = () => {
+    if (!tempNuevoPrograma.trim()) return;
+    if (config.programas.includes(tempNuevoPrograma)) return alert("Este programa ya existe");
+    setConfig(prev => ({ ...prev, programas: [...prev.programas, tempNuevoPrograma.trim()] }));
+    setTempNuevoPrograma("");
+  };
+
+  const eliminarPrograma = (index) => {
+    setConfig(prev => ({ ...prev, programas: prev.programas.filter((_, i) => i !== index) }));
   };
 
   // 6. FUNCIONES DE GUARDADO Y ELIMINACIÓN
@@ -325,19 +341,52 @@ const GestionAlumnosPage = ({ onBack, styles, usuario }) => {
             <input placeholder="Nombre Academia" style={styles.input} value={config.nombreAcademia} onChange={e => setConfig({...config, nombreAcademia: e.target.value})} />
             <input placeholder="Sede / Ciudad" style={styles.input} value={config.sede} onChange={e => setConfig({...config, sede: e.target.value})} />
             
-            {/* GESTOR DE HORARIOS */}
+            {/* GESTOR DE HORARIOS CON DÍAS */}
             <div style={{ border: '1px solid #222', padding: '15px', borderRadius: '10px', marginTop: '15px' }}>
               <p style={{ color: '#d4af37', fontSize: '0.7rem', textAlign: 'left', marginBottom: '10px' }}>GESTIÓN DE CLASES:</p>
               <div style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
-                <input type="time" style={{ ...styles.input, width: '120px', margin: 0 }} value={tempHora} onChange={e => setTempHora(e.target.value)} />
-                <input placeholder="Clase (ej: No-Gi)" style={{ ...styles.input, margin: 0 }} value={tempNombreClase} onChange={e => setTempNombreClase(e.target.value)} />
-                <button onClick={agregarHorario} style={{ ...styles.btnGold, width: '45px', padding: 0 }}>+</button>
+                <input type="time" style={{ ...styles.input, width: '100px', margin: 0 }} value={tempHora} onChange={e => setTempHora(e.target.value)} />
+                <input placeholder="Nombre clase" style={{ ...styles.input, margin: 0 }} value={tempNombreClase} onChange={e => setTempNombreClase(e.target.value)} />
               </div>
-              <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                {["L", "M", "M", "J", "V", "S", "D"].map((dia, i) => (
+                  <button key={i} onClick={() => toggleDia(i)} style={{ 
+                    width: '35px', height: '35px', borderRadius: '5px', border: '1px solid #333', 
+                    backgroundColor: tempDias.includes(i) ? '#d4af37' : '#000',
+                    color: tempDias.includes(i) ? '#000' : '#fff',
+                    fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer'
+                  }}>{dia}</button>
+                ))}
+              </div>
+              <button onClick={agregarHorario} style={{ ...styles.btnGold, width: '100%' }}>AÑADIR CLASE</button>
+
+              <div style={{ marginTop: '15px', maxHeight: '150px', overflowY: 'auto' }}>
                 {config.horarios.map((h, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', borderBottom: '1px solid #111', fontSize: '0.8rem' }}>
-                    <span>{h.hora} - {h.nombre}</span>
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', borderBottom: '1px solid #111', fontSize: '0.75rem' }}>
+                    <span style={{textAlign: 'left'}}>
+                      <strong style={{color: '#d4af37'}}>{h.hora}</strong> - {h.nombre} <br/>
+                      <small style={{color: '#666'}}>{h.dias?.map(d => ["L","M","M","J","V","S","D"][d]).join(', ')}</small>
+                    </span>
                     <button onClick={() => eliminarHorario(i)} style={{ color: '#ff4444', background: 'none', border: 'none', cursor: 'pointer' }}>×</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* GESTOR DE PROGRAMAS TIPO CHIPS */}
+            <div style={{ border: '1px solid #222', padding: '15px', borderRadius: '10px', marginTop: '15px' }}>
+              <p style={{ color: '#d4af37', fontSize: '0.7rem', textAlign: 'left', marginBottom: '10px' }}>PROGRAMAS ACTIVOS:</p>
+              <div style={{ display: 'flex', gap: '5px', marginBottom: '15px' }}>
+                <input placeholder="Nuevo programa" style={{ ...styles.input, margin: 0 }} value={tempNuevoPrograma} onChange={e => setTempNuevoPrograma(e.target.value)} />
+                <button onClick={agregarPrograma} style={{ ...styles.btnGold, width: '50px' }}>+</button>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {config.programas.map((p, i) => (
+                  <div key={i} style={{ 
+                    backgroundColor: '#d4af3711', border: '1px solid #d4af37', color: '#d4af37', 
+                    padding: '5px 12px', borderRadius: '15px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '8px'
+                  }}>
+                    {p} <span onClick={() => eliminarPrograma(i)} style={{ cursor: 'pointer', fontWeight: 'bold', color: '#fff' }}>×</span>
                   </div>
                 ))}
               </div>
