@@ -181,154 +181,195 @@ const cargarDatosDesdeFirebase = async (uid) => {
 };
 const AdminPage = ({ onBack }) => {
   const [usuarios, setUsuarios] = React.useState([]);
+  const [tickets, setTickets] = React.useState([]);
   const [cargando, setCargando] = React.useState(true);
+  const [tabActiva, setTabActiva] = React.useState('tickets');
 
-  const obtenerUsuarios = async () => {
+  const obtenerDatos = async () => {
     try {
       setCargando(true);
-      const querySnapshot = await getDocs(collection(db, "usuarios"));
-      const lista = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setUsuarios(lista);
+      
+      // 1. Obtener Usuarios
+      const uSnap = await getDocs(collection(db, "usuarios"));
+      const listaU = uSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setUsuarios(listaU);
+
+      // 2. Obtener Tickets (Soporte + Errores de Video)
+      const tSnap = await getDocs(collection(db, "soporte"));
+      const listaT = tSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Orden descendente por fecha
+      listaT.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+      setTickets(listaT);
+
     } catch (error) {
-      console.error("Error al obtener usuarios:", error);
+      console.error("Error al sincronizar Admin:", error);
     } finally {
       setCargando(false);
     }
   };
 
   React.useEffect(() => {
-    obtenerUsuarios();
+    obtenerDatos();
   }, []);
 
   const actualizarUsuario = async (uid, nuevosDatos) => {
     try {
       const userRef = doc(db, "usuarios", uid);
       await updateDoc(userRef, nuevosDatos);
-      obtenerUsuarios();
+      obtenerDatos();
     } catch (error) {
-      alert("Error al actualizar: " + error.message);
+      alert("Error: " + error.message);
+    }
+  };
+
+  const resolverTicket = async (id) => {
+    if (!window.confirm("¿Marcar este reporte como resuelto? Se eliminará de la lista.")) return;
+    try {
+      await deleteDoc(doc(db, "soporte", id));
+      obtenerDatos();
+    } catch (error) {
+      alert("Error al eliminar ticket.");
     }
   };
 
   return (
     <div style={{ 
-      padding: '20px', 
-      backgroundColor: '#000', 
-      minHeight: '100vh', 
-      color: '#fff', 
-      fontFamily: 'monospace',
-      boxSizing: 'border-box',
-      width: '100%',
-      overflowX: 'hidden' 
+      padding: '20px', backgroundColor: '#000', minHeight: '100vh', 
+      color: '#fff', fontFamily: 'monospace', boxSizing: 'border-box',
+      width: '100%', overflowX: 'hidden' 
     }}>
-      {/* Header Responsivo */}
-      <div style={{ 
-        display: 'flex', 
-        flexDirection: window.innerWidth < 600 ? 'column' : 'row',
-        justifyContent: 'space-between', 
-        alignItems: window.innerWidth < 600 ? 'flex-start' : 'center',
-        gap: '15px',
-        marginBottom: '30px', 
-        borderBottom: '2px solid #d4af37', 
-        paddingBottom: '20px' 
-      }}>
-        <h2 style={{ color: '#d4af37', margin: 0, fontSize: '1.2rem' }}>GESTIÓN: LA FORTUNA</h2>
-        <button onClick={onBack} style={{ background: 'none', border: '1px solid #d4af37', color: '#d4af37', cursor: 'pointer', padding: '8px 15px', fontWeight: 'bold' }}>VOLVER</button>
+      
+      {/* Header con Navegación de Tabs */}
+      <div style={{ borderBottom: '2px solid #d4af37', paddingBottom: '20px', marginBottom: '30px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+          <h2 style={{ color: '#d4af37', margin: 0, fontSize: '1.2rem' }}>ADMINISTRACIÓN VAULT</h2>
+          <button onClick={onBack} style={{ background: 'none', border: '1px solid #d4af37', color: '#d4af37', padding: '8px 15px', fontWeight: 'bold', cursor: 'pointer' }}>VOLVER</button>
+        </div>
+
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button 
+            onClick={() => setTabActiva('tickets')}
+            style={{
+              flex: 1, padding: '12px', cursor: 'pointer', fontWeight: 'bold',
+              backgroundColor: tabActiva === 'tickets' ? '#ff4444' : '#111',
+              color: tabActiva === 'tickets' ? '#fff' : '#666',
+              border: 'none', borderRadius: '4px', fontSize: '0.8rem'
+            }}
+          >
+            REPORTES ({tickets.length})
+          </button>
+          <button 
+            onClick={() => setTabActiva('usuarios')}
+            style={{
+              flex: 1, padding: '12px', cursor: 'pointer', fontWeight: 'bold',
+              backgroundColor: tabActiva === 'usuarios' ? '#d4af37' : '#111',
+              color: tabActiva === 'usuarios' ? '#000' : '#666',
+              border: 'none', borderRadius: '4px', fontSize: '0.8rem'
+            }}
+          >
+            USUARIOS ({usuarios.length})
+          </button>
+        </div>
       </div>
 
       {cargando ? (
-        <p style={{ color: '#d4af37' }}>Cargando Vault...</p>
+        <p style={{ color: '#d4af37' }}>Sincronizando Vault...</p>
       ) : (
-        <div style={{ width: '100%', overflowX: 'auto' }}>
-          {/* Contenedor tipo "Card List" para móvil */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            {/* Header de tabla (Solo visible en escritorio si prefieres, o lo omitimos para consistencia) */}
-            <div style={{ 
-                display: window.innerWidth < 600 ? 'none' : 'grid', 
-                gridTemplateColumns: '2fr 1fr 1.5fr 1fr', 
-                padding: '10px', 
-                color: '#666', 
-                fontSize: '0.8rem',
-                borderBottom: '1px solid #222'
-            }}>
-                <span>USUARIO</span>
-                <span>ESTADO</span>
-                <span>ROL</span>
-                <span>ACCIONES</span>
+        <div style={{ width: '100%' }}>
+          
+          {/* VISTA DE TICKETS (Soporte y Fallos de Video) */}
+          {tabActiva === 'tickets' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              {tickets.length === 0 ? (
+                <p style={{ color: '#666', textAlign: 'center' }}>No hay alertas pendientes.</p>
+              ) : (
+                tickets.map(t => {
+                  const esFalloVideo = t.tipo === 'video_fail';
+                  return (
+                    <div key={t.id} style={{ 
+                      padding: '15px', 
+                      backgroundColor: '#0a0a0a', 
+                      border: esFalloVideo ? '2px solid #ff4444' : '1px solid #333', 
+                      borderRadius: '8px',
+                      position: 'relative'
+                    }}>
+                      {/* Badge de tipo de error */}
+                      {esFalloVideo && (
+                        <div style={{ position: 'absolute', top: '-10px', right: '10px', backgroundColor: '#ff4444', color: '#fff', fontSize: '0.6rem', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>
+                          ERROR DE VIDEO
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#666', marginBottom: '8px' }}>
+                        <span>DE: {t.nombre?.toUpperCase()}</span>
+                        <span>{t.fecha}</span>
+                      </div>
+
+                      <p style={{ 
+                        margin: '10px 0', 
+                        fontSize: '0.85rem', 
+                        color: esFalloVideo ? '#ff4444' : '#eee', 
+                        whiteSpace: 'pre-wrap',
+                        lineHeight: '1.4'
+                      }}>
+                        {t.mensaje}
+                      </p>
+
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px', borderTop: '1px solid #222', paddingTop: '10px' }}>
+                        <a href={`mailto:${t.email}`} style={{ textDecoration: 'none', color: '#d4af37', border: '1px solid #d4af37', padding: '5px 12px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>MAIL</a>
+                        <button 
+                          onClick={() => resolverTicket(t.id)} 
+                          style={{ backgroundColor: esFalloVideo ? '#ff4444' : '#222', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer' }}
+                        >
+                          {esFalloVideo ? 'REPARADO' : 'RESOLVER'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
+          )}
 
-            {usuarios.map(u => (
-              <div key={u.id} style={{ 
-                display: 'grid', 
-                // En móvil 1 columna, en escritorio 4
-                gridTemplateColumns: window.innerWidth < 600 ? '1fr' : '2fr 1fr 1.5fr 1fr', 
-                gap: '15px',
-                padding: '15px', 
-                backgroundColor: '#0a0a0a',
-                border: '1px solid #111',
-                borderRadius: '8px',
-                alignItems: 'center'
-              }}>
-                {/* Datos Usuario */}
-                <div style={{ overflow: 'hidden' }}>
-                  <div style={{ fontWeight: 'bold', color: '#d4af37', fontSize: '0.9rem' }}>{u.nombre?.toUpperCase() || 'SIN NOMBRE'}</div>
-                  <div style={{ fontSize: '0.7rem', color: '#555', textOverflow: 'ellipsis', overflow: 'hidden' }}>{u.email}</div>
-                </div>
-                
-                {/* Estado */}
-                <div>
-                  {u.validado ? 
-                    <span style={{ color: '#4CAF50', fontSize: '0.75rem', fontWeight: 'bold' }}>● ACTIVO</span> : 
-                    <span style={{ color: '#FF5252', fontSize: '0.75rem', fontWeight: 'bold' }}>● PENDIENTE</span>
-                  }
-                </div>
-
-                {/* Rol (Select adaptado) */}
-                <div>
+          {/* VISTA DE USUARIOS (Diseño Original Intacto) */}
+          {tabActiva === 'usuarios' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              <div style={{ display: window.innerWidth < 600 ? 'none' : 'grid', gridTemplateColumns: '2fr 1fr 1.5fr 1fr', padding: '10px', color: '#666', fontSize: '0.8rem', borderBottom: '1px solid #222' }}>
+                <span>USUARIO</span><span>ESTADO</span><span>ROL</span><span>ACCIONES</span>
+              </div>
+              {usuarios.map(u => (
+                <div key={u.id} style={{ 
+                  display: 'grid', gridTemplateColumns: window.innerWidth < 600 ? '1fr' : '2fr 1fr 1.5fr 1fr', 
+                  gap: '15px', padding: '15px', backgroundColor: '#0a0a0a', border: '1px solid #111', borderRadius: '8px', alignItems: 'center' 
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 'bold', color: '#d4af37', fontSize: '0.9rem' }}>{u.nombre?.toUpperCase() || 'SIN NOMBRE'}</div>
+                    <div style={{ fontSize: '0.7rem', color: '#555' }}>{u.email}</div>
+                  </div>
+                  <div>
+                    {u.validado ? 
+                      <span style={{ color: '#4CAF50', fontSize: '0.75rem', fontWeight: 'bold' }}>● ACTIVO</span> : 
+                      <span style={{ color: '#FF5252', fontSize: '0.75rem', fontWeight: 'bold' }}>● PENDIENTE</span>
+                    }
+                  </div>
                   <select
                     value={u.rol || 'alumno'}
                     onChange={(e) => actualizarUsuario(u.uid, { rol: e.target.value })}
-                    style={{
-                      width: '100%',
-                      backgroundColor: '#111',
-                      color: u.rol === 'admin' ? '#d4af37' : u.rol === 'profesor' ? '#4CAF50' : '#fff',
-                      border: '1px solid #333',
-                      padding: '8px',
-                      borderRadius: '4px',
-                      fontSize: '0.8rem',
-                      cursor: 'pointer'
-                    }}
+                    style={{ backgroundColor: '#111', color: u.rol === 'admin' ? '#d4af37' : '#fff', border: '1px solid #333', padding: '8px', borderRadius: '4px', fontSize: '0.8rem' }}
                   >
                     <option value="alumno">Alumno</option>
                     <option value="instructor">Instructor</option>
                     <option value="profesor">Profesor</option>
                     <option value="admin">Administrador</option>
                   </select>
-                </div>
-
-                {/* Acciones */}
-                <div style={{ textAlign: window.innerWidth < 600 ? 'left' : 'center' }}>
                   {!u.validado && (
-                    <button 
-                      onClick={() => actualizarUsuario(u.uid, { validado: true })}
-                      style={{ 
-                        backgroundColor: '#d4af37', 
-                        color: '#000', 
-                        border: 'none', 
-                        padding: '10px 15px', 
-                        fontWeight: 'bold', 
-                        cursor: 'pointer',
-                        width: '100%',
-                        borderRadius: '4px'
-                      }}
-                    >
-                      DAR ACCESO
-                    </button>
+                    <button onClick={() => actualizarUsuario(u.uid, { validado: true })} style={{ backgroundColor: '#d4af37', color: '#000', border: 'none', padding: '10px', fontWeight: 'bold', borderRadius: '4px', cursor: 'pointer' }}>DAR ACCESO</button>
                   )}
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -3021,7 +3062,7 @@ const MapaPage = ({
   );
 };
 const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos = [], toggleVisto, usuario, styles = {} }) => {
-  // --- ESTADOS ---
+  // --- ESTADOS EXISTENTES ---
   const [nota, setNota] = useState("");
   const [segundosCorriendo, setSegundosCorriendo] = useState(0);
   const [isCronometroActivo, setIsCronometroActivo] = useState(false);
@@ -3031,6 +3072,10 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
   const [esMovil, setEsMovil] = React.useState(window.innerWidth < 768);
   const [mostrarAlerta, setMostrarAlerta] = useState(false);
   const [mensajeAlerta, setMensajeAlerta] = useState("");
+
+  // --- NUEVOS ESTADOS PARA REPORTES ---
+  const [mostrarReporte, setMostrarReporte] = useState(false);
+  const [enviandoReporte, setEnviandoReporte] = useState(false);
 
   // --- EFECTOS ---
   React.useEffect(() => {
@@ -3108,6 +3153,32 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
     }
   };
 
+  // --- FUNCIÓN DE REPORTE DE VIDEO ---
+  const enviarReporteVideo = async () => {
+    setEnviandoReporte(true);
+    try {
+      await addDoc(collection(db, "soporte"), {
+        uid: usuario?.uid || "anonimo",
+        nombre: usuario?.nombre || "Usuario",
+        email: usuario?.email || "Sin email",
+        mensaje: `⚠️ ERROR DE CARGA EN VIDEO: "${video?.titulo}" (ID: ${video?.id}). El alumno informa que el contenido no es accesible.`,
+        fecha: new Date().toLocaleString(),
+        estado: "pendiente",
+        tipo: "video_fail",
+        videoId: video?.id
+      });
+      setMensajeAlerta("Reporte enviado a Ngasi 🛡️");
+      setMostrarAlerta(true);
+      setMostrarReporte(false);
+      setTimeout(() => setMostrarAlerta(false), 3000);
+    } catch (error) {
+      setMensajeAlerta("No se pudo enviar el reporte.");
+      setMostrarAlerta(true);
+    } finally {
+      setEnviandoReporte(false);
+    }
+  };
+
   const isCompletado = vistos.includes(video?.id);
 
   return (
@@ -3137,6 +3208,16 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
             allowFullScreen
           ></iframe>
         </div>
+
+        {/* BOTÓN DE REPORTE DISCRETO */}
+        <div style={{ padding: '8px 15px', display: 'flex', justifyContent: 'flex-end' }}>
+          <button 
+            onClick={() => setMostrarReporte(true)}
+            style={{ background: 'none', border: 'none', color: '#444', fontSize: '0.65rem', cursor: 'pointer', textDecoration: 'underline' }}
+          >
+            ¿Problemas con el video? Reportar fallo técnico
+          </button>
+        </div>
       </div>
 
       {/* SECCIÓN DERECHA: NOTAS */}
@@ -3165,34 +3246,18 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
         {/* TRACKER DE MARCAS DINÁMICO */}
         <p style={{ fontSize: '0.6rem', color: '#444', margin: '0 0 8px 5px', letterSpacing: '1px' }}>MARCADORES EN ESTE VIDEO:</p>
         <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '15px', scrollbarWidth: 'none' }}>
-  {/* Regex más flexible: detecta [00:00] y lo que sigue después de un espacio o guion */}
-  {(nota.match(/\[\d+:\d+\]\s*(?:-?\s*([^[\n]*))?/g) || []).map((marcaCompleta, i) => {
-    const tiempoMatch = marcaCompleta.match(/\[\d+:\d+\]/);
-    if (!tiempoMatch) return null;
-    
-    const tiempo = tiempoMatch[0];
-    // Limpia el nombre quitando el corchete de tiempo y el guion inicial
-    const nombre = marcaCompleta.replace(tiempo, "").replace(/^\s*-\s*/, "").trim() || "Marca";
-    
-    return (
-      <button 
-        key={i} 
-        onClick={() => saltarATiempo(tiempo)} 
-        style={{ 
-          fontSize: '0.65rem', 
-          padding: '8px 14px', 
-          backgroundColor: '#d4af3711', 
-          color: '#d4af37', 
-          border: '1px solid #d4af37', 
-          borderRadius: '20px', 
-          whiteSpace: 'nowrap' 
-        }}
-      >
-        📍 {tiempo} {nombre}
-      </button>
-    );
-  })}
-</div>
+          {(nota.match(/\[\d+:\d+\]\s*(?:-?\s*([^[\n]*))?/g) || []).map((marcaCompleta, i) => {
+            const tiempoMatch = marcaCompleta.match(/\[\d+:\d+\]/);
+            if (!tiempoMatch) return null;
+            const tiempo = tiempoMatch[0];
+            const nombre = marcaCompleta.replace(tiempo, "").replace(/^\s*-\s*/, "").trim() || "Marca";
+            return (
+              <button key={i} onClick={() => saltarATiempo(tiempo)} style={{ fontSize: '0.65rem', padding: '8px 14px', backgroundColor: '#d4af3711', color: '#d4af37', border: '1px solid #d4af37', borderRadius: '20px', whiteSpace: 'nowrap' }}>
+                📍 {tiempo} {nombre}
+              </button>
+            );
+          })}
+        </div>
 
         <textarea 
           value={nota} 
@@ -3203,6 +3268,28 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
 
         <button style={{ ...(styles.btnGold || {}), marginTop: '15px', padding: '15px', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(212, 175, 55, 0.1)' }} onClick={guardar}>GUARDAR</button>
       </div>
+
+      {/* MODAL DE REPORTE TÉCNICO */}
+      {mostrarReporte && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10005, padding: '20px' }}>
+          <div style={{ backgroundColor: '#111', border: '1px solid #ff4444', padding: '25px', borderRadius: '12px', width: '100%', maxWidth: '350px', textAlign: 'center' }}>
+            <h3 style={{ color: '#ff4444', marginTop: 0 }}>REPORTAR VIDEO</h3>
+            <p style={{ color: '#ccc', fontSize: '0.85rem', lineHeight: '1.5' }}>
+              ¿El video <b>"{video?.titulo}"</b> no carga o tiene errores? Ngasi revisará el enlace en el Vault.
+            </p>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+              <button onClick={() => setMostrarReporte(false)} style={{ flex: 1, padding: '10px', background: '#222', color: '#666', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>CANCELAR</button>
+              <button 
+                onClick={enviarReporteVideo} 
+                disabled={enviandoReporte}
+                style={{ flex: 1, padding: '10px', background: '#ff4444', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                {enviandoReporte ? 'ENVIANDO...' : 'CONFIRMAR'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL ALERTA */}
       {mostrarAlerta && (
@@ -3272,50 +3359,183 @@ const handleLogout = async () => {
     console.error("Error al cerrar sesión:", error);
   }
 };
-const HubPage = ({ onNavigate, onContinue, hasSession, userRole, onLogout }) => (
-  <div style={styles.container}>
-    <h1 style={styles.goldTitle}>LA FORTUNA VAULT</h1>
+const HubPage = ({ onNavigate, onContinue, hasSession, userRole, onLogout, usuario }) => {
+  // 1. Estados para el sistema de soporte
+  const [showSoporte, setShowSoporte] = useState(false);
+  const [mensajeSoporte, setMensajeSoporte] = useState("");
+  const [enviando, setEnviando] = useState(false);
 
-    <div style={styles.grid}>
-      {/* Botones de Contenido (Admin, Profesor, Instructor) */}
-      <button style={styles.hubBtn} onClick={() => onNavigate('mapa')}>MAPA</button>
-      <button style={styles.hubBtn} onClick={() => onNavigate('notas_hub')}>BITÁCORA</button>
-      <button style={styles.hubBtn} onClick={() => onNavigate('busqueda')}>BUSCAR</button>
-<button 
-  style={{ ...styles.hubBtn, backgroundColor: '#050505', border: '1px dashed #444' }} 
-  onClick={() => onNavigate('instalar')} // O usa el modal directamente
->
-  INSTALAR APP
-</button>
+  // --- NUEVO: Estado para Tutoriales ---
+  const [showTutoriales, setShowTutoriales] = useState(false);
 
-      {/* Planeador (Admin, Profesor, Instructor) */}
-      <button style={{ ...styles.hubBtn, border: '1px solid #d4af37' }} onClick={() => onNavigate('planeador')}>
-        PLANEAR CLASE
+  // 2. Función para guardar el ticket en Firestore
+  const handleEnviarSoporte = async () => {
+    if (!mensajeSoporte.trim()) return;
+    setEnviando(true);
+    try {
+      await addDoc(collection(db, "soporte"), {
+        uid: usuario?.uid || "anonimo",
+        nombre: usuario?.nombre || "Usuario sin nombre",
+        email: usuario?.email || "Sin email",
+        mensaje: mensajeSoporte,
+        fecha: new Date().toLocaleString(),
+        estado: "pendiente",
+        rolAlMomento: userRole
+      });
+      alert("Mensaje enviado a Ngasi. Revisaré el sistema pronto. 🛡️");
+      setMensajeSoporte("");
+      setShowSoporte(false);
+    } catch (error) {
+      console.error("Error soporte:", error);
+      alert("No se pudo enviar el reporte.");
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  return (
+    <div style={styles.container}>
+      <h1 style={styles.goldTitle}>LA FORTUNA VAULT</h1>
+
+      <div style={styles.grid}>
+        {/* --- Funciones Originales --- */}
+        <button style={styles.hubBtn} onClick={() => onNavigate('mapa')}>MAPA</button>
+        <button style={styles.hubBtn} onClick={() => onNavigate('notas_hub')}>BITÁCORA</button>
+        <button style={styles.hubBtn} onClick={() => onNavigate('busqueda')}>BUSCAR</button>
+        
+        <button 
+          style={{ ...styles.hubBtn, backgroundColor: '#050505', border: '1px dashed #444' }} 
+          onClick={() => onNavigate('instalar')}
+        >
+          INSTALAR APP
+        </button>
+
+        <button style={{ ...styles.hubBtn, border: '1px solid #d4af37' }} onClick={() => onNavigate('planeador')}>
+          PLANEAR CLASE
+        </button>
+
+        {/* --- Gestión (Admin/Profesor) --- */}
+        {['admin', 'profesor'].includes(userRole) && (
+          <button style={{ ...styles.hubBtn, border: '1px solid #d4af37' }} onClick={() => onNavigate('alumnos')}>
+            GESTIÓN DOJO
+          </button>
+        )}
+
+        {/* --- BOTONES DE APOYO (Soporte y Tutoriales) --- */}
+        <div style={{ gridColumn: 'span 2', display: 'flex', gap: '10px' }}>
+            <button 
+              style={{ ...styles.hubBtn, flex: 1, border: '1px solid #ff4444', color: '#ff4444', margin: 0 }} 
+              onClick={() => setShowSoporte(true)}
+            >
+              SOPORTE
+            </button>
+            <button 
+              style={{ ...styles.hubBtn, flex: 1, border: '1px solid #4CAF50', color: '#4CAF50', margin: 0 }} 
+              onClick={() => setShowTutoriales(true)}
+            >
+              TUTORIALES
+            </button>
+        </div>
+
+        {/* --- Control de Accesos (Solo Admin) --- */}
+        {userRole === 'admin' && (
+          <button
+            style={{ ...styles.hubBtn, gridColumn: 'span 2', backgroundColor: '#1a1a1a', color: '#d4af37' }}
+            onClick={() => onNavigate('admin')}
+          >
+            CONTROL DE ACCESOS
+          </button>
+        )}
+      </div>
+
+      <button onClick={onLogout} style={{ ...styles.btnOutline, marginTop: '40px', width: '200px' }}>
+        CERRAR SESIÓN
       </button>
 
-      {/* Gestión de Alumnos (Solo Admin y Profesor) */}
-      {['admin', 'profesor'].includes(userRole) && (
-        <button style={{ ...styles.hubBtn, border: '1px solid #d4af37' }} onClick={() => onNavigate('alumnos')}>
-          GESTIÓN DOJO
-        </button>
+      {/* --- MODAL DE SOPORTE INTERNO --- */}
+      {showSoporte && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center',
+          alignItems: 'center', zIndex: 10001, padding: '20px', boxSizing: 'border-box'
+        }}>
+          <div style={{
+            backgroundColor: '#111', border: '1px solid #ff4444', padding: '25px',
+            borderRadius: '12px', width: '100%', maxWidth: '400px', textAlign: 'center'
+          }}>
+            <h3 style={{ color: '#ff4444', marginTop: 0, letterSpacing: '2px' }}>CONTACTAR A SOPORTE</h3>
+            <p style={{ color: '#666', fontSize: '0.75rem', marginBottom: '15px' }}>
+              Describe el error o la función que necesitas.
+            </p>
+            
+            <textarea 
+              value={mensajeSoporte}
+              onChange={(e) => setMensajeSoporte(e.target.value)}
+              placeholder="Escribe tu mensaje aquí..."
+              style={{
+                width: '100%', height: '120px', backgroundColor: '#000', color: '#fff',
+                border: '1px solid #333', borderRadius: '6px', padding: '10px',
+                fontSize: '0.9rem', outline: 'none', resize: 'none', marginBottom: '20px'
+              }}
+            />
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setShowSoporte(false)} style={{ ...styles.btnOutline, flex: 1, borderColor: '#444', color: '#666' }}>CANCELAR</button>
+              <button onClick={handleEnviarSoporte} disabled={enviando || !mensajeSoporte.trim()} style={{ ...styles.btnGold, flex: 1, backgroundColor: enviando ? '#444' : '#ff4444', color: '#fff' }}>
+                {enviando ? 'ENVIANDO...' : 'ENVIAR'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* Control de Accesos (Único para el Admin) */}
-      {userRole === 'admin' && (
-        <button
-          style={{ ...styles.hubBtn, gridColumn: 'span 2', backgroundColor: '#1a1a1a', color: '#d4af37' }}
-          onClick={() => onNavigate('admin')}
-        >
-          CONTROL DE ACCESOS
-        </button>
+      {/* --- NUEVO: MODAL DE TUTORIALES --- */}
+      {showTutoriales && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center',
+          alignItems: 'center', zIndex: 10001, padding: '20px', boxSizing: 'border-box'
+        }}>
+          <div style={{
+            backgroundColor: '#111', border: '1px solid #4CAF50', padding: '25px',
+            borderRadius: '12px', width: '100%', maxWidth: '450px', maxHeight: '80vh', overflowY: 'auto'
+          }}>
+            <h3 style={{ color: '#4CAF50', marginTop: 0, letterSpacing: '2px', textAlign: 'center' }}>TUTORIALES DE LA APP</h3>
+            <p style={{ color: '#666', fontSize: '0.75rem', marginBottom: '20px', textAlign: 'center' }}>
+              Aprende a usar las herramientas del Vault.
+            </p>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {/* Aquí irás agregando tus tutoriales poco a poco */}
+              <button 
+                onClick={() => window.open('TU_LINK_AQUI', '_blank')}
+                style={{ backgroundColor: '#000', color: '#fff', border: '1px solid #333', padding: '15px', borderRadius: '8px', textAlign: 'left', cursor: 'pointer' }}
+              >
+                <div style={{ color: '#4CAF50', fontWeight: 'bold', fontSize: '0.8rem' }}>1. Introducción al Vault</div>
+                <div style={{ fontSize: '0.7rem', color: '#555' }}>Conceptos básicos y navegación.</div>
+              </button>
+
+              <button 
+                onClick={() => window.open('TU_LINK_AQUI', '_blank')}
+                style={{ backgroundColor: '#000', color: '#fff', border: '1px solid #333', padding: '15px', borderRadius: '8px', textAlign: 'left', cursor: 'pointer' }}
+              >
+                <div style={{ color: '#4CAF50', fontWeight: 'bold', fontSize: '0.8rem' }}>2. Uso de la Bitácora</div>
+                <div style={{ fontSize: '0.7rem', color: '#555' }}>Cómo tomar notas y usar marcas de tiempo.</div>
+              </button>
+            </div>
+
+            <button 
+              onClick={() => setShowTutoriales(false)} 
+              style={{ ...styles.btnOutline, width: '100%', marginTop: '20px', borderColor: '#4CAF50', color: '#4CAF50' }}
+            >
+              CERRAR
+            </button>
+          </div>
+        </div>
       )}
     </div>
-
-    <button onClick={onLogout} style={{ ...styles.btnOutline, marginTop: '40px', width: '200px' }}>
-      CERRAR SESIÓN
-    </button>
-  </div>
-);
+  );
+};
 const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles }) => {
   const [notas, setNotas] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -3693,19 +3913,19 @@ React.useEffect(() => {
     // 3. SI EL USUARIO ESTÁ VALIDADO: Navegación según Rol
     switch (page) {
       case 'hub':
-        return (
+  return (
     <>
       <HubPage 
+        usuario={usuario} // <--- ¡AÑADE ESTA LÍNEA!
         onNavigate={(p) => {
-          if(p === 'instalar') setShowInstalar(true); // Si es instalar, abre el modal
-          else setPage(p); // Si no, cambia de página normal
+          if(p === 'instalar') setShowInstalar(true);
+          else setPage(p);
         }} 
         onContinue={() => setPage('estudio')}
         hasSession={!!videoActual} 
         userRole={userRole} 
         onLogout={handleLogout} 
       />
-      {/* Agregamos el componente aquí mismo para que flote sobre el Hub */}
       <InstalacionModal 
         isOpen={showInstalar} 
         onClose={() => setShowInstalar(false)} 
