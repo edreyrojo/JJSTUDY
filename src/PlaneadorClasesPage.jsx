@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from './firebase';
 import { collection, addDoc, onSnapshot, query, orderBy, doc, updateDoc, arrayUnion, deleteDoc, where } from 'firebase/firestore';
 
@@ -9,18 +9,77 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
     const [claseSeleccionada, setClaseSeleccionada] = useState(null);
     const [timeLeft, setTimeLeft] = useState(0);
     const [timerActive, setTimerActive] = useState(false);
+    const [isPrepTime, setIsPrepTime] = useState(false);
+    const [currentTargetTime, setCurrentTargetTime] = useState(0);
+const intentarVolver = () => {
+    if (modo === 'clase_activa') {
+        const confirmar = window.confirm("¡Atención! Tienes una sesión de entrenamiento activa. Si sales ahora, el cronómetro se detendrá y perderás el progreso actual. ¿Realmente quieres abandonar?");
+        if (!confirmar) return; // Se queda en la clase
+    }
+    
+    // Si no hay clase activa o si el usuario confirmó salir:
+    setTimerActive(false);
+    onBack();
+};
+    // --- LÓGICA DE SONIDO ---
+    const playBeep = (freq = 440, duration = 2) => {
+    try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        // Tipo de onda: 'triangle' o 'sine' suenan más a campana que la estándar
+        oscillator.type = 'triangle'; 
+        oscillator.frequency.value = freq;
+
+        // LÓGICA DE CAMPANA (El sonido empieza fuerte y cae)
+        const now = audioCtx.currentTime;
+        gainNode.gain.setValueAtTime(0.5, now); // Volumen inicial
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, now + duration); // Se desvanece
+
+        oscillator.start(now);
+        oscillator.stop(now + duration);
+    } catch (e) { console.error("Audio error", e); }
+};
+const playTripleCampana = () => {
+    playBeep(1200, 2); // Primera
+    setTimeout(() => playBeep(1200, 2), 300); // Segunda
+    setTimeout(() => playBeep(1200, 3), 600); // Tercera (más larga)
+};
 
     // --- LÓGICA DEL TIMER ---
     useEffect(() => {
         let interval = null;
         if (timerActive && timeLeft > 0) {
-            interval = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
-        } else if (timeLeft === 0) {
+            if (timeLeft <= 5) playBeep(600, 0.5); // Beep aviso final
+            interval = setInterval(() => {
+                setTimeLeft(prev => {
+                    if (prev <= 2 && isPrepTime) {
+                        setIsPrepTime(false);
+                        playBeep(800, 3); // Sonido de inicio oficial
+                        return currentTargetTime; 
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+        } else if (timeLeft === 0 && timerActive) {
             setTimerActive(false);
+            playTripleCampana(1200, 3); // Sonido de fin
             if (interval) clearInterval(interval);
         }
         return () => { if (interval) clearInterval(interval); };
-    }, [timerActive, timeLeft]);
+    }, [timerActive, timeLeft, isPrepTime, currentTargetTime]);
+
+    const startTimerWithPrep = (minutos) => {
+        setCurrentTargetTime(minutos * 60);
+        setTimeLeft(30); 
+        setIsPrepTime(true);
+        setTimerActive(true);
+        playBeep(500, 2); 
+    };
 
     const formatTime = (seconds) => {
         const mins = Math.floor(seconds / 60);
@@ -28,6 +87,7 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
         return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
     };
 
+    // --- DATOS ---
     const estadoInicial = {
         titulo: '',
         fecha: new Date().toISOString().split('T')[0],
@@ -38,65 +98,26 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
     };
     const [nuevaClase, setNuevaClase] = useState(estadoInicial);
 
-    // --- CARGA DE DATOS (BLINDADA) ---
-    // --- CARGA DE DATOS (VERSIÓN DE TRANSICIÓN SEGURA) ---
-useEffect(() => {
-        // SEGURIDAD: Si no hay usuario, abortamos para evitar colapsos al navegar
+    useEffect(() => {
         if (!usuario?.uid) return;
-
         let isMounted = true;
         const idParaFiltrar = usuario.academiaId || usuario.uid;
-
-        // 1. CARGA DE CLASES (General por ahora para recuperar tus datos viejos)
-        // Quitamos el 'where' solo aquí para que aparezca "MONTURA CLA"
-        const qClases = query(
-            collection(db, "clases"), 
-            orderBy("fecha", "desc")
-        );
-        
+        const qClases = query(collection(db, "clases"), orderBy("fecha", "desc"));
         const unsubClases = onSnapshot(qClases, (snap) => {
-            if (isMounted) {
-                const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                setClases(docs);
-            }
-        }, (err) => console.error("Error en Clases:", err));
-
-        // 2. CARGA DE ALUMNOS (Filtrada por academiaId y Activos)
-        const qAlumnos = query(
-            collection(db, "alumnos"), 
-            where("academiaId", "==", idParaFiltrar),
-            orderBy("nombre", "asc")
-        );
-
+            if (isMounted) setClases(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+        const qAlumnos = query(collection(db, "alumnos"), where("academiaId", "==", idParaFiltrar), orderBy("nombre", "asc"));
         const unsubAlumnos = onSnapshot(qAlumnos, (snap) => {
-            if (isMounted) {
-                // Aprovechamos el campo 'activo' que ya tienes
-                setAlumnos(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(a => a.activo));
-            }
-        }, (err) => console.error("Error en Alumnos:", err));
-
-        return () => {
-            isMounted = false;
-            unsubClases();
-            unsubAlumnos();
-        };
+            if (isMounted) setAlumnos(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(a => a.activo));
+        });
+        return () => { isMounted = false; unsubClases(); unsubAlumnos(); };
     }, [usuario]);
 
-    // --- FUNCIONES DE EDICIÓN (SIN CAMBIOS) ---
     const agregarBloqueCLA = () => {
         const nuevosBloques = [...nuevaClase.bloques];
-        const bloqueCLA = { 
-            id: Date.now().toString(), 
-            tipo: 'CLA', 
-            atacante: '', defensor: '', rondas: ['', '', ''], intensidad: 1, minutos: 3 
-        };
+        const bloqueCLA = { id: Date.now().toString(), tipo: 'CLA', atacante: '', defensor: '', rondas: ['', '', ''], intensidad: 1, minutos: 3 };
         nuevosBloques.splice(nuevosBloques.length - 1, 0, bloqueCLA);
         setNuevaClase({ ...nuevaClase, bloques: nuevosBloques });
-    };
-
-    const eliminarBloqueProvisional = (id) => {
-        if (id === 'b1' || id === 'b_final') return;
-        setNuevaClase({ ...nuevaClase, bloques: nuevaClase.bloques.filter(b => b.id !== id) });
     };
 
     const moverBloque = (index, direccion) => {
@@ -107,32 +128,13 @@ useEffect(() => {
         setNuevaClase({ ...nuevaClase, bloques: nuevos });
     };
 
-    // --- GUARDAR CLASE (AHORA CON INYECCIÓN DE ID) ---
     const guardarClase = async () => {
         if (!nuevaClase.titulo) return alert("Falta título");
-        if (!usuario?.uid) return alert("Error: Sesión no encontrada");
-
         try {
-            await addDoc(collection(db, "clases"), {
-                ...nuevaClase,
-                // Inyectamos el ID para que las clases nuevas ya vengan "etiquetadas"
-                academiaId: usuario.academiaId || usuario.uid,
-                fechaRegistro: new Date().toISOString()
-            });
+            await addDoc(collection(db, "clases"), { ...nuevaClase, academiaId: usuario.academiaId || usuario.uid, fechaRegistro: new Date().toISOString() });
             setModo('lista');
             setNuevaClase(estadoInicial);
-        } catch (e) { 
-            console.error("Error al guardar:", e);
-            alert("Error al guardar clase en la Bóveda."); 
-        }
-    };
-
-    const eliminarClaseDB = async (id) => {
-        if (window.confirm("¿Borrar permanentemente?")) {
-            try {
-                await deleteDoc(doc(db, "clases", id));
-            } catch (e) { console.error(e); }
-        }
+        } catch (e) { alert("Error al guardar"); }
     };
 
     const registrarAsistenciaConNota = async (alumnoId, nota) => {
@@ -141,156 +143,147 @@ useEffect(() => {
             const alumnoRef = doc(db, "alumnos", alumnoId);
             await updateDoc(alumnoRef, {
                 asistencias: arrayUnion(claseSeleccionada.fecha),
-                historialTecnico: arrayUnion({ 
-                    fecha: claseSeleccionada.fecha, 
-                    clase: claseSeleccionada.titulo, 
-                    nota: nota || "Asistió" 
-                })
+                historialTecnico: arrayUnion({ fecha: claseSeleccionada.fecha, clase: claseSeleccionada.titulo, nota: nota || "Asistió" })
             });
-            alert("Nota guardada");
-        } catch (e) { 
-            console.error(e);
-            alert("Error de permisos en Firestore"); 
-        }
+        } catch (e) { console.error(e); }
     };
 
-    // --- RENDER SEGURO ---
-    if (!usuario) return <div style={{color: 'white', padding: '50px'}}>Cargando sesión...</div>;
-
     return (
-        <div style={{ backgroundColor: '#000', minHeight: '100vh', color: '#fff', width: '100%', margin: 0, padding: 0, boxSizing: 'border-box', overflowX: 'hidden' }}>
+        <div style={{ backgroundColor: '#000', minHeight: '100vh', color: '#fff', width: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
             
+            {/* TIMER STICKY RESPONSIVE */}
             {modo === 'clase_activa' && (
-                <div style={{ position: 'sticky', top: 0, zIndex: 100, backgroundColor: '#d4af37', color: '#000', padding: '15px', borderRadius: '0 0 15px 15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '1.8rem', fontWeight: 'bold' }}>{formatTime(timeLeft)}</span>
+                <div style={{ 
+                    position: 'sticky', top: 0, zIndex: 100, 
+                    backgroundColor: isPrepTime ? '#ff4444' : '#d4af37', 
+                    color: '#000', padding: '10px 15px', 
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.5)', boxSizing: 'border-box'
+                }}>
+                    <div>
+                        <span style={{ fontSize: '1.8rem', fontWeight: '900', fontFamily: 'monospace' }}>{formatTime(timeLeft)}</span>
+                        <div style={{ fontSize: '0.6rem', fontWeight: 'bold', marginTop: '-5px' }}>
+                            {isPrepTime ? 'PREPARACIÓN' : 'TIEMPO ACTIVO'}
+                        </div>
+                    </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
-                        <button onClick={() => setTimerActive(!timerActive)} style={{ backgroundColor: '#000', color: '#d4af37', border: 'none', padding: '10px 15px', borderRadius: '8px', fontWeight: 'bold' }}>
-                            {timerActive ? 'PAUSA' : 'START'}
+                        <button onClick={() => setTimerActive(!timerActive)} style={{ backgroundColor: '#000', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.7rem' }}>
+                            {timerActive ? 'PAUSA' : 'RESUME'}
                         </button>
-                        <button onClick={() => { setTimerActive(false); setTimeLeft(0); }} style={{ backgroundColor: 'rgba(0,0,0,0.1)', border: '1px solid #000', borderRadius: '8px', padding: '10px' }}>⏹</button>
+                        <button onClick={() => { setTimerActive(false); setTimeLeft(0); }} style={{ backgroundColor: 'rgba(0,0,0,0.2)', border: '1px solid #000', borderRadius: '8px', width: '40px' }}>⏹</button>
                     </div>
                 </div>
             )}
 
-            <div style={{ padding: '15px', boxSizing: 'border-box', width: '100%' }}>
+            <div style={{ padding: '15px', maxWidth: '1200px', margin: '0 auto', boxSizing: 'border-box' }}>
+                {/* Header */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
-                    <button onClick={onBack} style={{ ...styles.btnOutline, width: '45px', height: '45px' }}>←</button>
+                    <button onClick={intentarVolver} style={{ ...styles.btnOutline, width: '40px', height: '40px' }}>←</button>
                     <div style={{ textAlign: 'right' }}>
                         <h2 style={{ color: '#d4af37', margin: 0, fontSize: '1.1rem', fontWeight: 'bold' }}>LA FORTUNA</h2>
                         <span style={{ fontSize: '0.6rem', color: '#666' }}>CLA PLANNER</span>
                     </div>
                 </div>
 
-                {/* VISTA: LISTA */}
+                {/* VISTA: LISTA (GRID ADAPTABLE) */}
                 {modo === 'lista' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                        <button onClick={() => setModo('crear')} style={{ ...styles.btnGold, padding: '18px' }}>+ NUEVA CLASE</button>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax( 300 px, 1fr))', gap: '12px' }}>
+                        <button onClick={() => setModo('crear')} style={{ ...styles.btnGold, padding: '15px', gridColumn: '1 / -1' }}>+ NUEVA SESIÓN</button>
                         {clases.map(c => (
-                            <div key={c.id} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                            <div key={c.id} style={{ display: 'flex', gap: '8px', boxSizing: 'border-box' }}>
                                 <div onClick={() => { setClaseSeleccionada(c); setModo('clase_activa'); }}
-                                    style={{ ...styles.card, flex: 1, width: 'auto', maxWidth: 'none', textAlign: 'left', cursor: 'pointer', padding: '15px' }}>
-                                    <h3 style={{ margin: 0, color: '#d4af37', fontSize: '1rem' }}>{c.titulo.toUpperCase()}</h3>
-                                    <span style={{ fontSize: '0.7rem', color: '#555' }}>{c.fecha}</span>
+                                    style={{ ...styles.card, flex: 1, textAlign: 'left', padding: '12px', boxSizing: 'border-box' }}>
+                                    <h3 style={{ margin: 0, color: '#d4af37', fontSize: '0.9rem', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{c.titulo.toUpperCase()}</h3>
+                                    <span style={{ fontSize: '0.6rem', color: '#666' }}>{c.fecha}</span>
                                 </div>
-                                <button onClick={() => eliminarClaseDB(c.id)} style={{ backgroundColor: '#111', border: '1px solid #300', color: '#ff4444', padding: '15px', borderRadius: '10px' }}>🗑</button>
+                                <button onClick={() => { if(window.confirm("¿Borrar?")) deleteDoc(doc(db, "clases", c.id)) }} style={{ background: '#111', border: '1px solid #333', color: '#555', padding: '10px', borderRadius: '8px' }}>🗑</button>
                             </div>
                         ))}
                     </div>
                 )}
 
-                {/* VISTA: CREAR */}
+                {/* VISTA: CREAR (BOX-SIZING CORREGIDO) */}
                 {modo === 'crear' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', paddingBottom: '100px', maxWidth: '100%', boxSizing: 'border-box' }}>
-                        <input placeholder="TÍTULO DE LA SESIÓN" style={{ ...styles.input, width: '100%', boxSizing: 'border-box', textAlign: 'center', borderBottom: '2px solid #d4af37' }} onChange={e => setNuevaClase({ ...nuevaClase, titulo: e.target.value })} />
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '15px', paddingBottom: '100px' }}>
+                        <div style={{ gridColumn: '1 / -1' }}>
+                            <input placeholder="TÍTULO DE LA SESIÓN" style={{ ...styles.input, width: '100%', boxSizing: 'border-box', textAlign: 'center', borderBottom: '2px solid #d4af37' }} onChange={e => setNuevaClase({ ...nuevaClase, titulo: e.target.value })} />
+                        </div>
+                        
                         {nuevaClase.bloques.map((bloque, index) => (
-                            <div key={bloque.id} style={{ ...styles.card, width: '100%', maxWidth: 'none', boxSizing: 'border-box', border: '1px solid #333', padding: '15px', textAlign: 'left' }}>
+                            <div key={bloque.id} style={{ ...styles.card, padding: '15px', border: '1px solid #222', textAlign: 'left', boxSizing: 'border-box' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
-                                    <span style={{ color: '#d4af37', fontWeight: 'bold', fontSize: '0.8rem' }}>{bloque.tipo.toUpperCase()}</span>
-                                    <div style={{ display: 'flex', gap: '5px' }}>
-                                        {bloque.id !== 'b1' && bloque.id !== 'b_final' && (
-                                            <>
-                                                <button onClick={() => moverBloque(index, -1)} style={{ background: '#222', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '4px' }}>↑</button>
-                                                <button onClick={() => moverBloque(index, 1)} style={{ background: '#222', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '4px' }}>↓</button>
-                                                <button onClick={() => eliminarBloqueProvisional(bloque.id)} style={{ background: '#300', color: 'red', border: 'none', padding: '5px 10px', borderRadius: '4px' }}>×</button>
-                                            </>
-                                        )}
+                                    <span style={{ color: '#d4af37', fontWeight: 'bold', fontSize: '0.8rem' }}>{bloque.tipo}</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#111', padding: '4px 10px', borderRadius: '20px', border: '1px solid #333' }}>
+                                        <input type="number" value={bloque.minutos} style={{ background: 'none', border: 'none', color: '#fff', width: '35px', fontSize: '0.9rem', textAlign: 'center' }} 
+                                            onChange={e => { const b = [...nuevaClase.bloques]; b[index].minutos = parseInt(e.target.value) || 0; setNuevaClase({ ...nuevaClase, bloques: b }); }} />
+                                        <span style={{ fontSize: '0.6rem', color: '#d4af37', fontWeight: 'bold' }}>MIN</span>
                                     </div>
                                 </div>
+
                                 {bloque.tipo === 'Calentamiento' ? (
-                                    <>
-                                        <textarea placeholder="Calentamiento Ligero (Movilidad)..." style={{...styles.input, width: '100%',maxWidth: '100%', height: '80px', marginBottom: '10px', boxSizing: 'border-box', // 🛠 Clave: incluye el padding en el cálculo del ancho
-        resize: 'none'}} onChange={e => { const b = [...nuevaClase.bloques]; b[index].ligero = e.target.value; setNuevaClase({ ...nuevaClase, bloques: b }); }} />
-                                        <textarea placeholder="Drills Intensos..." style={{...styles.input, width: '100%', height: '60px', maxWidth: '100%', boxSizing: 'border-box', // 🛠 Clave: incluye el padding en el cálculo del ancho
-        resize: 'none'}} onChange={e => { const b = [...nuevaClase.bloques]; b[index].intenso = e.target.value; setNuevaClase({ ...nuevaClase, bloques: b }); }} />
-                                    </>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+                                        <textarea placeholder="Movilidad / Ligero" style={{ ...styles.input, width: '100%', boxSizing: 'border-box', height: '60px', fontSize: '0.8rem', resize: 'none' }} onChange={e => { const b = [...nuevaClase.bloques]; b[index].ligero = e.target.value; setNuevaClase({ ...nuevaClase, bloques: b }); }} />
+                                        <textarea placeholder="Drills / Intenso" style={{ ...styles.input, width: '100%', boxSizing: 'border-box', height: '60px', fontSize: '0.8rem', resize: 'none' }} onChange={e => { const b = [...nuevaClase.bloques]; b[index].intenso = e.target.value; setNuevaClase({ ...nuevaClase, bloques: b }); }} />
+                                    </div>
                                 ) : bloque.tipo === 'CLA' ? (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                        <input placeholder="Objetivo Atacante" style={styles.input} onChange={e => { const b = [...nuevaClase.bloques]; b[index].atacante = e.target.value; setNuevaClase({ ...nuevaClase, bloques: b }); }} />
-                                        <input placeholder="Objetivo Defensor" style={styles.input} onChange={e => { const b = [...nuevaClase.bloques]; b[index].defensor = e.target.value; setNuevaClase({ ...nuevaClase, bloques: b }); }} />
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '5px' }}>
-                                            {bloque.rondas.map((r, ri) => (
-                                                <input key={ri} placeholder={`R${ri+1}`} style={{...styles.input, fontSize: '0.7rem', padding: '8px'}} onChange={e => { const b = [...nuevaClase.bloques]; b[index].rondas[ri] = e.target.value; setNuevaClase({ ...nuevaClase, bloques: b }); }} />
-                                            ))}
-                                        </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+                                        <input placeholder="Objetivo Atacante" style={{ ...styles.input, width: '100%', boxSizing: 'border-box', fontSize: '0.8rem' }} onChange={e => { const b = [...nuevaClase.bloques]; b[index].atacante = e.target.value; setNuevaClase({ ...nuevaClase, bloques: b }); }} />
+                                        <input placeholder="Objetivo Defensor" style={{ ...styles.input, width: '100%', boxSizing: 'border-box', fontSize: '0.8rem' }} onChange={e => { const b = [...nuevaClase.bloques]; b[index].defensor = e.target.value; setNuevaClase({ ...nuevaClase, bloques: b }); }} />
                                     </div>
                                 ) : (
-                                    <textarea placeholder="Detalles Sparring..." style={{...styles.input, height: '80px', maxWidth: '100%', boxSizing: 'border-box', // 🛠 Clave: incluye el padding en el cálculo del ancho
-        resize: 'none'}} onChange={e => { const b = [...nuevaClase.bloques]; b[index].contenido = e.target.value; setNuevaClase({ ...nuevaClase, bloques: b }); }} />
+                                    <textarea placeholder="Detalles de Sparring" style={{ ...styles.input, width: '100%', boxSizing: 'border-box', height: '60px', fontSize: '0.8rem', resize: 'none' }} onChange={e => { const b = [...nuevaClase.bloques]; b[index].contenido = e.target.value; setNuevaClase({ ...nuevaClase, bloques: b }); }} />
                                 )}
-                                <div style={{marginTop: '10px', display:'flex', alignItems:'center', gap:'10px'}}>
-                                    <span style={{fontSize:'0.7rem', color:'#666'}}>DURACIÓN (MIN):</span>
-                                    <input type="number" style={{...styles.input, width:'60px', marginBottom:0}} onChange={e => { const b = [...nuevaClase.bloques]; b[index].minutos = parseInt(e.target.value); setNuevaClase({ ...nuevaClase, bloques: b }); }} />
-                                </div>
                             </div>
                         ))}
-                        <button onClick={agregarBloqueCLA} style={styles.btnOutline}>+ AÑADIR DINÁMICA CLA</button>
-                        <button onClick={guardarClase} style={styles.btnGold}>GUARDAR SESIÓN</button>
+                        <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <button onClick={agregarBloqueCLA} style={{ ...styles.btnOutline, padding: '12px' }}>+ AÑADIR BLOQUE TÉCNICO</button>
+                            <button onClick={guardarClase} style={{ ...styles.btnGold, padding: '15px' }}>GUARDAR EN BÓVEDA</button>
+                        </div>
                     </div>
                 )}
 
-                {/* VISTA: CLASE ACTIVA */}
+                {/* VISTA: CLASE ACTIVA (GRID ADAPTABLE) */}
                 {modo === 'clase_activa' && claseSeleccionada && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', paddingBottom: '100px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '15px', paddingBottom: '100px' }}>
                         {claseSeleccionada.bloques.map((b, i) => (
-                            <div key={i} style={{ ...styles.card, width: '100%', maxWidth: '100%', textAlign: 'left', borderLeft: '4px solid #d4af37', padding: '15px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #222', paddingBottom: '10px', marginBottom: '10px' }}>
+                            <div key={i} style={{ ...styles.card, borderLeft: '4px solid #d4af37', padding: '15px', textAlign: 'left', boxSizing: 'border-box' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                                     <h4 style={{ color: '#d4af37', margin: 0, fontSize: '0.9rem' }}>{b.tipo}</h4>
-                                    <button onClick={() => { setTimeLeft(b.minutos * 60); setTimerActive(true); }} style={{ background: '#d4af37', color: '#000', border: 'none', borderRadius: '4px', padding: '5px 10px', fontWeight: 'bold', fontSize: '0.7rem' }}>
-                                        START {b.minutos}M
+                                    <button onClick={() => startTimerWithPrep(b.minutos)} 
+                                        style={{ background: '#d4af37', color: '#000', border: 'none', borderRadius: '4px', padding: '6px 12px', fontWeight: 'bold', fontSize: '0.7rem' }}>
+                                        INICIAR {b.minutos}M
                                     </button>
                                 </div>
-                                <div style={{ fontSize: '0.9rem' }}>
+                                <div style={{ fontSize: '0.85rem', color: '#ccc', lineHeight: '1.5' }}>
                                     {b.tipo === 'Calentamiento' ? (
                                         <>
-                                            <p style={{ margin: '0 0 5px 0' }}><strong style={{color:'#888'}}>LIGERO:</strong> {b.ligero}</p>
-                                            <p style={{ margin: 0 }}><strong style={{color:'#888'}}>INTENSO:</strong> {b.intenso}</p>
+                                            <div style={{marginBottom: '5px'}}><strong>LIGERO:</strong> {b.ligero}</div>
+                                            <div><strong>INTENSO:</strong> {b.intenso}</div>
                                         </>
                                     ) : b.tipo === 'CLA' ? (
                                         <>
-                                            <p style={{ margin: '0 0 5px 0' }}><strong style={{color:'#888'}}>ATACANTE:</strong> {b.atacante}</p>
-                                            <p style={{ margin: '0 0 10px 0' }}><strong style={{color:'#888'}}>DEFENSOR:</strong> {b.defensor}</p>
-                                            <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-                                                {b.rondas.map((r, ri) => (
-                                                    <span key={ri} style={{ background: '#111', padding: '4px 8px', borderRadius: '4px', color: '#d4af37', border: '1px solid #333', fontSize: '0.7rem' }}>R{ri+1}: {r}</span>
-                                                ))}
-                                            </div>
+                                            <div style={{marginBottom: '5px'}}><strong>ATK:</strong> {b.atacante}</div>
+                                            <div><strong>DEF:</strong> {b.defensor}</div>
                                         </>
-                                    ) : <p style={{ margin: 0 }}>{b.contenido}</p>}
+                                    ) : <div>{b.contenido}</div>}
                                 </div>
                             </div>
                         ))}
 
-                        <div style={{ backgroundColor: '#111', padding: '20px', borderRadius: '15px', border: '1px solid #333' }}>
-                            <p style={{ color: '#d4af37', fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '15px' }}>ASISTENCIA Y SCOUTING</p>
-                            {alumnos.map(a => (
-                                <div key={a.id} style={{ display: 'flex', gap: '10px', marginBottom: '12px', alignItems: 'center', borderBottom: '1px solid #222', paddingBottom: '10px' }}>
-                                    <span style={{ flex: 1, fontSize: '0.8rem' }}>{a.nombre}</span>
-                                    <input placeholder="Nota..." style={{ ...styles.input, width: '100px', marginBottom: 0, padding: '5px', fontSize:'0.7rem' }} onBlur={(e) => e.target.value && registrarAsistenciaConNota(a.id, e.target.value)} />
-                                    <button onClick={() => registrarAsistenciaConNota(a.id, "Asistió")} style={{ backgroundColor: '#d4af37', border: 'none', padding: '5px 12px', borderRadius: '4px' }}>✓</button>
-                                </div>
-                            ))}
+                        {/* Scouting section responsiva */}
+                        <div style={{ backgroundColor: '#111', padding: '20px', borderRadius: '15px', gridColumn: '1 / -1' }}>
+                            <p style={{ color: '#d4af37', fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '15px' }}>SCOUTING RÁPIDO</p>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '10px' }}>
+                                {alumnos.map(a => (
+                                    <div key={a.id} style={{ display: 'flex', gap: '8px', alignItems: 'center', background: '#000', padding: '10px', borderRadius: '8px', border: '1px solid #222' }}>
+                                        <span style={{ flex: 1, fontSize: '0.75rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.nombre}</span>
+                                        <input placeholder="Nota" style={{ ...styles.input, width: '70px', marginBottom: 0, padding: '5px', fontSize:'0.7rem' }} onBlur={(e) => e.target.value && registrarAsistenciaConNota(a.id, e.target.value)} />
+                                        <button onClick={() => registrarAsistenciaConNota(a.id, "Asistió")} style={{ backgroundColor: '#d4af37', border: 'none', padding: '8px 12px', borderRadius: '4px' }}>✓</button>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
-                        <button onClick={() => { setModo('lista'); setTimerActive(false); }} style={{...styles.btnOutline, padding: '15px'}}>TERMINAR SESIÓN</button>
+                        <button onClick={() => { setModo('lista'); setTimerActive(false); }} style={{...styles.btnOutline, padding: '15px', gridColumn: '1 / -1'}}>TERMINAR SESIÓN</button>
                     </div>
                 )}
             </div>

@@ -183,7 +183,6 @@ const AdminPage = ({ onBack }) => {
   const [usuarios, setUsuarios] = React.useState([]);
   const [cargando, setCargando] = React.useState(true);
 
-  // 1. Cargamos TODOS los usuarios registrados
   const obtenerUsuarios = async () => {
     try {
       setCargando(true);
@@ -201,62 +200,103 @@ const AdminPage = ({ onBack }) => {
     obtenerUsuarios();
   }, []);
 
-  // 2. Función para actualizar cualquier campo (Validación o Rol)
   const actualizarUsuario = async (uid, nuevosDatos) => {
     try {
       const userRef = doc(db, "usuarios", uid);
       await updateDoc(userRef, nuevosDatos);
-      obtenerUsuarios(); // Recargar lista
+      obtenerUsuarios();
     } catch (error) {
       alert("Error al actualizar: " + error.message);
     }
   };
 
   return (
-    <div style={{ padding: '40px', backgroundColor: '#000', minHeight: '100vh', color: '#fff', fontFamily: 'monospace' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '40px', borderBottom: '2px solid #d4af37', paddingBottom: '20px' }}>
-        <h2 style={{ color: '#d4af37', margin: 0 }}>GESTIÓN DE ACADEMIA: LA FORTUNA</h2>
-        <button onClick={onBack} style={{ background: 'none', border: '1px solid #d4af37', color: '#d4af37', cursor: 'pointer', padding: '5px 15px' }}>VOLVER</button>
+    <div style={{ 
+      padding: '20px', 
+      backgroundColor: '#000', 
+      minHeight: '100vh', 
+      color: '#fff', 
+      fontFamily: 'monospace',
+      boxSizing: 'border-box',
+      width: '100%',
+      overflowX: 'hidden' 
+    }}>
+      {/* Header Responsivo */}
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: window.innerWidth < 600 ? 'column' : 'row',
+        justifyContent: 'space-between', 
+        alignItems: window.innerWidth < 600 ? 'flex-start' : 'center',
+        gap: '15px',
+        marginBottom: '30px', 
+        borderBottom: '2px solid #d4af37', 
+        paddingBottom: '20px' 
+      }}>
+        <h2 style={{ color: '#d4af37', margin: 0, fontSize: '1.2rem' }}>GESTIÓN: LA FORTUNA</h2>
+        <button onClick={onBack} style={{ background: 'none', border: '1px solid #d4af37', color: '#d4af37', cursor: 'pointer', padding: '8px 15px', fontWeight: 'bold' }}>VOLVER</button>
       </div>
 
       {cargando ? (
-        <p style={{ color: '#d4af37' }}>Cargando base de datos...</p>
+        <p style={{ color: '#d4af37' }}>Cargando Vault...</p>
       ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-          <thead>
-            <tr style={{ color: '#666', fontSize: '0.8rem', borderBottom: '1px solid #222' }}>
-              <th style={{ padding: '10px' }}>USUARIO</th>
-              <th style={{ padding: '10px' }}>ESTADO</th>
-              <th style={{ padding: '10px' }}>ROL</th>
-              <th style={{ padding: '10px' }}>ACCIONES</th>
-            </tr>
-          </thead>
-          <tbody>
-            {usuarios.map(u => (
-              <tr key={u.id} style={{ borderBottom: '1px solid #111' }}>
-                <td style={{ padding: '15px 10px' }}>
-                  <div style={{ fontWeight: 'bold' }}>{u.nombre || 'Sin nombre'}</div>
-                  <div style={{ fontSize: '0.7rem', color: '#555' }}>{u.email}</div>
-                </td>
-                
-                <td style={{ padding: '10px' }}>
-                  {u.validado ? 
-                    <span style={{ color: '#4CAF50', fontSize: '0.8rem' }}>● ACTIVO</span> : 
-                    <span style={{ color: '#FF5252', fontSize: '0.8rem' }}>● PENDIENTE</span>
-                  }
-                </td>
+        <div style={{ width: '100%', overflowX: 'auto' }}>
+          {/* Contenedor tipo "Card List" para móvil */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            {/* Header de tabla (Solo visible en escritorio si prefieres, o lo omitimos para consistencia) */}
+            <div style={{ 
+                display: window.innerWidth < 600 ? 'none' : 'grid', 
+                gridTemplateColumns: '2fr 1fr 1.5fr 1fr', 
+                padding: '10px', 
+                color: '#666', 
+                fontSize: '0.8rem',
+                borderBottom: '1px solid #222'
+            }}>
+                <span>USUARIO</span>
+                <span>ESTADO</span>
+                <span>ROL</span>
+                <span>ACCIONES</span>
+            </div>
 
-                <td style={{ padding: '10px' }}>
+            {usuarios.map(u => (
+              <div key={u.id} style={{ 
+                display: 'grid', 
+                // En móvil 1 columna, en escritorio 4
+                gridTemplateColumns: window.innerWidth < 600 ? '1fr' : '2fr 1fr 1.5fr 1fr', 
+                gap: '15px',
+                padding: '15px', 
+                backgroundColor: '#0a0a0a',
+                border: '1px solid #111',
+                borderRadius: '8px',
+                alignItems: 'center'
+              }}>
+                {/* Datos Usuario */}
+                <div style={{ overflow: 'hidden' }}>
+                  <div style={{ fontWeight: 'bold', color: '#d4af37', fontSize: '0.9rem' }}>{u.nombre?.toUpperCase() || 'SIN NOMBRE'}</div>
+                  <div style={{ fontSize: '0.7rem', color: '#555', textOverflow: 'ellipsis', overflow: 'hidden' }}>{u.email}</div>
+                </div>
+                
+                {/* Estado */}
+                <div>
+                  {u.validado ? 
+                    <span style={{ color: '#4CAF50', fontSize: '0.75rem', fontWeight: 'bold' }}>● ACTIVO</span> : 
+                    <span style={{ color: '#FF5252', fontSize: '0.75rem', fontWeight: 'bold' }}>● PENDIENTE</span>
+                  }
+                </div>
+
+                {/* Rol (Select adaptado) */}
+                <div>
                   <select
-                    value={u.rol || 'alumno'} // Usamos 'rol' (en español como en tu App.jsx)
+                    value={u.rol || 'alumno'}
                     onChange={(e) => actualizarUsuario(u.uid, { rol: e.target.value })}
                     style={{
+                      width: '100%',
                       backgroundColor: '#111',
                       color: u.rol === 'admin' ? '#d4af37' : u.rol === 'profesor' ? '#4CAF50' : '#fff',
                       border: '1px solid #333',
-                      padding: '5px',
+                      padding: '8px',
                       borderRadius: '4px',
-                      fontSize: '0.8rem'
+                      fontSize: '0.8rem',
+                      cursor: 'pointer'
                     }}
                   >
                     <option value="alumno">Alumno</option>
@@ -264,22 +304,32 @@ const AdminPage = ({ onBack }) => {
                     <option value="profesor">Profesor</option>
                     <option value="admin">Administrador</option>
                   </select>
-                </td>
+                </div>
 
-                <td style={{ padding: '10px' }}>
+                {/* Acciones */}
+                <div style={{ textAlign: window.innerWidth < 600 ? 'left' : 'center' }}>
                   {!u.validado && (
                     <button 
                       onClick={() => actualizarUsuario(u.uid, { validado: true })}
-                      style={{ backgroundColor: '#d4af37', color: '#000', border: 'none', padding: '5px 10px', fontWeight: 'bold', cursor: 'pointer' }}
+                      style={{ 
+                        backgroundColor: '#d4af37', 
+                        color: '#000', 
+                        border: 'none', 
+                        padding: '10px 15px', 
+                        fontWeight: 'bold', 
+                        cursor: 'pointer',
+                        width: '100%',
+                        borderRadius: '4px'
+                      }}
                     >
                       DAR ACCESO
                     </button>
                   )}
-                </td>
-              </tr>
+                </div>
+              </div>
             ))}
-          </tbody>
-        </table>
+          </div>
+        </div>
       )}
     </div>
   );
