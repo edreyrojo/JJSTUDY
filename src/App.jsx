@@ -3293,14 +3293,7 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles }) => {
     setCargando(false);
   }, [usuario]);
 
-  const eliminarNota = async (notaId) => {
-    if (!window.confirm("¿Eliminar esta nota del Vault?")) return;
-    try {
-      const userRef = doc(db, "usuarios", usuario.uid);
-      await updateDoc(userRef, { [`notas.${notaId}`]: deleteField() });
-      setNotas(prev => prev.filter(n => n.id !== notaId));
-    } catch (e) { alert("Error al eliminar."); }
-  };
+  // ... (eliminarNota se mantiene igual)
 
   if (cargando) {
     return (
@@ -3311,26 +3304,45 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles }) => {
   }
 
   return (
-    <div style={{ padding: '20px', minHeight: '100vh', backgroundColor: '#000', color: '#fff', boxSizing: 'border-box' }}>
+    <div style={{ 
+      padding: '15px', 
+      minHeight: '100vh', 
+      backgroundColor: '#000', 
+      color: '#fff', 
+      boxSizing: 'border-box',
+      width: '100%',
+      overflowX: 'hidden' // 🛠️ Evita cualquier empuje lateral
+    }}>
       
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', maxWidth: '1200px', margin: '0 auto 30px auto' }}>
-        <button onClick={onBack} style={{ ...styles.btnOutline, width: 'auto', padding: '10px 20px' }}>← VOLVER</button>
-        <h2 style={{ ...styles.goldTitle, margin: 0, fontSize: '1.2rem' }}>BITÁCORA TÉCNICA</h2>
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        marginBottom: '20px', 
+        maxWidth: '1200px', // Un poco más ancho para escritorio
+        margin: '0 auto 20px auto',
+        width: '100%',
+        boxSizing: 'border-box'
+      }}>
+        <button onClick={onBack} style={{ ...styles.btnOutline, width: 'auto', padding: '8px 15px', fontSize: '0.7rem' }}>← VOLVER</button>
+        <h2 style={{ ...styles.goldTitle, margin: 0, fontSize: '1rem' }}>BITÁCORA</h2>
       </div>
 
-      {/* Grid de Notas con responsive corregido */}
+      {/* Grid Responsivo Inteligente */}
       <div style={{ 
         display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', // Un poco más ancho el mínimo para escritorio
-        gap: '25px', // Más espacio entre notas
+        gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', 
+        gap: '15px', 
         maxWidth: '1200px', 
         margin: '0 auto',
-        paddingBottom: '40px'
+        paddingBottom: '40px',
+        width: '100%',
+        boxSizing: 'border-box'
       }}>
         {notas.length === 0 ? (
           <div style={{ gridColumn: '1/-1', textAlign: 'center', marginTop: '50px' }}>
-            <p style={{ color: '#444' }}>No hay registros en tu bitácora personal.</p>
+            <p style={{ color: '#444' }}>Bitácora vacía.</p>
           </div>
         ) : (
           notas.map((n) => {
@@ -3341,23 +3353,24 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles }) => {
               <div key={n.id} style={{ 
                 ...(styles?.card || {}), 
                 border: '1px solid #222', 
-                padding: '20px', 
+                padding: '15px', 
                 display: 'flex', 
                 flexDirection: 'column', 
-                height: '300px', // Un poco más de altura para evitar desbordes de botones
+                minHeight: '200px', 
                 justifyContent: 'space-between',
                 backgroundColor: '#0a0a0a',
-                boxSizing: 'border-box',
+                boxSizing: 'border-box', // 🛠️ Clave para que el padding no "empuje"
                 position: 'relative',
-                overflow: 'hidden' // Evita que el contenido salga de la card
+                borderRadius: '8px',
+                width: '100%' // 🛠️ Asegura que ocupe su celda del grid
               }}>
                 <div style={{ overflow: 'hidden' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                     <h4 style={{ 
                       color: '#d4af37', 
                       margin: 0, 
-                      fontSize: '0.85rem', 
-                      paddingRight: '25px',
+                      fontSize: '0.75rem', 
+                      paddingRight: '20px',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis' 
@@ -3366,27 +3379,16 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles }) => {
                     </h4>
                     <button 
                       onClick={() => eliminarNota(n.id)} 
-                      style={{ 
-                        color: '#444', 
-                        background: 'none', 
-                        border: 'none', 
-                        fontSize: '1.2rem', 
-                        cursor: 'pointer',
-                        position: 'absolute',
-                        top: '15px',
-                        right: '15px',
-                        zIndex: 2
-                      }}
+                      style={{ color: '#444', background: 'none', border: 'none', fontSize: '1.1rem', cursor: 'pointer', position: 'absolute', top: '10px', right: '10px' }}
                     >×</button>
                   </div>
                   
-                  {/* Contenedor de texto con scroll interno si es muy largo, pero limitado visualmente */}
                   <p style={{ 
                     color: '#aaa', 
                     fontSize: '0.8rem', 
-                    lineHeight: '1.6', 
+                    lineHeight: '1.4', 
                     display: '-webkit-box', 
-                    WebkitLineClamp: '6', // Mostramos hasta 6 líneas
+                    WebkitLineClamp: '4', // Limitamos a 4 líneas para mantener uniformidad
                     WebkitBoxOrient: 'vertical', 
                     overflow: 'hidden',
                     whiteSpace: 'pre-wrap',
@@ -3397,31 +3399,37 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles }) => {
                 </div>
                 
                 <div style={{ 
-                  marginTop: '15px', 
+                  marginTop: '12px', 
                   display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center', 
+                  flexDirection: 'column', 
+                  gap: '8px',
                   borderTop: '1px solid #1a1a1a', 
-                  paddingTop: '15px',
-                  backgroundColor: '#0a0a0a' // Fondo sólido para que no se transparente el texto atrás
+                  paddingTop: '12px'
                 }}>
-                  <span style={{ fontSize: '0.65rem', color: '#444', fontWeight: 'bold' }}>
-                    {n.fecha.split(',')[0]}
-                  </span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.6rem', color: '#444' }}>
+                      {n.fecha.split(',')[0]}
+                    </span>
+                    {n.videoId && (
+                      <span style={{ fontSize: '0.6rem', color: '#d4af37', fontWeight: 'bold' }}>
+                        {match ? match[0] : 'VIDEO'}
+                      </span>
+                    )}
+                  </div>
                   
                   {n.videoId && (
                     <button 
                       onClick={() => onNavigateToVideo({ id: n.videoId, titulo: n.titulo, startTime: segs })}
                       style={{ 
                         ...styles.btnGold, 
-                        width: 'auto', 
-                        padding: '8px 15px', 
+                        width: '100%', 
+                        padding: '8px 0', 
                         fontSize: '0.65rem',
                         fontWeight: 'bold',
-                        boxShadow: '0 4px 10px rgba(0,0,0,0.3)' 
+                        margin: 0 // 🛠️ Evita márgenes extra que empujen
                       }}
                     >
-                      VER TÉCNICA {match ? `(${match[0]})` : ''}
+                      ABRIR EN REPRODUCTOR
                     </button>
                   )}
                 </div>

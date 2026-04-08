@@ -23,23 +23,29 @@ const GestionAlumnosPage = ({ onBack, styles, usuario }) => {
   const [tempDias, setTempDias] = useState([]); // Nuevo: para los días de la clase
   const [tempNuevoPrograma, setTempNuevoPrograma] = useState(""); // Nuevo: para añadir programas uno a uno
 
-  const estadoInicial = {
+// Busca esta línea y reemplázala por esta estructura completa:
+const estadoAlumnoInicial = {
     nombre: '',
-    fechaPago: '',
-    diaPago: '',
-    programa: '',
-    horario: '',
-    perfil: 'Recreativo',
-    tieneExperiencia: false,
-    tiempoExperiencia: '',
-    notasTecnicas: '',
-    contacto: '',
-    redes: '',
     fotoBase64: '',
-    activo: true
-  };
+    edad: '',
+    telefono: '',
+    instagram: '',
+    contactoEmergenciaNombre: '',
+    contactoEmergenciaTel: '',
+    condicionEspecial: '',
+    tieneExperiencia: 'no', // Valor por defecto
+    tiempoExperiencia: '',
+    programa: config.programas[0] || '', // Toma el primero disponible
+    horario: config.horarios[0] ? `${config.horarios[0].hora} - ${config.horarios[0].nombre}` : '',
+    fechaPago: new Date().toISOString().split('T')[0],
+    notasTecnicas: '',
+    activo: true,
+    asistencias: [],
+    historialTecnico: []
+};
 
-  const [nuevo, setNuevo] = useState(estadoInicial);
+// Y el useState quedaría así:
+const [nuevo, setNuevo] = useState(estadoAlumnoInicial);
 
   // 1. CARGAR CONFIGURACIÓN DE LA ACADEMIA
   useEffect(() => {
@@ -149,23 +155,37 @@ const toggleDia = (index) => {
   };
 
   // 6. FUNCIONES DE GUARDADO Y ELIMINACIÓN
-  const handleGuardarAlumno = async () => {
+const handleGuardarAlumno = async () => {
     if (!nuevo.nombre || !nuevo.fechaPago) {
       alert("Nombre y fecha de pago son obligatorios.");
       return;
     }
+
     const diaExtraido = nuevo.fechaPago.split('-')[2];
     
     try {
+      // 1. Intentamos guardar
       await addDoc(collection(db, "alumnos"), {
         ...nuevo,
         diaPago: diaExtraido,
         academiaId: usuario.academiaId || usuario.uid,
         fechaRegistro: new Date().toISOString()
       });
+
+      // 2. Si llegamos aquí, el guardado fue exitoso. 
+      // Primero avisamos al usuario (es mejor UX)
+      alert("¡Alumno registrado con éxito en el Vault!");
+
+      // 3. Cerramos el formulario
       setMostrarForm(false);
-      setNuevo(estadoInicial);
+
+      // 4. Limpiamos el estado usando SOLO el objeto correcto
+      // Revisa si tu objeto se llama 'estadoAlumnoInicial' o 'estadoInicial' y usa solo ese.
+      setNuevo(estadoAlumnoInicial); 
+
     } catch (e) {
+      // Solo entrará aquí si Firebase falla de verdad (ej. sin internet o sin permisos)
+      console.error("Error real de Firebase:", e); 
       alert("Error al guardar alumno.");
     }
   };
@@ -280,49 +300,110 @@ const toggleDia = (index) => {
 
       {/* MODAL REGISTRO ALUMNO */}
       {mostrarForm && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1100, padding: '20px', boxSizing: 'border-box' }}>
-          <div style={{ ...styles.card, width: '100%', maxWidth: '450px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h3 style={{...styles.goldTitle, marginBottom: '20px'}}>NUEVO ALUMNO</h3>
-            
-            <div style={{ marginBottom: '20px', textAlign: 'center' }}>
-                <div onClick={() => document.getElementById('fotoInput').click()} style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#222', margin: '0 auto 8px', border: '2px dashed #d4af37', overflow: 'hidden', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {nuevo.fotoBase64 ? <img src={nuevo.fotoBase64} style={{width:'100%', height:'100%', objectFit:'cover'}} alt="" /> : <span style={{fontSize:'1.5rem'}}>📷</span>}
-                </div>
-                <input id="fotoInput" type="file" accept="image/*" hidden onChange={handleFotoChange} />
-                <p style={{fontSize: '0.5rem', color: '#d4af37'}}>FOTO DE PERFIL</p>
+    <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1100, padding: '20px', boxSizing: 'border-box' }}>
+      <div style={{ ...styles.card, width: '100%', maxWidth: '480px', maxHeight: '95vh', overflowY: 'auto', padding: '25px', boxSizing: 'border-box' }}>
+        <h3 style={{...styles.goldTitle, marginBottom: '20px', textAlign: 'center'}}>EXPEDIENTE NUEVO ALUMNO</h3>
+        
+        {/* FOTO DE PERFIL */}
+        <div style={{ marginBottom: '20px', textAlign: 'center' }}>
+            <div onClick={() => document.getElementById('fotoInput').click()} style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#222', margin: '0 auto 8px', border: '2px dashed #d4af37', overflow: 'hidden', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {nuevo.fotoBase64 ? <img src={nuevo.fotoBase64} style={{width:'100%', height:'100%', objectFit:'cover'}} alt="" /> : <span style={{fontSize:'1.5rem'}}>📷</span>}
             </div>
-
-            <input placeholder="Nombre completo" style={styles.input} value={nuevo.nombre} onChange={e => setNuevo({...nuevo, nombre: e.target.value})} />
-            
-            <div style={{ textAlign: 'left', marginBottom: '15px' }}>
-                <label style={{ fontSize: '0.6rem', color: '#d4af37' }}>FECHA DE PRÓXIMO PAGO:</label>
-                <input type="date" style={{...styles.input, marginTop: '5px'}} value={nuevo.fechaPago} onChange={e => setNuevo({...nuevo, fechaPago: e.target.value})} />
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
-                <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: '0.6rem', color: '#d4af37' }}>PROGRAMA:</label>
-                    <select style={styles.input} value={nuevo.programa} onChange={e => setNuevo({...nuevo, programa: e.target.value})}>
-                        {config.programas.map(p => <option key={p} value={p}>{p}</option>)}
-                    </select>
-                </div>
-                <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: '0.6rem', color: '#d4af37' }}>HORARIO:</label>
-                    <select style={styles.input} value={nuevo.horario} onChange={e => setNuevo({...nuevo, horario: e.target.value})}>
-                        {config.horarios.map((h, i) => <option key={i} value={`${h.hora} - ${h.nombre}`}>{h.hora} - {h.nombre}</option>)}
-                    </select>
-                </div>
-            </div>
-
-            <textarea placeholder="Scouting técnico" style={{ ...styles.input, height: '80px' }} value={nuevo.notasTecnicas} onChange={e => setNuevo({...nuevo, notasTecnicas: e.target.value})} />
-
-            <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-              <button onClick={handleGuardarAlumno} style={styles.btnGold}>DAR DE ALTA</button>
-              <button onClick={() => setMostrarForm(false)} style={styles.btnOutline}>CANCELAR</button>
-            </div>
-          </div>
+            <input id="fotoInput" type="file" accept="image/*" hidden onChange={handleFotoChange} />
+            <p style={{fontSize: '0.5rem', color: '#d4af37'}}>FOTO DE PERFIL</p>
         </div>
-      )}
+
+        {/* SECCIÓN 1: DATOS PERSONALES */}
+        <input 
+            placeholder="Nombre completo" 
+            style={{...styles.input, width: '100%', boxSizing: 'border-box'}} 
+            value={nuevo.nombre} 
+            onChange={e => setNuevo({...nuevo, nombre: e.target.value})} 
+        />
+
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+            <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '0.6rem', color: '#d4af37', display: 'block', marginBottom: '5px' }}>EDAD:</label>
+                <input type="number" placeholder="Edad" style={{...styles.input, width: '100%', boxSizing: 'border-box', margin: 0}} value={nuevo.edad} onChange={e => setNuevo({...nuevo, edad: e.target.value})} />
+            </div>
+            <div style={{ flex: 2 }}>
+                <label style={{ fontSize: '0.6rem', color: '#d4af37', display: 'block', marginBottom: '5px' }}>TELÉFONO:</label>
+                <input type="tel" placeholder="Número de WhatsApp" style={{...styles.input, width: '100%', boxSizing: 'border-box', margin: 0}} value={nuevo.telefono} onChange={e => setNuevo({...nuevo, telefono: e.target.value})} />
+            </div>
+        </div>
+
+        <input 
+            placeholder="Usuario de Instagram (ej: @ngasi_jiujitsu)" 
+            style={{...styles.input, width: '100%', boxSizing: 'border-box', marginBottom: '15px'}} 
+            value={nuevo.instagram} 
+            onChange={e => setNuevo({...nuevo, instagram: e.target.value})} 
+        />
+
+        {/* SECCIÓN 2: CONTACTO DE EMERGENCIA */}
+        <div style={{ border: '1px solid #222', padding: '12px', borderRadius: '10px', marginBottom: '15px', backgroundColor: '#050505' }}>
+            <label style={{ fontSize: '0.6rem', color: '#d4af37', display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>EN CASO DE EMERGENCIA LLAMAR A:</label>
+            <input placeholder="Nombre del contacto" style={{...styles.input, width: '100%', boxSizing: 'border-box', marginBottom: '8px'}} value={nuevo.contactoEmergenciaNombre} onChange={e => setNuevo({...nuevo, contactoEmergenciaNombre: e.target.value})} />
+            <input placeholder="Teléfono de emergencia" style={{...styles.input, width: '100%', boxSizing: 'border-box', margin: 0}} value={nuevo.contactoEmergenciaTel} onChange={e => setNuevo({...nuevo, contactoEmergenciaTel: e.target.value})} />
+        </div>
+
+        {/* SECCIÓN 3: SALUD Y EXPERIENCIA */}
+        <div style={{ textAlign: 'left', marginBottom: '15px' }}>
+            <label style={{ fontSize: '0.6rem', color: '#d4af37', display: 'block', marginBottom: '5px' }}>¿CONDICIÓN ESPECIAL O LESIÓN?</label>
+            <input placeholder="Ninguna / Asma, hernia, etc." style={{...styles.input, width: '100%', boxSizing: 'border-box', margin: 0}} value={nuevo.condicionEspecial} onChange={e => setNuevo({...nuevo, condicionEspecial: e.target.value})} />
+        </div>
+
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '15px', alignItems: 'flex-end' }}>
+            <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '0.6rem', color: '#d4af37', display: 'block', marginBottom: '5px' }}>¿TIENE EXPERIENCIA?</label>
+                <select style={{...styles.input, width: '100%', boxSizing: 'border-box', margin: 0}} value={nuevo.tieneExperiencia} onChange={e => setNuevo({...nuevo, tieneExperiencia: e.target.value})}>
+                    <option value="no">No</option>
+                    <option value="si">Sí</option>
+                </select>
+            </div>
+            {nuevo.tieneExperiencia === 'si' && (
+                <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: '0.6rem', color: '#d4af37', display: 'block', marginBottom: '5px' }}>¿CUÁNTO TIEMPO?</label>
+                    <input placeholder="Ej: 6 meses" style={{...styles.input, width: '100%', boxSizing: 'border-box', margin: 0}} value={nuevo.tiempoExperiencia} onChange={e => setNuevo({...nuevo, tiempoExperiencia: e.target.value})} />
+                </div>
+            )}
+        </div>
+
+        {/* SECCIÓN 4: ACADÉMICO Y PAGOS */}
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+            <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '0.6rem', color: '#d4af37', display: 'block', marginBottom: '5px' }}>PROGRAMA:</label>
+                <select style={{...styles.input, width: '100%', boxSizing: 'border-box', margin: 0}} value={nuevo.programa} onChange={e => setNuevo({...nuevo, programa: e.target.value})}>
+                    {config.programas.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+            </div>
+            <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '0.6rem', color: '#d4af37', display: 'block', marginBottom: '5px' }}>HORARIO:</label>
+                <select style={{...styles.input, width: '100%', boxSizing: 'border-box', margin: 0}} value={nuevo.horario} onChange={e => setNuevo({...nuevo, horario: e.target.value})}>
+                    {config.horarios.map((h, i) => <option key={i} value={`${h.hora} - ${h.nombre}`}>{h.hora} - {h.nombre}</option>)}
+                </select>
+            </div>
+        </div>
+
+        <div style={{ textAlign: 'left', marginBottom: '15px' }}>
+            <label style={{ fontSize: '0.6rem', color: '#d4af37', display: 'block', marginBottom: '5px' }}>FECHA DE PRÓXIMO PAGO:</label>
+            <input type="date" style={{...styles.input, width: '100%', boxSizing: 'border-box', margin: 0}} value={nuevo.fechaPago} onChange={e => setNuevo({...nuevo, fechaPago: e.target.value})} />
+        </div>
+
+        <textarea 
+            placeholder="Scouting técnico inicial (Notas del profesor)" 
+            style={{ ...styles.input, width: '100%', height: '80px', boxSizing: 'border-box', margin: 0, resize: 'none' }} 
+            value={nuevo.notasTecnicas} 
+            onChange={e => setNuevo({...nuevo, notasTecnicas: e.target.value})} 
+        />
+
+        {/* BOTONES DE ACCIÓN */}
+        <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+          <button onClick={handleGuardarAlumno} style={{...styles.btnGold, flex: 2}}>REGISTRAR ALUMNO</button>
+          <button onClick={() => setMostrarForm(false)} style={{...styles.btnOutline, flex: 1}}>CANCELAR</button>
+        </div>
+      </div>
+    </div>
+)}
 
       {/* MODAL CONFIGURACIÓN (LOGO + HORARIO INTUITIVO) */}
       {editandoConfig && (
@@ -402,84 +483,85 @@ const toggleDia = (index) => {
           </div>
         </div>
       )}{editandoConfig && (
-    <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.98)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1200, padding: '20px', boxSizing: 'border-box' }}>
-      <div style={{ ...styles.card, width: '100%', maxWidth: '450px', maxHeight: '95vh', overflowY: 'auto', padding: '25px', boxSizing: 'border-box' }}>
-        <h3 style={styles.goldTitle}>CONFIGURACIÓN DE SEDE</h3>
+  <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.98)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1200, padding: '20px', boxSizing: 'border-box' }}>
+    <div style={{ ...styles.card, width: '100%', maxWidth: '450px', maxHeight: '95vh', overflowY: 'auto', boxSizing: 'border-box' }}>
+      <h3 style={styles.goldTitle}>CONFIGURACIÓN DE SEDE</h3>
 
-        <div style={{ marginBottom: '20px', textAlign: 'center' }}>
-            <div onClick={() => document.getElementById('logoInput').click()} style={{ width: '80px', height: '80px', borderRadius: '10px', backgroundColor: '#222', margin: '0 auto 8px', border: '1px dashed #d4af37', overflow: 'hidden', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {config.logoBase64 ? <img src={config.logoBase64} style={{width:'100%', height:'100%', objectFit:'cover'}} alt="" /> : <span style={{fontSize:'1.2rem'}}>🏯</span>}
+      <div style={{ marginBottom: '20px', textAlign: 'center' }}>
+          <div onClick={() => document.getElementById('logoInput').click()} style={{ width: '80px', height: '80px', borderRadius: '10px', backgroundColor: '#222', margin: '0 auto 8px', border: '1px dashed #d4af37', overflow: 'hidden', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {config.logoBase64 ? <img src={config.logoBase64} style={{width:'100%', height:'100%', objectFit:'cover'}} alt="" /> : <span style={{fontSize:'1.2rem'}}>🏯</span>}
+          </div>
+          <input id="logoInput" type="file" accept="image/*" hidden onChange={handleLogoChange} />
+          <p style={{fontSize: '0.5rem', color: '#d4af37'}}>LOGO ACADEMIA</p>
+      </div>
+
+      {/* INPUTS PRINCIPALES: Añadimos width 100% y boxSizing */}
+      <input placeholder="Nombre Academia" style={{ ...styles.input, width: '100%', boxSizing: 'border-box' }} value={config.nombreAcademia} onChange={e => setConfig({...config, nombreAcademia: e.target.value})} />
+      <input placeholder="Sede / Ciudad" style={{ ...styles.input, width: '100%', boxSizing: 'border-box' }} value={config.sede} onChange={e => setConfig({...config, sede: e.target.value})} />
+      
+      {/* GESTOR DE HORARIOS */}
+      <div style={{ border: '1px solid #222', padding: '15px', borderRadius: '10px', marginTop: '15px', boxSizing: 'border-box' }}>
+        <p style={{ color: '#d4af37', fontSize: '0.7rem', textAlign: 'left', marginBottom: '10px' }}>GESTIÓN DE CLASES:</p>
+        <div style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
+          <input type="time" style={{ ...styles.input, width: '100px', margin: 0, boxSizing: 'border-box' }} value={tempHora} onChange={e => setTempHora(e.target.value)} />
+          {/* El input de nombre clase ahora usa flex: 1 para no empujar */}
+          <input placeholder="Nombre clase" style={{ ...styles.input, flex: 1, margin: 0, boxSizing: 'border-box' }} value={tempNombreClase} onChange={e => setTempNombreClase(e.target.value)} />
+        </div>
+        
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', gap: '4px' }}>
+          {["L", "M", "M", "J", "V", "S", "D"].map((dia, i) => (
+            <button key={i} onClick={() => toggleDia(i)} style={{ 
+              flex: 1, height: '35px', borderRadius: '5px', border: '1px solid #333', 
+              backgroundColor: tempDias.includes(i) ? '#d4af37' : '#000',
+              color: tempDias.includes(i) ? '#000' : '#fff',
+              fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer'
+            }}>{dia}</button>
+          ))}
+        </div>
+        <button onClick={agregarHorario} style={{ ...styles.btnGold, width: '100%', margin: 0 }}>AÑADIR CLASE</button>
+
+        <div style={{ marginTop: '15px', maxHeight: '150px', overflowY: 'auto' }}>
+          {config.horarios.map((h, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', borderBottom: '1px solid #111', fontSize: '0.75rem' }}>
+              <span style={{textAlign: 'left'}}>
+                <strong style={{color: '#d4af37'}}>{h.hora}</strong> - {h.nombre} <br/>
+                <small style={{color: '#666'}}>{h.dias?.map(d => ["L","M","M","J","V","S","D"][d]).join(', ')}</small>
+              </span>
+              <button onClick={() => eliminarHorario(i)} style={{ color: '#ff4444', background: 'none', border: 'none', cursor: 'pointer' }}>×</button>
             </div>
-            <input id="logoInput" type="file" accept="image/*" hidden onChange={handleLogoChange} />
-            <p style={{fontSize: '0.5rem', color: '#d4af37'}}>LOGO ACADEMIA</p>
-        </div>
-
-        {/* INPUTS PRINCIPALES CON BOX-SIZING */}
-        <input placeholder="Nombre Academia" style={{...styles.input, width: '100%', boxSizing: 'border-box'}} value={config.nombreAcademia} onChange={e => setConfig({...config, nombreAcademia: e.target.value})} />
-        <input placeholder="Sede / Ciudad" style={{...styles.input, width: '100%', boxSizing: 'border-box'}} value={config.sede} onChange={e => setConfig({...config, sede: e.target.value})} />
-        
-        {/* GESTOR DE HORARIOS */}
-        <div style={{ border: '1px solid #222', padding: '15px', borderRadius: '10px', marginTop: '15px', boxSizing: 'border-box' }}>
-          <p style={{ color: '#d4af37', fontSize: '0.7rem', textAlign: 'left', marginBottom: '10px' }}>GESTIÓN DE CLASES:</p>
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-            <input type="time" style={{ ...styles.input, width: '120px', margin: 0, boxSizing: 'border-box' }} value={tempHora} onChange={e => setTempHora(e.target.value)} />
-            <input placeholder="Nombre clase" style={{ ...styles.input, flex: 1, margin: 0, boxSizing: 'border-box' }} value={tempNombreClase} onChange={e => setTempNombreClase(e.target.value)} />
-          </div>
-          
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', gap: '4px' }}>
-            {["L", "M", "M", "J", "V", "S", "D"].map((dia, i) => (
-              <button key={i} onClick={() => toggleDia(i)} style={{ 
-                flex: 1, height: '35px', borderRadius: '5px', border: '1px solid #333', 
-                backgroundColor: tempDias.includes(i) ? '#d4af37' : '#000',
-                color: tempDias.includes(i) ? '#000' : '#fff',
-                fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer'
-              }}>{dia}</button>
-            ))}
-          </div>
-          <button onClick={agregarHorario} style={{ ...styles.btnGold, width: '100%', margin: 0 }}>AÑADIR CLASE</button>
-
-          <div style={{ marginTop: '15px', maxHeight: '150px', overflowY: 'auto', borderTop: '1px solid #111' }}>
-            {config.horarios.map((h, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #111', fontSize: '0.75rem' }}>
-                <span style={{textAlign: 'left'}}>
-                  <strong style={{color: '#d4af37'}}>{h.hora}</strong> - {h.nombre} <br/>
-                  <small style={{color: '#666'}}>{h.dias?.map(d => ["L","M","M","J","V","S","D"][d]).join(', ')}</small>
-                </span>
-                <button onClick={() => eliminarHorario(i)} style={{ color: '#ff4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}>×</button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* GESTOR DE PROGRAMAS */}
-        <div style={{ border: '1px solid #222', padding: '15px', borderRadius: '10px', marginTop: '15px', boxSizing: 'border-box' }}>
-          <p style={{ color: '#d4af37', fontSize: '0.7rem', textAlign: 'left', marginBottom: '10px' }}>PROGRAMAS ACTIVOS:</p>
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '15px' }}>
-            <input placeholder="Nuevo programa" style={{ ...styles.input, flex: 1, margin: 0, boxSizing: 'border-box' }} value={tempNuevoPrograma} onChange={e => setTempNuevoPrograma(e.target.value)} />
-            <button onClick={agregarPrograma} style={{ ...styles.btnGold, width: '50px', margin: 0 }}>+</button>
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-            {config.programas.map((p, i) => (
-              <div key={i} style={{ 
-                backgroundColor: '#d4af3711', border: '1px solid #d4af37', color: '#d4af37', 
-                padding: '5px 12px', borderRadius: '15px', fontSize: '0.65rem', display: 'flex', alignItems: 'center', gap: '8px'
-              }}>
-                {p} <span onClick={() => eliminarPrograma(i)} style={{ cursor: 'pointer', fontWeight: 'bold', color: '#fff' }}>×</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <p style={{ color: '#d4af37', fontSize: '0.7rem', textAlign: 'left', marginTop: '15px' }}>PROGRAMAS (Edición rápida):</p>
-        <textarea style={{...styles.input, height: '60px', width: '100%', boxSizing: 'border-box', fontSize: '0.8rem'}} value={config.programas.join(', ')} onChange={e => setConfig({...config, programas: e.target.value.split(',').map(s => s.trim())})} />
-        
-        <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-            <button onClick={handleUpdateConfig} style={{...styles.btnGold, flex: 1}}>GUARDAR TODO</button>
-            <button onClick={() => setEditandoConfig(false)} style={{...styles.btnOutline, flex: 1}}>CERRAR</button>
+          ))}
         </div>
       </div>
+
+      {/* GESTOR DE PROGRAMAS */}
+      <div style={{ border: '1px solid #222', padding: '15px', borderRadius: '10px', marginTop: '15px', boxSizing: 'border-box' }}>
+        <p style={{ color: '#d4af37', fontSize: '0.7rem', textAlign: 'left', marginBottom: '10px' }}>PROGRAMAS ACTIVOS:</p>
+        <div style={{ display: 'flex', gap: '5px', marginBottom: '15px' }}>
+          <input placeholder="Nuevo programa" style={{ ...styles.input, flex: 1, margin: 0, boxSizing: 'border-box' }} value={tempNuevoPrograma} onChange={e => setTempNuevoPrograma(e.target.value)} />
+          <button onClick={agregarPrograma} style={{ ...styles.btnGold, width: '50px', margin: 0 }}>+</button>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          {config.programas.map((p, i) => (
+            <div key={i} style={{ 
+              backgroundColor: '#d4af3711', border: '1px solid #d4af37', color: '#d4af37', 
+              padding: '5px 12px', borderRadius: '15px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '8px'
+            }}>
+              {p} <span onClick={() => eliminarPrograma(i)} style={{ cursor: 'pointer', fontWeight: 'bold', color: '#fff' }}>×</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <p style={{ color: '#d4af37', fontSize: '0.7rem', textAlign: 'left', marginTop: '15px' }}>PROGRAMAS (Separa por comas):</p>
+      <textarea style={{...styles.input, height: '60px', width: '100%', boxSizing: 'border-box'}} value={config.programas.join(', ')} onChange={e => setConfig({...config, programas: e.target.value.split(',').map(s => s.trim())})} />
+      
+      <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+          <button onClick={handleUpdateConfig} style={{ ...styles.btnGold, flex: 1 }}>GUARDAR TODO</button>
+          <button onClick={() => setEditandoConfig(false)} style={{ ...styles.btnOutline, flex: 1 }}>CERRAR</button>
+      </div>
     </div>
-  )}
+  </div>
+)}
     </div>
   );
 };
