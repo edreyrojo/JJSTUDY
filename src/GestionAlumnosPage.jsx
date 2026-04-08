@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db } from './firebase'; 
+import { db } from './firebase';
 import { collection, addDoc, onSnapshot, doc, updateDoc, query, orderBy, where, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 
 const GestionAlumnosPage = ({ onBack, styles, usuario }) => {
@@ -7,7 +7,7 @@ const GestionAlumnosPage = ({ onBack, styles, usuario }) => {
   const [verArchivados, setVerArchivados] = useState(false);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [editandoConfig, setEditandoConfig] = useState(false);
-  
+
   // --- ESTADOS PARA CONFIGURACIÓN (CON LOGO Y HORARIOS OBJETOS) ---
   const [config, setConfig] = useState({
     nombreAcademia: 'Tu Dojo',
@@ -23,8 +23,8 @@ const GestionAlumnosPage = ({ onBack, styles, usuario }) => {
   const [tempDias, setTempDias] = useState([]); // Nuevo: para los días de la clase
   const [tempNuevoPrograma, setTempNuevoPrograma] = useState(""); // Nuevo: para añadir programas uno a uno
 
-// Busca esta línea y reemplázala por esta estructura completa:
-const estadoAlumnoInicial = {
+  // Busca esta línea y reemplázala por esta estructura completa:
+  const estadoAlumnoInicial = {
     nombre: '',
     fotoBase64: '',
     edad: '',
@@ -42,14 +42,14 @@ const estadoAlumnoInicial = {
     activo: true,
     asistencias: [],
     historialTecnico: []
-};
+  };
 
-// Y el useState quedaría así:
-const [nuevo, setNuevo] = useState(estadoAlumnoInicial);
+  // Y el useState quedaría así:
+  const [nuevo, setNuevo] = useState(estadoAlumnoInicial);
 
   // 1. CARGAR CONFIGURACIÓN DE LA ACADEMIA
   useEffect(() => {
-    if (!usuario?.uid) return; 
+    if (!usuario?.uid) return;
     const academiaId = usuario.academiaId || usuario.uid;
     const docRef = doc(db, "academias", academiaId);
 
@@ -72,11 +72,11 @@ const [nuevo, setNuevo] = useState(estadoAlumnoInicial);
 
   // 2. ESCUCHA DE ALUMNOS (CON FILTRO MULTISEDE)
   useEffect(() => {
-    if (!usuario?.uid) return; 
+    if (!usuario?.uid) return;
     const idParaFiltrar = usuario.academiaId || usuario.uid;
 
     const q = query(
-      collection(db, "alumnos"), 
+      collection(db, "alumnos"),
       where("activo", "==", !verArchivados),
       where("academiaId", "==", idParaFiltrar),
       orderBy("nombre", "asc")
@@ -97,7 +97,7 @@ const [nuevo, setNuevo] = useState(estadoAlumnoInicial);
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onloadend = () => setNuevo(prev => ({...prev, fotoBase64: reader.result}));
+    reader.onloadend = () => setNuevo(prev => ({ ...prev, fotoBase64: reader.result }));
     reader.readAsDataURL(file);
   };
 
@@ -105,7 +105,7 @@ const [nuevo, setNuevo] = useState(estadoAlumnoInicial);
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onloadend = () => setConfig(prev => ({...prev, logoBase64: reader.result}));
+    reader.onloadend = () => setConfig(prev => ({ ...prev, logoBase64: reader.result }));
     reader.readAsDataURL(file);
   };
 
@@ -127,20 +127,26 @@ const [nuevo, setNuevo] = useState(estadoAlumnoInicial);
   };
 
   // 5. GESTIÓN DE HORARIOS INTUITIVA
-const toggleDia = (index) => {
+  const toggleDia = (index) => {
     setTempDias(prev => prev.includes(index) ? prev.filter(d => d !== index) : [...prev, index]);
   };
 
   const agregarHorario = () => {
     if (!tempNombreClase || tempDias.length === 0) return alert("Escribe el nombre y selecciona días");
-    const nuevoH = { 
-      hora: tempHora, 
-      nombre: tempNombreClase, 
-      dias: tempDias.sort() 
+    const nuevoH = {
+      hora: tempHora,
+      nombre: tempNombreClase,
+      dias: tempDias.sort()
     };
-    setConfig(prev => ({ ...prev, horarios: [...prev.horarios, nuevoH].sort((a,b) => a.hora.localeCompare(b.hora)) }));
+    setConfig(prev => ({ ...prev, horarios: [...prev.horarios, nuevoH].sort((a, b) => a.hora.localeCompare(b.hora)) }));
     setTempNombreClase("");
     setTempDias([]);
+  };
+  const eliminarHorario = (index) => {
+    setConfig(prev => ({
+      ...prev,
+      horarios: prev.horarios.filter((_, i) => i !== index)
+    }));
   };
 
   const agregarPrograma = () => {
@@ -155,14 +161,14 @@ const toggleDia = (index) => {
   };
 
   // 6. FUNCIONES DE GUARDADO Y ELIMINACIÓN
-const handleGuardarAlumno = async () => {
+  const handleGuardarAlumno = async () => {
     if (!nuevo.nombre || !nuevo.fechaPago) {
       alert("Nombre y fecha de pago son obligatorios.");
       return;
     }
 
     const diaExtraido = nuevo.fechaPago.split('-')[2];
-    
+
     try {
       // 1. Intentamos guardar
       await addDoc(collection(db, "alumnos"), {
@@ -181,11 +187,11 @@ const handleGuardarAlumno = async () => {
 
       // 4. Limpiamos el estado usando SOLO el objeto correcto
       // Revisa si tu objeto se llama 'estadoAlumnoInicial' o 'estadoInicial' y usa solo ese.
-      setNuevo(estadoAlumnoInicial); 
+      setNuevo(estadoAlumnoInicial);
 
     } catch (e) {
       // Solo entrará aquí si Firebase falla de verdad (ej. sin internet o sin permisos)
-      console.error("Error real de Firebase:", e); 
+      console.error("Error real de Firebase:", e);
       alert("Error al guardar alumno.");
     }
   };
@@ -198,41 +204,34 @@ const handleGuardarAlumno = async () => {
     }
   };
 
- const handleUpdateConfig = async () => {
-  // SEGURIDAD: Si por alguna razón el prop 'usuario' no llegó, detenemos todo
-  if (!usuario || !usuario.uid) {
-    console.error("No se encontró información del usuario activo.");
-    alert("Error: Sesión no detectada. Por favor, recarga la página.");
-    return;
-  }
-
-  try {
-    const academiaId = usuario.academiaId || usuario.uid;
-    console.log("Intentando actualizar academia:", academiaId);
-
-    // Validación de peso de logo (opcional pero recomendada)
-    if (config.logoBase64 && config.logoBase64.length > 1000000) {
-      alert("El logo es muy pesado. Usa uno de menos de 1MB.");
+  const handleUpdateConfig = async () => {
+    // 1. VALIDACIÓN DE SEGURIDAD
+    if (!usuario?.uid) {
+      console.error("No hay usuario activo");
+      alert("Error: Sesión no detectada.");
       return;
     }
 
-    const academiaRef = doc(db, "academias", academiaId);
-    await setDoc(academiaRef, {
-      ...config,
-      ultimaActualizacion: new Date().toISOString()
-    }, { merge: true });
-    
-    setEditandoConfig(false);
-    alert("Configuración de Dojo actualizada exitosamente. ");
-  } catch (e) {
-    console.error("Error en Firebase:", e);
-    alert("Error crítico: " + e.message);
-  }
-};
+    try {
+      // 2. USO SEGURO DE LA ID
+      const academiaId = usuario.academiaId || usuario.uid;
+      const academiaRef = doc(db, "academias", academiaId);
+
+      await setDoc(academiaRef, {
+        ...config,
+        ultimaActualizacion: new Date().toISOString()
+      }, { merge: true });
+
+      setEditandoConfig(false);
+      alert("Configuración actualizada.");
+    } catch (e) {
+      console.error("Error en Firebase:", e);
+    }
+  };
 
   return (
     <div style={{ padding: '20px', backgroundColor: '#000', minHeight: '100vh', color: '#fff', boxSizing: 'border-box' }}>
-      
+
       {/* HEADER CON LOGO DINÁMICO */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '30px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -248,10 +247,10 @@ const handleGuardarAlumno = async () => {
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
-            <button onClick={() => setVerArchivados(!verArchivados)} style={{ background: 'none', border: 'none', color: '#d4af37', textDecoration: 'underline', fontSize: '0.8rem', cursor: 'pointer' }}>
-                {verArchivados ? "Ver alumnos activos" : "Ver alumnos inactivos (Archivo)"}
-            </button>
-            <button onClick={() => setMostrarForm(true)} style={{ ...styles.btnGold, width: 'auto', padding: '10px 25px' }}>+ NUEVO ALUMNO</button>
+          <button onClick={() => setVerArchivados(!verArchivados)} style={{ background: 'none', border: 'none', color: '#d4af37', textDecoration: 'underline', fontSize: '0.8rem', cursor: 'pointer' }}>
+            {verArchivados ? "Ver alumnos activos" : "Ver alumnos inactivos (Archivo)"}
+          </button>
+          <button onClick={() => setMostrarForm(true)} style={{ ...styles.btnGold, width: 'auto', padding: '10px 25px' }}>+ NUEVO ALUMNO</button>
         </div>
       </div>
 
@@ -279,7 +278,7 @@ const handleGuardarAlumno = async () => {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                     <button onClick={() => {
                       const msj = alumno.activo ? "¿Archivar?" : "¿Reactivar?";
-                      if(window.confirm(msj)) updateDoc(doc(db, "alumnos", alumno.id), { activo: !alumno.activo });
+                      if (window.confirm(msj)) updateDoc(doc(db, "alumnos", alumno.id), { activo: !alumno.activo });
                     }} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer' }}>
                       {alumno.activo ? '📦' : '♻️'}
                     </button>
@@ -300,117 +299,118 @@ const handleGuardarAlumno = async () => {
 
       {/* MODAL REGISTRO ALUMNO */}
       {mostrarForm && (
-    <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1100, padding: '20px', boxSizing: 'border-box' }}>
-      <div style={{ ...styles.card, width: '100%', maxWidth: '480px', maxHeight: '95vh', overflowY: 'auto', padding: '25px', boxSizing: 'border-box' }}>
-        <h3 style={{...styles.goldTitle, marginBottom: '20px', textAlign: 'center'}}>EXPEDIENTE NUEVO ALUMNO</h3>
-        
-        {/* FOTO DE PERFIL */}
-        <div style={{ marginBottom: '20px', textAlign: 'center' }}>
-            <div onClick={() => document.getElementById('fotoInput').click()} style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#222', margin: '0 auto 8px', border: '2px dashed #d4af37', overflow: 'hidden', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {nuevo.fotoBase64 ? <img src={nuevo.fotoBase64} style={{width:'100%', height:'100%', objectFit:'cover'}} alt="" /> : <span style={{fontSize:'1.5rem'}}>📷</span>}
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1100, padding: '20px', boxSizing: 'border-box' }}>
+          <div style={{ ...styles.card, width: '100%', maxWidth: '480px', maxHeight: '95vh', overflowY: 'auto', padding: '25px', boxSizing: 'border-box' }}>
+            <h3 style={{ ...styles.goldTitle, marginBottom: '20px', textAlign: 'center' }}>EXPEDIENTE NUEVO ALUMNO</h3>
+
+            {/* FOTO DE PERFIL */}
+            <div style={{ marginBottom: '20px', textAlign: 'center' }}>
+              <div onClick={() => document.getElementById('fotoInput').click()} style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#222', margin: '0 auto 8px', border: '2px dashed #d4af37', overflow: 'hidden', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {nuevo.fotoBase64 ? <img src={nuevo.fotoBase64} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : <span style={{ fontSize: '1.5rem' }}>📷</span>}
+              </div>
+              <input id="fotoInput" type="file" accept="image/*" hidden onChange={handleFotoChange} />
+              <p style={{ fontSize: '0.5rem', color: '#d4af37' }}>FOTO DE PERFIL</p>
             </div>
-            <input id="fotoInput" type="file" accept="image/*" hidden onChange={handleFotoChange} />
-            <p style={{fontSize: '0.5rem', color: '#d4af37'}}>FOTO DE PERFIL</p>
-        </div>
 
-        {/* SECCIÓN 1: DATOS PERSONALES */}
-        <input 
-            placeholder="Nombre completo" 
-            style={{...styles.input, width: '100%', boxSizing: 'border-box'}} 
-            value={nuevo.nombre} 
-            onChange={e => setNuevo({...nuevo, nombre: e.target.value})} 
-        />
+            {/* SECCIÓN 1: DATOS PERSONALES */}
+            <input
+              placeholder="Nombre completo"
+              style={{ ...styles.input, width: '100%', boxSizing: 'border-box' }}
+              value={nuevo.nombre}
+              onChange={e => setNuevo({ ...nuevo, nombre: e.target.value })}
+            />
 
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
-            <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+              <div style={{ flex: 1 }}>
                 <label style={{ fontSize: '0.6rem', color: '#d4af37', display: 'block', marginBottom: '5px' }}>EDAD:</label>
-                <input type="number" placeholder="Edad" style={{...styles.input, width: '100%', boxSizing: 'border-box', margin: 0}} value={nuevo.edad} onChange={e => setNuevo({...nuevo, edad: e.target.value})} />
-            </div>
-            <div style={{ flex: 2 }}>
+                <input type="number" placeholder="Edad" style={{ ...styles.input, width: '100%', boxSizing: 'border-box', margin: 0 }} value={nuevo.edad} onChange={e => setNuevo({ ...nuevo, edad: e.target.value })} />
+              </div>
+              <div style={{ flex: 2 }}>
                 <label style={{ fontSize: '0.6rem', color: '#d4af37', display: 'block', marginBottom: '5px' }}>TELÉFONO:</label>
-                <input type="tel" placeholder="Número de WhatsApp" style={{...styles.input, width: '100%', boxSizing: 'border-box', margin: 0}} value={nuevo.telefono} onChange={e => setNuevo({...nuevo, telefono: e.target.value})} />
+                <input type="tel" placeholder="Número de WhatsApp" style={{ ...styles.input, width: '100%', boxSizing: 'border-box', margin: 0 }} value={nuevo.telefono} onChange={e => setNuevo({ ...nuevo, telefono: e.target.value })} />
+              </div>
             </div>
-        </div>
 
-        <input 
-            placeholder="Usuario de Instagram (ej: @ngasi_jiujitsu)" 
-            style={{...styles.input, width: '100%', boxSizing: 'border-box', marginBottom: '15px'}} 
-            value={nuevo.instagram} 
-            onChange={e => setNuevo({...nuevo, instagram: e.target.value})} 
-        />
+            <input
+              placeholder="Usuario de Instagram (ej: @ngasi_jiujitsu)"
+              style={{ ...styles.input, width: '100%', boxSizing: 'border-box', marginBottom: '15px' }}
+              value={nuevo.instagram}
+              onChange={e => setNuevo({ ...nuevo, instagram: e.target.value })}
+            />
 
-        {/* SECCIÓN 2: CONTACTO DE EMERGENCIA */}
-        <div style={{ border: '1px solid #222', padding: '12px', borderRadius: '10px', marginBottom: '15px', backgroundColor: '#050505' }}>
-            <label style={{ fontSize: '0.6rem', color: '#d4af37', display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>EN CASO DE EMERGENCIA LLAMAR A:</label>
-            <input placeholder="Nombre del contacto" style={{...styles.input, width: '100%', boxSizing: 'border-box', marginBottom: '8px'}} value={nuevo.contactoEmergenciaNombre} onChange={e => setNuevo({...nuevo, contactoEmergenciaNombre: e.target.value})} />
-            <input placeholder="Teléfono de emergencia" style={{...styles.input, width: '100%', boxSizing: 'border-box', margin: 0}} value={nuevo.contactoEmergenciaTel} onChange={e => setNuevo({...nuevo, contactoEmergenciaTel: e.target.value})} />
-        </div>
+            {/* SECCIÓN 2: CONTACTO DE EMERGENCIA */}
+            <div style={{ border: '1px solid #222', padding: '12px', borderRadius: '10px', marginBottom: '15px', backgroundColor: '#050505' }}>
+              <label style={{ fontSize: '0.6rem', color: '#d4af37', display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>EN CASO DE EMERGENCIA LLAMAR A:</label>
+              <input placeholder="Nombre del contacto" style={{ ...styles.input, width: '100%', boxSizing: 'border-box', marginBottom: '8px' }} value={nuevo.contactoEmergenciaNombre} onChange={e => setNuevo({ ...nuevo, contactoEmergenciaNombre: e.target.value })} />
+              <input placeholder="Teléfono de emergencia" style={{ ...styles.input, width: '100%', boxSizing: 'border-box', margin: 0 }} value={nuevo.contactoEmergenciaTel} onChange={e => setNuevo({ ...nuevo, contactoEmergenciaTel: e.target.value })} />
+            </div>
 
-        {/* SECCIÓN 3: SALUD Y EXPERIENCIA */}
-        <div style={{ textAlign: 'left', marginBottom: '15px' }}>
-            <label style={{ fontSize: '0.6rem', color: '#d4af37', display: 'block', marginBottom: '5px' }}>¿CONDICIÓN ESPECIAL O LESIÓN?</label>
-            <input placeholder="Ninguna / Asma, hernia, etc." style={{...styles.input, width: '100%', boxSizing: 'border-box', margin: 0}} value={nuevo.condicionEspecial} onChange={e => setNuevo({...nuevo, condicionEspecial: e.target.value})} />
-        </div>
+            {/* SECCIÓN 3: SALUD Y EXPERIENCIA */}
+            <div style={{ textAlign: 'left', marginBottom: '15px' }}>
+              <label style={{ fontSize: '0.6rem', color: '#d4af37', display: 'block', marginBottom: '5px' }}>¿CONDICIÓN ESPECIAL O LESIÓN?</label>
+              <input placeholder="Ninguna / Asma, hernia, etc." style={{ ...styles.input, width: '100%', boxSizing: 'border-box', margin: 0 }} value={nuevo.condicionEspecial} onChange={e => setNuevo({ ...nuevo, condicionEspecial: e.target.value })} />
+            </div>
 
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '15px', alignItems: 'flex-end' }}>
-            <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '15px', alignItems: 'flex-end' }}>
+              <div style={{ flex: 1 }}>
                 <label style={{ fontSize: '0.6rem', color: '#d4af37', display: 'block', marginBottom: '5px' }}>¿TIENE EXPERIENCIA?</label>
-                <select style={{...styles.input, width: '100%', boxSizing: 'border-box', margin: 0}} value={nuevo.tieneExperiencia} onChange={e => setNuevo({...nuevo, tieneExperiencia: e.target.value})}>
-                    <option value="no">No</option>
-                    <option value="si">Sí</option>
+                <select style={{ ...styles.input, width: '100%', boxSizing: 'border-box', margin: 0 }} value={nuevo.tieneExperiencia} onChange={e => setNuevo({ ...nuevo, tieneExperiencia: e.target.value })}>
+                  <option value="no">No</option>
+                  <option value="si">Sí</option>
                 </select>
-            </div>
-            {nuevo.tieneExperiencia === 'si' && (
+              </div>
+              {nuevo.tieneExperiencia === 'si' && (
                 <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: '0.6rem', color: '#d4af37', display: 'block', marginBottom: '5px' }}>¿CUÁNTO TIEMPO?</label>
-                    <input placeholder="Ej: 6 meses" style={{...styles.input, width: '100%', boxSizing: 'border-box', margin: 0}} value={nuevo.tiempoExperiencia} onChange={e => setNuevo({...nuevo, tiempoExperiencia: e.target.value})} />
+                  <label style={{ fontSize: '0.6rem', color: '#d4af37', display: 'block', marginBottom: '5px' }}>¿CUÁNTO TIEMPO?</label>
+                  <input placeholder="Ej: 6 meses" style={{ ...styles.input, width: '100%', boxSizing: 'border-box', margin: 0 }} value={nuevo.tiempoExperiencia} onChange={e => setNuevo({ ...nuevo, tiempoExperiencia: e.target.value })} />
                 </div>
-            )}
-        </div>
+              )}
+            </div>
 
-        {/* SECCIÓN 4: ACADÉMICO Y PAGOS */}
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
-            <div style={{ flex: 1 }}>
+            {/* SECCIÓN 4: ACADÉMICO Y PAGOS */}
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+              <div style={{ flex: 1 }}>
                 <label style={{ fontSize: '0.6rem', color: '#d4af37', display: 'block', marginBottom: '5px' }}>PROGRAMA:</label>
-                <select style={{...styles.input, width: '100%', boxSizing: 'border-box', margin: 0}} value={nuevo.programa} onChange={e => setNuevo({...nuevo, programa: e.target.value})}>
-                    {config.programas.map(p => <option key={p} value={p}>{p}</option>)}
+                <select style={{ ...styles.input, width: '100%', boxSizing: 'border-box', margin: 0 }} value={nuevo.programa} onChange={e => setNuevo({ ...nuevo, programa: e.target.value })}>
+                  {config.programas.map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
-            </div>
-            <div style={{ flex: 1 }}>
+              </div>
+              <div style={{ flex: 1 }}>
                 <label style={{ fontSize: '0.6rem', color: '#d4af37', display: 'block', marginBottom: '5px' }}>HORARIO:</label>
-                <select style={{...styles.input, width: '100%', boxSizing: 'border-box', margin: 0}} value={nuevo.horario} onChange={e => setNuevo({...nuevo, horario: e.target.value})}>
-                    {config.horarios.map((h, i) => <option key={i} value={`${h.hora} - ${h.nombre}`}>{h.hora} - {h.nombre}</option>)}
+                <select style={{ ...styles.input, width: '100%', boxSizing: 'border-box', margin: 0 }} value={nuevo.horario} onChange={e => setNuevo({ ...nuevo, horario: e.target.value })}>
+                  {config.horarios.map((h, i) => <option key={i} value={`${h.hora} - ${h.nombre}`}>{h.hora} - {h.nombre}</option>)}
                 </select>
+              </div>
             </div>
-        </div>
 
-        <div style={{ textAlign: 'left', marginBottom: '15px' }}>
-            <label style={{ fontSize: '0.6rem', color: '#d4af37', display: 'block', marginBottom: '5px' }}>FECHA DE PRÓXIMO PAGO:</label>
-            <input type="date" style={{...styles.input, width: '100%', boxSizing: 'border-box', margin: 0}} value={nuevo.fechaPago} onChange={e => setNuevo({...nuevo, fechaPago: e.target.value})} />
-        </div>
+            <div style={{ textAlign: 'left', marginBottom: '15px' }}>
+              <label style={{ fontSize: '0.6rem', color: '#d4af37', display: 'block', marginBottom: '5px' }}>FECHA DE PRÓXIMO PAGO:</label>
+              <input type="date" style={{ ...styles.input, width: '100%', boxSizing: 'border-box', margin: 0 }} value={nuevo.fechaPago} onChange={e => setNuevo({ ...nuevo, fechaPago: e.target.value })} />
+            </div>
 
-        <textarea 
-            placeholder="Scouting técnico inicial (Notas del profesor)" 
-            style={{ ...styles.input, width: '100%', height: '80px', boxSizing: 'border-box', margin: 0, resize: 'none' }} 
-            value={nuevo.notasTecnicas} 
-            onChange={e => setNuevo({...nuevo, notasTecnicas: e.target.value})} 
-        />
+            <textarea
+              placeholder="Scouting técnico inicial (Notas del profesor)"
+              style={{ ...styles.input, width: '100%', height: '80px', boxSizing: 'border-box', margin: 0, resize: 'none' }}
+              value={nuevo.notasTecnicas}
+              onChange={e => setNuevo({ ...nuevo, notasTecnicas: e.target.value })}
+            />
 
-        {/* BOTONES DE ACCIÓN */}
-        <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-          <button onClick={handleGuardarAlumno} style={{...styles.btnGold, flex: 2}}>REGISTRAR ALUMNO</button>
-          <button onClick={() => setMostrarForm(false)} style={{...styles.btnOutline, flex: 1}}>CANCELAR</button>
+            {/* BOTONES DE ACCIÓN */}
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+              <button onClick={handleGuardarAlumno} style={{ ...styles.btnGold, flex: 2 }}>REGISTRAR ALUMNO</button>
+              <button onClick={() => setMostrarForm(false)} style={{ ...styles.btnOutline, flex: 1 }}>CANCELAR</button>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-)}
+      )}
 
       {/* MODAL CONFIGURACIÓN (LOGO + HORARIO INTUITIVO) */}
       {editandoConfig && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.98)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1200, padding: '20px' }}>
-          <div style={{ ...styles.card, width: '100%', maxWidth: '450px', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.98)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1200, padding: '20px', boxSizing: 'border-box' }}>
+          <div style={{ ...styles.card, width: '100%', maxWidth: '450px', maxHeight: '95vh', overflowY: 'auto', padding: '25px', boxSizing: 'border-box' }}>
             <h3 style={styles.goldTitle}>CONFIGURACIÓN DE SEDE</h3>
 
+            {/* LOGO */}
             <div style={{ marginBottom: '20px', textAlign: 'center' }}>
                 <div onClick={() => document.getElementById('logoInput').click()} style={{ width: '80px', height: '80px', borderRadius: '10px', backgroundColor: '#222', margin: '0 auto 8px', border: '1px dashed #d4af37', overflow: 'hidden', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {config.logoBase64 ? <img src={config.logoBase64} style={{width:'100%', height:'100%', objectFit:'cover'}} alt="" /> : <span style={{fontSize:'1.2rem'}}>🏯</span>}
@@ -419,31 +419,31 @@ const handleGuardarAlumno = async () => {
                 <p style={{fontSize: '0.5rem', color: '#d4af37'}}>LOGO ACADEMIA</p>
             </div>
 
-            <input placeholder="Nombre Academia" style={styles.input} value={config.nombreAcademia} onChange={e => setConfig({...config, nombreAcademia: e.target.value})} />
-            <input placeholder="Sede / Ciudad" style={styles.input} value={config.sede} onChange={e => setConfig({...config, sede: e.target.value})} />
+            <input placeholder="Nombre Academia" style={{ ...styles.input, width: '100%', boxSizing: 'border-box' }} value={config.nombreAcademia} onChange={e => setConfig({...config, nombreAcademia: e.target.value})} />
+            <input placeholder="Sede / Ciudad" style={{ ...styles.input, width: '100%', boxSizing: 'border-box' }} value={config.sede} onChange={e => setConfig({...config, sede: e.target.value})} />
             
-            {/* GESTOR DE HORARIOS CON DÍAS */}
-            <div style={{ border: '1px solid #222', padding: '15px', borderRadius: '10px', marginTop: '15px' }}>
+            {/* GESTOR DE HORARIOS */}
+            <div style={{ border: '1px solid #222', padding: '15px', borderRadius: '10px', marginTop: '15px', boxSizing: 'border-box' }}>
               <p style={{ color: '#d4af37', fontSize: '0.7rem', textAlign: 'left', marginBottom: '10px' }}>GESTIÓN DE CLASES:</p>
               <div style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
-                <input type="time" style={{ ...styles.input, width: '100px', margin: 0 }} value={tempHora} onChange={e => setTempHora(e.target.value)} />
-                <input placeholder="Nombre clase" style={{ ...styles.input, margin: 0 }} value={tempNombreClase} onChange={e => setTempNombreClase(e.target.value)} />
+                <input type="time" style={{ ...styles.input, width: '100px', margin: 0, boxSizing: 'border-box' }} value={tempHora} onChange={e => setTempHora(e.target.value)} />
+                <input placeholder="Nombre clase" style={{ ...styles.input, flex: 1, margin: 0, boxSizing: 'border-box' }} value={tempNombreClase} onChange={e => setTempNombreClase(e.target.value)} />
               </div>
               
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', gap: '4px' }}>
                 {["L", "M", "M", "J", "V", "S", "D"].map((dia, i) => (
                   <button key={i} onClick={() => toggleDia(i)} style={{ 
-                    width: '35px', height: '35px', borderRadius: '5px', border: '1px solid #333', 
+                    flex: 1, height: '35px', borderRadius: '5px', border: '1px solid #333', 
                     backgroundColor: tempDias.includes(i) ? '#d4af37' : '#000',
                     color: tempDias.includes(i) ? '#000' : '#fff',
                     fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer'
                   }}>{dia}</button>
                 ))}
               </div>
-              <button onClick={agregarHorario} style={{ ...styles.btnGold, width: '100%' }}>AÑADIR CLASE</button>
+              <button onClick={agregarHorario} style={{ ...styles.btnGold, width: '100%', margin: 0 }}>AÑADIR CLASE</button>
 
               <div style={{ marginTop: '15px', maxHeight: '150px', overflowY: 'auto' }}>
-                {config.horarios.map((h, i) => (
+                {config.horarios?.map((h, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', borderBottom: '1px solid #111', fontSize: '0.75rem' }}>
                     <span style={{textAlign: 'left'}}>
                       <strong style={{color: '#d4af37'}}>{h.hora}</strong> - {h.nombre} <br/>
@@ -454,15 +454,16 @@ const handleGuardarAlumno = async () => {
                 ))}
               </div>
             </div>
-            {/* GESTOR DE PROGRAMAS TIPO CHIPS */}
-            <div style={{ border: '1px solid #222', padding: '15px', borderRadius: '10px', marginTop: '15px' }}>
+
+            {/* GESTOR DE PROGRAMAS */}
+            <div style={{ border: '1px solid #222', padding: '15px', borderRadius: '10px', marginTop: '15px', boxSizing: 'border-box' }}>
               <p style={{ color: '#d4af37', fontSize: '0.7rem', textAlign: 'left', marginBottom: '10px' }}>PROGRAMAS ACTIVOS:</p>
               <div style={{ display: 'flex', gap: '5px', marginBottom: '15px' }}>
-                <input placeholder="Nuevo programa" style={{ ...styles.input, margin: 0 }} value={tempNuevoPrograma} onChange={e => setTempNuevoPrograma(e.target.value)} />
-                <button onClick={agregarPrograma} style={{ ...styles.btnGold, width: '50px' }}>+</button>
+                <input placeholder="Nuevo programa" style={{ ...styles.input, flex: 1, margin: 0, boxSizing: 'border-box' }} value={tempNuevoPrograma} onChange={e => setTempNuevoPrograma(e.target.value)} />
+                <button onClick={agregarPrograma} style={{ ...styles.btnGold, width: '50px', margin: 0 }}>+</button>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {config.programas.map((p, i) => (
+                {config.programas?.map((p, i) => (
                   <div key={i} style={{ 
                     backgroundColor: '#d4af3711', border: '1px solid #d4af37', color: '#d4af37', 
                     padding: '5px 12px', borderRadius: '15px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '8px'
@@ -472,97 +473,15 @@ const handleGuardarAlumno = async () => {
                 ))}
               </div>
             </div>
-
-            <p style={{ color: '#d4af37', fontSize: '0.7rem', textAlign: 'left', marginTop: '15px' }}>PROGRAMAS (Separa por comas):</p>
-            <textarea style={{...styles.input, height: '60px'}} value={config.programas.join(', ')} onChange={e => setConfig({...config, programas: e.target.value.split(',').map(s => s.trim())})} />
             
             <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-                <button onClick={handleUpdateConfig} style={styles.btnGold}>GUARDAR TODO</button>
-                <button onClick={() => setEditandoConfig(false)} style={styles.btnOutline}>CERRAR</button>
+                <button onClick={handleUpdateConfig} style={{ ...styles.btnGold, flex: 1 }}>GUARDAR TODO</button>
+                <button onClick={() => setEditandoConfig(false)} style={{ ...styles.btnOutline, flex: 1 }}>CERRAR</button>
             </div>
           </div>
         </div>
-      )}{editandoConfig && (
-  <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.98)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1200, padding: '20px', boxSizing: 'border-box' }}>
-    <div style={{ ...styles.card, width: '100%', maxWidth: '450px', maxHeight: '95vh', overflowY: 'auto', boxSizing: 'border-box' }}>
-      <h3 style={styles.goldTitle}>CONFIGURACIÓN DE SEDE</h3>
-
-      <div style={{ marginBottom: '20px', textAlign: 'center' }}>
-          <div onClick={() => document.getElementById('logoInput').click()} style={{ width: '80px', height: '80px', borderRadius: '10px', backgroundColor: '#222', margin: '0 auto 8px', border: '1px dashed #d4af37', overflow: 'hidden', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {config.logoBase64 ? <img src={config.logoBase64} style={{width:'100%', height:'100%', objectFit:'cover'}} alt="" /> : <span style={{fontSize:'1.2rem'}}>🏯</span>}
-          </div>
-          <input id="logoInput" type="file" accept="image/*" hidden onChange={handleLogoChange} />
-          <p style={{fontSize: '0.5rem', color: '#d4af37'}}>LOGO ACADEMIA</p>
-      </div>
-
-      {/* INPUTS PRINCIPALES: Añadimos width 100% y boxSizing */}
-      <input placeholder="Nombre Academia" style={{ ...styles.input, width: '100%', boxSizing: 'border-box' }} value={config.nombreAcademia} onChange={e => setConfig({...config, nombreAcademia: e.target.value})} />
-      <input placeholder="Sede / Ciudad" style={{ ...styles.input, width: '100%', boxSizing: 'border-box' }} value={config.sede} onChange={e => setConfig({...config, sede: e.target.value})} />
-      
-      {/* GESTOR DE HORARIOS */}
-      <div style={{ border: '1px solid #222', padding: '15px', borderRadius: '10px', marginTop: '15px', boxSizing: 'border-box' }}>
-        <p style={{ color: '#d4af37', fontSize: '0.7rem', textAlign: 'left', marginBottom: '10px' }}>GESTIÓN DE CLASES:</p>
-        <div style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
-          <input type="time" style={{ ...styles.input, width: '100px', margin: 0, boxSizing: 'border-box' }} value={tempHora} onChange={e => setTempHora(e.target.value)} />
-          {/* El input de nombre clase ahora usa flex: 1 para no empujar */}
-          <input placeholder="Nombre clase" style={{ ...styles.input, flex: 1, margin: 0, boxSizing: 'border-box' }} value={tempNombreClase} onChange={e => setTempNombreClase(e.target.value)} />
-        </div>
-        
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', gap: '4px' }}>
-          {["L", "M", "M", "J", "V", "S", "D"].map((dia, i) => (
-            <button key={i} onClick={() => toggleDia(i)} style={{ 
-              flex: 1, height: '35px', borderRadius: '5px', border: '1px solid #333', 
-              backgroundColor: tempDias.includes(i) ? '#d4af37' : '#000',
-              color: tempDias.includes(i) ? '#000' : '#fff',
-              fontSize: '0.7rem', fontWeight: 'bold', cursor: 'pointer'
-            }}>{dia}</button>
-          ))}
-        </div>
-        <button onClick={agregarHorario} style={{ ...styles.btnGold, width: '100%', margin: 0 }}>AÑADIR CLASE</button>
-
-        <div style={{ marginTop: '15px', maxHeight: '150px', overflowY: 'auto' }}>
-          {config.horarios.map((h, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', borderBottom: '1px solid #111', fontSize: '0.75rem' }}>
-              <span style={{textAlign: 'left'}}>
-                <strong style={{color: '#d4af37'}}>{h.hora}</strong> - {h.nombre} <br/>
-                <small style={{color: '#666'}}>{h.dias?.map(d => ["L","M","M","J","V","S","D"][d]).join(', ')}</small>
-              </span>
-              <button onClick={() => eliminarHorario(i)} style={{ color: '#ff4444', background: 'none', border: 'none', cursor: 'pointer' }}>×</button>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* GESTOR DE PROGRAMAS */}
-      <div style={{ border: '1px solid #222', padding: '15px', borderRadius: '10px', marginTop: '15px', boxSizing: 'border-box' }}>
-        <p style={{ color: '#d4af37', fontSize: '0.7rem', textAlign: 'left', marginBottom: '10px' }}>PROGRAMAS ACTIVOS:</p>
-        <div style={{ display: 'flex', gap: '5px', marginBottom: '15px' }}>
-          <input placeholder="Nuevo programa" style={{ ...styles.input, flex: 1, margin: 0, boxSizing: 'border-box' }} value={tempNuevoPrograma} onChange={e => setTempNuevoPrograma(e.target.value)} />
-          <button onClick={agregarPrograma} style={{ ...styles.btnGold, width: '50px', margin: 0 }}>+</button>
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-          {config.programas.map((p, i) => (
-            <div key={i} style={{ 
-              backgroundColor: '#d4af3711', border: '1px solid #d4af37', color: '#d4af37', 
-              padding: '5px 12px', borderRadius: '15px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '8px'
-            }}>
-              {p} <span onClick={() => eliminarPrograma(i)} style={{ cursor: 'pointer', fontWeight: 'bold', color: '#fff' }}>×</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <p style={{ color: '#d4af37', fontSize: '0.7rem', textAlign: 'left', marginTop: '15px' }}>PROGRAMAS (Separa por comas):</p>
-      <textarea style={{...styles.input, height: '60px', width: '100%', boxSizing: 'border-box'}} value={config.programas.join(', ')} onChange={e => setConfig({...config, programas: e.target.value.split(',').map(s => s.trim())})} />
-      
-      <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-          <button onClick={handleUpdateConfig} style={{ ...styles.btnGold, flex: 1 }}>GUARDAR TODO</button>
-          <button onClick={() => setEditandoConfig(false)} style={{ ...styles.btnOutline, flex: 1 }}>CERRAR</button>
-      </div>
-    </div>
-  </div>
-)}
-    </div>
+      )}
+    </div> // Cierre del contenedor principal del componente
   );
 };
 
