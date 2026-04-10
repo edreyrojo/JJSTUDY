@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 // IMPORTANTE: Necesitas estas importaciones para Firestore
 import { db } from '../firebase';
 import { doc, setDoc, addDoc, collection } from 'firebase/firestore';
-const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos = [], toggleVisto, usuario, styles = {} }) => {
+
+const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos = [], toggleVisto, usuario, styles = {}, getAdjacentVideo }) => {
     // --- ESTADOS EXISTENTES ---
     const [nota, setNota] = useState("");
     const [segundosCorriendo, setSegundosCorriendo] = useState(0);
@@ -13,6 +14,18 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
     const [esMovil, setEsMovil] = React.useState(window.innerWidth < 768);
     const [mostrarAlerta, setMostrarAlerta] = useState(false);
     const [mensajeAlerta, setMensajeAlerta] = useState("");
+    const navegarVideo = (direccion) => {
+        if (!getAdjacentVideo || !video) return;
+        const siguiente = getAdjacentVideo(video, direccion);
+        if (siguiente) {
+            // Usamos onSelectVideo que ya viene de App.jsx para cambiar el video actual
+            onSelectVideo(siguiente);
+        } else {
+            setMensajeAlerta(direccion === 'next' ? "Fin del curso 🥋" : "Inicio del curso 🥋");
+            setMostrarAlerta(true);
+            setTimeout(() => setMostrarAlerta(false), 2000);
+        }
+    };
 
     // --- NUEVOS ESTADOS PARA REPORTES ---
     const [mostrarReporte, setMostrarReporte] = useState(false);
@@ -127,8 +140,45 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
 
             {/* SECCIÓN IZQUIERDA: VIDEO */}
             <div style={{ flex: esMovil ? 'none' : 3, display: 'flex', flexDirection: 'column', borderRight: '1px solid #222' }}>
+
+                {/* HEADER CON NAVEGACIÓN MEJORADA */}
                 <div style={{ padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#0a0a0a', minHeight: '70px' }}>
-                    <button onClick={onBack} style={{ ...(styles.btnOutline || {}), width: 'auto', padding: '8px 15px' }}>← VOLVER</button>
+                    {/* CONTENEDOR DE NAVEGACIÓN DINÁMICA */}
+                    <div style={{ display: 'flex', gap: '5px' }}>
+                        <button onClick={onBack} style={{ ...(styles.btnOutline || {}), width: 'auto', padding: '8px 12px' }}>←</button>
+
+                        {/* Solo aparece si existe un video previo */}
+                        {getAdjacentVideo(video, 'prev') && (
+                            <button
+                                onClick={() => navegarVideo('prev')}
+                                style={{
+                                    ...(styles.btnOutline || {}),
+                                    width: 'auto',
+                                    padding: '8px 12px',
+                                    border: '1px solid #d4af37',
+                                    color: '#d4af37'
+                                }}
+                            >
+                                ◁
+                            </button>
+                        )}
+
+                        {/* Solo aparece si existe un video siguiente */}
+                        {getAdjacentVideo(video, 'next') && (
+                            <button
+                                onClick={() => navegarVideo('next')}
+                                style={{
+                                    ...(styles.btnOutline || {}),
+                                    width: 'auto',
+                                    padding: '8px 12px',
+                                    border: '1px solid #d4af37',
+                                    color: '#d4af37'
+                                }}
+                            >
+                                ▷
+                            </button>
+                        )}
+                    </div>
 
                     <div style={{ textAlign: 'center', flex: 1, padding: '0 10px' }}>
                         <span style={{ fontSize: '0.6rem', color: '#666', letterSpacing: '2px', display: 'block' }}>MODO ESTUDIO</span>
@@ -141,6 +191,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                     </div>
                 </div>
 
+                {/* CONTENEDOR DE VIDEO */}
                 <div style={{ width: '100%', aspectRatio: '16/9', backgroundColor: '#000', position: 'relative' }}>
                     <iframe
                         key={`${video?.id}-${tiempoActivo}`}
@@ -150,8 +201,15 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                     ></iframe>
                 </div>
 
-                {/* BOTÓN DE REPORTE DISCRETO */}
-                <div style={{ padding: '8px 15px', display: 'flex', justifyContent: 'flex-end' }}>
+                {/* ACCIONES RÁPIDAS DE VIDEO */}
+                <div style={{ padding: '8px 15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <button
+                        onClick={() => navegarVideo('next')}
+                        style={{ background: '#d4af3722', border: '1px solid #d4af37', color: '#d4af37', fontSize: '0.6rem', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer' }}
+                    >
+                        SIGUIENTE LECCIÓN ▷
+                    </button>
+
                     <button
                         onClick={() => setMostrarReporte(true)}
                         style={{ background: 'none', border: 'none', color: '#444', fontSize: '0.65rem', cursor: 'pointer', textDecoration: 'underline' }}
@@ -169,7 +227,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                     <p style={{ color: '#555', fontSize: '0.7rem', margin: 0, fontStyle: 'italic' }}>{video?.titulo}</p>
                 </div>
 
-                {/* PANEL DE CONTROL */}
+                {/* PANEL DE CONTROL DEL CRONÓMETRO */}
                 <div style={{ backgroundColor: '#111', padding: '15px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #222' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', alignItems: 'center' }}>
                         <span style={{ fontSize: '1.1rem', color: '#d4af37', fontWeight: 'bold', fontFamily: 'monospace' }}>{formatearTiempo(segundosCorriendo)}</span>
@@ -207,7 +265,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                     placeholder="Escribe aquí los detalles del sistema..."
                 />
 
-                <button style={{ ...(styles.btnGold || {}), marginTop: '15px', padding: '15px', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(212, 175, 55, 0.1)' }} onClick={guardar}>GUARDAR</button>
+                <button style={{ ...(styles.btnGold || {}), marginTop: '15px', padding: '15px', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(212, 175, 55, 0.1)' }} onClick={guardar}>GUARDAR CAMBIOS</button>
             </div>
 
             {/* MODAL DE REPORTE TÉCNICO */}
@@ -232,7 +290,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                 </div>
             )}
 
-            {/* MODAL ALERTA */}
+            {/* MODAL ALERTA FLOTANTE */}
             {mostrarAlerta && (
                 <div style={{ position: 'fixed', bottom: '30px', left: '50%', transform: 'translateX(-50%)', backgroundColor: '#d4af37', color: '#000', padding: '12px 25px', borderRadius: '30px', fontWeight: 'bold', zIndex: 9999, boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}>
                     {mensajeAlerta}

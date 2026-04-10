@@ -30,13 +30,13 @@ import PlaneadorClasesPage from './components/PlaneadorClasesPage';
 import { DB_INSTRUCCIONALES } from './data/instruccionales';
 import MapaPage from './components/MapaPage';
 import NotasHubPage from './components/NotasHubPage';
-import { ref, remove } from "firebase/database";
 import EstudioPage from './components/EstudioPage';
 import AdminPage from './components/AdminPage';
 import BusquedaPage from './components/BusquedaPage';
 import LoginPage from './components/LoginPage';
 import HubPage from './components/HubPage';
-
+import InstalacionModal from './components/InstalacionModal';
+import { getAdjacentVideo } from './utils/videoHelpers';
 // --- 1. CONFIGURACIÓN DE ESTILOS ---
 const styles = {
   containerCenter: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh' },
@@ -48,95 +48,6 @@ const styles = {
   btnOutline: { width: '100%', padding: '10px', backgroundColor: 'transparent', border: '1px solid #d4af37', color: '#d4af37', cursor: 'pointer', borderRadius: '4px' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', maxWidth: '600px', margin: '0 auto' },
   hubBtn: { padding: '40px 20px', backgroundColor: '#111', border: '1px solid #333', color: '#fff', fontSize: '1.1rem', cursor: 'pointer', borderRadius: '8px', transition: '0.3s' },
-};
-// Importamos las herramientas de Firestore necesarias (Asegúrate de tenerlas arriba en App.jsx)//
-const cargarDatosDesdeFirebase = async (uid) => {
-  try {
-    const userRef = doc(db, "usuarios", uid);
-    const userDoc = await getDoc(userRef);
-
-    if (userDoc.exists()) {
-      const data = userDoc.data();
-
-      // 1. Sincronizamos VISTOS
-      if (data.vistos) {
-        setVistos(data.vistos);
-        localStorage.setItem('lafortuna_vistos', JSON.stringify(data.vistos));
-      }
-
-      // 2. Sincronizamos NOTAS GLOBALES
-      // Esto hará que la PC recupere lo que escribiste en el iPhone
-      if (data.notas) {
-        localStorage.setItem('lafortuna_notas', JSON.stringify(data.notas));
-        // Opcional: Si tienes un estado global de notas, actualízalo aquí
-        // setNotas(data.notas); 
-      }
-
-      console.log("✅ Datos de la nube sincronizados con éxito");
-    }
-  } catch (error) {
-    console.error("❌ Error cargando datos de nube:", error);
-  }
-};
-// Coloca esto antes de los componentes de página//
-const getAdjacentVideo = (currentVideo, direction) => {
-  for (const cursoKey in DB_INSTRUCCIONALES) {
-    const curso = DB_INSTRUCCIONALES[cursoKey];
-    for (const vol of curso.volumenes) {
-      const index = vol.partes.findIndex(p => p.id === currentVideo.id);
-      if (index !== -1) {
-        const targetIndex = direction === 'next' ? index + 1 : index - 1;
-        const nextVideo = vol.partes[targetIndex];
-        if (nextVideo) {
-          return { titulo: nextVideo.nombre, id: nextVideo.id };
-        }
-      }
-    }
-  }
-  return null;
-};
-const InstalacionModal = ({ isOpen, onClose }) => {
-  if (!isOpen) return null;
-
-  const esIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-
-  return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
-      backgroundColor: 'rgba(0,0,0,0.9)', display: 'flex', justifyContent: 'center',
-      alignItems: 'center', zIndex: 10000, padding: '20px', boxSizing: 'border-box'
-    }}>
-      <div style={{
-        backgroundColor: '#111', border: '1px solid #d4af37', padding: '30px',
-        borderRadius: '15px', textAlign: 'center', maxWidth: '400px', position: 'relative'
-      }}>
-        <button onClick={onClose} style={{ position: 'absolute', top: '10px', right: '15px', background: 'none', border: 'none', color: '#666', fontSize: '1.5rem', cursor: 'pointer' }}>×</button>
-
-        <h3 style={{ color: '#d4af37', marginBottom: '15px' }}>INSTALAR VAULT</h3>
-
-        {esIOS ? (
-          <div style={{ color: '#ccc', fontSize: '0.9rem', lineHeight: '1.6' }}>
-            <p>Para llevar **La Fortuna** en tu iPhone:</p>
-            <ol style={{ textAlign: 'left', marginTop: '15px' }}>
-              <li>Toca el botón **Compartir** <span style={{ fontSize: '1.2rem' }}>⎋</span> (abajo en el centro).</li>
-              <li>Desliza hacia arriba y busca **"Añadir a pantalla de inicio"** ➕.</li>
-              <li>Presiona **"Añadir"** en la esquina superior derecha.</li>
-            </ol>
-          </div>
-        ) : (
-          <div style={{ color: '#ccc', fontSize: '0.9rem', lineHeight: '1.6' }}>
-            <p>Para instalar en tu Android:</p>
-            <ol style={{ textAlign: 'left', marginTop: '15px' }}>
-              <li>Toca los **tres puntos** ⋮ en la esquina superior derecha.</li>
-              <li>Selecciona **"Instalar aplicación"** o **"Añadir a pantalla de inicio"**.</li>
-            </ol>
-          </div>
-        )}
-
-        <button onClick={onClose} style={{ ...styles.btnGold, marginTop: '20px' }}>ENTENDIDO</button>
-      </div>
-    </div>
-  );
 };
 // --- 4. COMPONENTE PRINCIPAL (EXPORT DEFAULT) ---//
 export default function App() {
@@ -387,6 +298,7 @@ export default function App() {
             vistos={vistos}
             toggleVisto={toggleVisto}
             styles={styles}
+            getAdjacentVideo={getAdjacentVideo}
             usuario={usuario} // <-- Le pasas el usuario que ya tienes en App
             onNavigateToNotes={() => setPage('notas_hub')}
             onSelectVideo={(v) => {
@@ -445,12 +357,6 @@ export default function App() {
         }
         return <HubPage usuario={usuario} onNavigate={setPage} userRole={userRole} onLogout={handleLogout} />;
 
-        // Admin, profesor e instructor pueden planear clases
-        if (['admin', 'profesor', 'instructor'].includes(userRole)) {
-          return <PlaneadorClasesPage onBack={() => setPage('hub')} styles={styles} />;
-        }
-        return <HubPage onNavigate={setPage} userRole={userRole} onLogout={handleLogout} />;
-
       case 'admin':
         // Protección de acceso: si no es admin, regresa al Hub
         if (userRole === 'admin') {
@@ -477,7 +383,7 @@ export default function App() {
         );
     }
   };
-  // Dentro de App.jsx, antes del return
+
   const handleEliminarNota = async (notaId) => {
     if (!usuario) return;
 
