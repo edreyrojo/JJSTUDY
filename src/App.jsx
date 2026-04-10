@@ -73,6 +73,7 @@ export default function App() {
     const guardado = localStorage.getItem('lafortuna_last_video');
     return guardado ? JSON.parse(guardado) : null;
   });
+  const [academiaIdInput, setAcademiaIdInput] = useState('');
   // --- 2. EFECTO DE AUTENTICACIÓN ---
   React.useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -136,17 +137,24 @@ export default function App() {
     return () => unsub();
   }, []);
 
+
   // --- 3. FUNCIONES DE LÓGICA ---
+  // --- 3. FUNCIONES DE LÓGICA ---
+
   const handleLogout = async () => {
     try {
       await auth.signOut();
+      // Limpiamos estados de la aplicación
       setVistos([]);
       setVideoActual(null);
       setUsuario(null);
+      // Limpiamos persistencia local
       localStorage.removeItem('lafortuna_vistos');
       localStorage.removeItem('lafortuna_last_video');
       localStorage.removeItem('lafortuna_notas');
+      // Redirigimos al inicio
       setPage('login');
+      console.log("Sesión cerrada y Vault bloqueado 🛡️");
     } catch (error) {
       console.error("Error al cerrar sesión:", error);
     }
@@ -158,25 +166,41 @@ export default function App() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Tu correo maestro sigue siendo el único Admin automático
+      // Identificación del Admin Maestro
       const isAdmin = email === "zamna.ed@gmail.com";
+
+      // LÓGICA DE ROLES Y VINCULACIÓN:
+      // Si tiene código -> Instructor. Si no -> Alumno. Si es tu mail -> Admin.
+      let rolAsignado = 'alumno';
+      if (isAdmin) {
+        rolAsignado = 'admin';
+      } else if (academiaIdInput && academiaIdInput.trim() !== "") {
+        rolAsignado = 'instructor';
+      }
 
       await setDoc(doc(db, "usuarios", user.uid), {
         uid: user.uid,
         email: user.email,
         nombre: nombreCompleto,
-        // CAMBIO AQUÍ: Usamos 'alumno' para que coincida con el resto de la app
-        rol: isAdmin ? 'admin' : 'alumno',
-        validado: isAdmin,
+        rol: rolAsignado,
+        // Solo guardamos el academiaId si se registró como instructor vinculado
+        academiaId: (rolAsignado === 'instructor') ? academiaIdInput.trim() : null,
+        validado: isAdmin, // Solo el admin entra directo, los demás esperan validación
         fechaRegistro: new Date().toISOString()
       });
 
-      alert(isAdmin
-        ? "¡Bienvenido, Ngasi! Acceso total concedido."
-        : "Solicitud enviada a La Fortuna. Espera a que el profesor valide tu perfil."
-      );
+      // Feedback personalizado
+      if (isAdmin) {
+        alert("¡Bienvenido, Ngasi! Acceso total concedido.");
+      } else if (rolAsignado === 'instructor') {
+        alert("Solicitud de Instructor enviada. El profesor debe validar tu cuenta para vincularte a la sede.");
+      } else {
+        alert("Solicitud enviada a La Fortuna. Espera a que el profesor valide tu perfil.");
+      }
 
       setPage('login');
+      setAcademiaIdInput(''); // Limpiamos el campo del código después del uso
+
     } catch (err) {
       setError("Error al registrar: " + err.message);
     }
@@ -196,11 +220,15 @@ export default function App() {
           setVistos(data.vistos || []);
           setPage('hub');
         } else {
-          alert("Tu cuenta aún no ha sido validada.");
-          auth.signOut();
+          alert("Tu cuenta aún no ha sido validada por el profesor.");
+          // Usamos handleLogout para asegurar que Firebase cierre la sesión 
+          // técnica que se abrió al intentar el login.
+          handleLogout();
         }
       }
-    } catch (err) { setError("Credenciales incorrectas."); }
+    } catch (err) {
+      setError("Credenciales incorrectas o usuario no encontrado.");
+    }
   };
 
   const toggleVisto = async (id) => {

@@ -162,39 +162,38 @@ const GestionAlumnosPage = ({ onBack, styles, usuario }) => {
 
     // 6. FUNCIONES DE GUARDADO Y ELIMINACIÓN
     const handleGuardarAlumno = async () => {
-        if (!nuevo.nombre || !nuevo.fechaPago) {
-            alert("Nombre y fecha de pago son obligatorios.");
-            return;
-        }
+    // 1. Validaciones de seguridad
+    if (!nuevo.nombre || !nuevo.fechaPago) {
+        alert("Nombre y fecha de pago son obligatorios.");
+        return;
+    }
 
-        const diaExtraido = nuevo.fechaPago.split('-')[2];
+    // 2. Extraer el día para el semáforo de pagos
+    const diaExtraido = nuevo.fechaPago.split('-')[2];
 
-        try {
-            // 1. Intentamos guardar
-            await addDoc(collection(db, "alumnos"), {
-                ...nuevo,
-                diaPago: diaExtraido,
-                academiaId: usuario.academiaId || usuario.uid,
-                fechaRegistro: new Date().toISOString()
-            });
+    // 3. Identificar la academia (Dueño o Instructor vinculado)
+    const idSede = usuario.academiaId || usuario.uid;
 
-            // 2. Si llegamos aquí, el guardado fue exitoso. 
-            // Primero avisamos al usuario (es mejor UX)
-            alert("¡Alumno registrado con éxito en el Vault!");
+    try {
+        await addDoc(collection(db, "alumnos"), {
+            ...nuevo, // Esparcimos los datos del formulario (edad, tel, etc.)
+            diaPago: diaExtraido,
+            academiaId: idSede, // <--- VITAL para la jerarquía
+            registradoPor: usuario.uid, // <--- NUEVO: Para saber qué instructor lo inscribió
+            activo: true, // Aseguramos que entre como activo
+            fechaRegistro: new Date().toISOString()
+        });
 
-            // 3. Cerramos el formulario
-            setMostrarForm(false);
+        alert("¡Alumno registrado con éxito en el Vault! 🛡️");
+        setMostrarForm(false);
+        setNuevo(estadoAlumnoInicial);
 
-            // 4. Limpiamos el estado usando SOLO el objeto correcto
-            // Revisa si tu objeto se llama 'estadoAlumnoInicial' o 'estadoInicial' y usa solo ese.
-            setNuevo(estadoAlumnoInicial);
-
-        } catch (e) {
-            // Solo entrará aquí si Firebase falla de verdad (ej. sin internet o sin permisos)
-            console.error("Error real de Firebase:", e);
-            alert("Error al guardar alumno.");
-        }
-    };
+    } catch (e) {
+        console.error("Error en el registro:", e);
+        // Si falla por permisos de Firebase, aquí te avisará
+        alert("Error de acceso al Vault. Revisa tu conexión o permisos de instructor.");
+    }
+};
 
     const eliminarDefinitivo = async (id) => {
         if (window.confirm("¿ELIMINAR DEFINITIVAMENTE? Esta acción no se puede deshacer.")) {
@@ -421,7 +420,29 @@ const GestionAlumnosPage = ({ onBack, styles, usuario }) => {
 
                         <input placeholder="Nombre Academia" style={{ ...styles.input, width: '100%', boxSizing: 'border-box' }} value={config.nombreAcademia} onChange={e => setConfig({ ...config, nombreAcademia: e.target.value })} />
                         <input placeholder="Sede / Ciudad" style={{ ...styles.input, width: '100%', boxSizing: 'border-box' }} value={config.sede} onChange={e => setConfig({ ...config, sede: e.target.value })} />
-
+                        {/* SECCIÓN DE VINCULACIÓN (Solo para el dueño/Profesor) */}
+                        {!usuario.academiaId && (
+                            <div style={{ backgroundColor: '#111', padding: '15px', borderRadius: '10px', border: '1px solid #d4af37', marginBottom: '20px' }}>
+                                <p style={{ color: '#d4af37', fontSize: '0.7rem', margin: '0 0 5px 0' }}>CÓDIGO DE VINCULACIÓN PARA INSTRUCTORES:</p>
+                                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                    <code style={{ flex: 1, backgroundColor: '#000', padding: '10px', borderRadius: '5px', fontSize: '0.8rem', color: '#fff' }}>
+                                        {usuario.uid}
+                                    </code>
+                                    <button
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(usuario.uid);
+                                            alert("Código copiado. Pásalo a tu instructor para que se vincule a tu equipo.");
+                                        }}
+                                        style={{ ...styles.btnGold, width: 'auto', padding: '10px' }}
+                                    >
+                                        📋
+                                    </button>
+                                </div>
+                                <p style={{ fontSize: '0.6rem', color: '#666', marginTop: '5px' }}>
+                                    Cualquier instructor con este código podrá ver y gestionar a tus alumnos.
+                                </p>
+                            </div>
+                        )}
                         {/* GESTOR DE HORARIOS */}
                         <div style={{ border: '1px solid #222', padding: '15px', borderRadius: '10px', marginTop: '15px', boxSizing: 'border-box' }}>
                             <p style={{ color: '#d4af37', fontSize: '0.7rem', textAlign: 'left', marginBottom: '10px' }}>GESTIÓN DE CLASES:</p>
