@@ -1,73 +1,84 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { db } from './firebase';
-import { collection, addDoc, onSnapshot, query, orderBy, doc, updateDoc, arrayUnion, deleteDoc, where } from 'firebase/firestore';
+import React, { useState, useEffect } from 'react';
+// IMPORTANTE: Ajuste de ruta para Firebase
+import { db } from '../firebase';
+import {
+    collection,
+    addDoc,
+    onSnapshot,
+    query,
+    orderBy,
+    doc,
+    updateDoc,
+    arrayUnion,
+    deleteDoc,
+    where
+} from 'firebase/firestore';
 
 const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
     const [clases, setClases] = useState([]);
     const [alumnos, setAlumnos] = useState([]);
-    const [modo, setModo] = useState('lista'); 
+    const [modo, setModo] = useState('lista');
     const [claseSeleccionada, setClaseSeleccionada] = useState(null);
     const [timeLeft, setTimeLeft] = useState(0);
     const [timerActive, setTimerActive] = useState(false);
     const [isPrepTime, setIsPrepTime] = useState(false);
     const [currentTargetTime, setCurrentTargetTime] = useState(0);
-const intentarVolver = () => {
-    if (modo === 'clase_activa') {
-        const confirmar = window.confirm("¡Atención! Tienes una sesión de entrenamiento activa. Si sales ahora, el cronómetro se detendrá y perderás el progreso actual. ¿Realmente quieres abandonar?");
-        if (!confirmar) return; // Se queda en la clase
-    }
-    
-    // Si no hay clase activa o si el usuario confirmó salir:
-    setTimerActive(false);
-    onBack();
-};
-    // --- LÓGICA DE SONIDO ---
+
+    const intentarVolver = () => {
+        if (modo === 'clase_activa') {
+            const confirmar = window.confirm("¡Atención! Tienes una sesión de entrenamiento activa. Si sales ahora, el cronómetro se detendrá y perderás el progreso actual. ¿Realmente quieres abandonar?");
+            if (!confirmar) return;
+        }
+        setTimerActive(false);
+        onBack();
+    };
+
+    // --- LÓGICA DE SONIDO (CAMPANA) ---
     const playBeep = (freq = 440, duration = 2) => {
-    try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
+        try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
 
-        oscillator.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
 
-        // Tipo de onda: 'triangle' o 'sine' suenan más a campana que la estándar
-        oscillator.type = 'triangle'; 
-        oscillator.frequency.value = freq;
+            oscillator.type = 'triangle';
+            oscillator.frequency.value = freq;
 
-        // LÓGICA DE CAMPANA (El sonido empieza fuerte y cae)
-        const now = audioCtx.currentTime;
-        gainNode.gain.setValueAtTime(0.5, now); // Volumen inicial
-        gainNode.gain.exponentialRampToValueAtTime(0.0001, now + duration); // Se desvanece
+            const now = audioCtx.currentTime;
+            gainNode.gain.setValueAtTime(0.5, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, now + duration);
 
-        oscillator.start(now);
-        oscillator.stop(now + duration);
-    } catch (e) { console.error("Audio error", e); }
-};
-const playTripleCampana = () => {
-    playBeep(1200, 2); // Primera
-    setTimeout(() => playBeep(1200, 2), 300); // Segunda
-    setTimeout(() => playBeep(1200, 3), 600); // Tercera (más larga)
-};
+            oscillator.start(now);
+            oscillator.stop(now + duration);
+        } catch (e) { console.error("Audio error", e); }
+    };
+
+    const playTripleCampana = () => {
+        playBeep(1200, 2);
+        setTimeout(() => playBeep(1200, 2), 300);
+        setTimeout(() => playBeep(1200, 3), 600);
+    };
 
     // --- LÓGICA DEL TIMER ---
     useEffect(() => {
         let interval = null;
         if (timerActive && timeLeft > 0) {
-            if (timeLeft <= 5) playBeep(600, 0.5); // Beep aviso final
+            if (timeLeft <= 5) playBeep(600, 0.5);
             interval = setInterval(() => {
                 setTimeLeft(prev => {
                     if (prev <= 2 && isPrepTime) {
                         setIsPrepTime(false);
-                        playBeep(800, 3); // Sonido de inicio oficial
-                        return currentTargetTime; 
+                        playBeep(800, 3);
+                        return currentTargetTime;
                     }
                     return prev - 1;
                 });
             }, 1000);
         } else if (timeLeft === 0 && timerActive) {
             setTimerActive(false);
-            playTripleCampana(1200, 3); // Sonido de fin
+            playTripleCampana();
             if (interval) clearInterval(interval);
         }
         return () => { if (interval) clearInterval(interval); };
@@ -75,10 +86,10 @@ const playTripleCampana = () => {
 
     const startTimerWithPrep = (minutos) => {
         setCurrentTargetTime(minutos * 60);
-        setTimeLeft(30); 
+        setTimeLeft(30);
         setIsPrepTime(true);
         setTimerActive(true);
-        playBeep(500, 2); 
+        playBeep(500, 2);
     };
 
     const formatTime = (seconds) => {
@@ -102,14 +113,17 @@ const playTripleCampana = () => {
         if (!usuario?.uid) return;
         let isMounted = true;
         const idParaFiltrar = usuario.academiaId || usuario.uid;
+
         const qClases = query(collection(db, "clases"), orderBy("fecha", "desc"));
         const unsubClases = onSnapshot(qClases, (snap) => {
             if (isMounted) setClases(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         });
+
         const qAlumnos = query(collection(db, "alumnos"), where("academiaId", "==", idParaFiltrar), orderBy("nombre", "asc"));
         const unsubAlumnos = onSnapshot(qAlumnos, (snap) => {
             if (isMounted) setAlumnos(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(a => a.activo));
         });
+
         return () => { isMounted = false; unsubClases(); unsubAlumnos(); };
     }, [usuario]);
 
@@ -118,14 +132,6 @@ const playTripleCampana = () => {
         const bloqueCLA = { id: Date.now().toString(), tipo: 'CLA', atacante: '', defensor: '', rondas: ['', '', ''], intensidad: 1, minutos: 3 };
         nuevosBloques.splice(nuevosBloques.length - 1, 0, bloqueCLA);
         setNuevaClase({ ...nuevaClase, bloques: nuevosBloques });
-    };
-
-    const moverBloque = (index, direccion) => {
-        const nuevos = [...nuevaClase.bloques];
-        const destino = index + direccion;
-        if (destino <= 0 || destino >= nuevos.length - 1) return;
-        [nuevos[index], nuevos[destino]] = [nuevos[destino], nuevos[index]];
-        setNuevaClase({ ...nuevaClase, bloques: nuevos });
     };
 
     const guardarClase = async () => {
@@ -150,13 +156,13 @@ const playTripleCampana = () => {
 
     return (
         <div style={{ backgroundColor: '#000', minHeight: '100vh', color: '#fff', width: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
-            
+
             {/* TIMER STICKY RESPONSIVE */}
             {modo === 'clase_activa' && (
-                <div style={{ 
-                    position: 'sticky', top: 0, zIndex: 100, 
-                    backgroundColor: isPrepTime ? '#ff4444' : '#d4af37', 
-                    color: '#000', padding: '10px 15px', 
+                <div style={{
+                    position: 'sticky', top: 0, zIndex: 100,
+                    backgroundColor: isPrepTime ? '#ff4444' : '#d4af37',
+                    color: '#000', padding: '10px 15px',
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     boxShadow: '0 4px 20px rgba(0,0,0,0.5)', boxSizing: 'border-box'
                 }}>
@@ -196,7 +202,7 @@ const playTripleCampana = () => {
                                     <h3 style={{ margin: 0, color: '#d4af37', fontSize: '0.9rem', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{c.titulo.toUpperCase()}</h3>
                                     <span style={{ fontSize: '0.6rem', color: '#666' }}>{c.fecha}</span>
                                 </div>
-                                <button onClick={() => { if(window.confirm("¿Borrar?")) deleteDoc(doc(db, "clases", c.id)) }} style={{ background: '#111', border: '1px solid #333', color: '#555', padding: '10px', borderRadius: '8px' }}>🗑</button>
+                                <button onClick={() => { if (window.confirm("¿Borrar?")) deleteDoc(doc(db, "clases", c.id)) }} style={{ background: '#111', border: '1px solid #333', color: '#555', padding: '10px', borderRadius: '8px' }}>🗑</button>
                             </div>
                         ))}
                     </div>
@@ -208,13 +214,13 @@ const playTripleCampana = () => {
                         <div style={{ gridColumn: '1 / -1' }}>
                             <input placeholder="TÍTULO DE LA SESIÓN" style={{ ...styles.input, width: '100%', boxSizing: 'border-box', textAlign: 'center', borderBottom: '2px solid #d4af37' }} onChange={e => setNuevaClase({ ...nuevaClase, titulo: e.target.value })} />
                         </div>
-                        
+
                         {nuevaClase.bloques.map((bloque, index) => (
                             <div key={bloque.id} style={{ ...styles.card, padding: '15px', border: '1px solid #222', textAlign: 'left', boxSizing: 'border-box' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
                                     <span style={{ color: '#d4af37', fontWeight: 'bold', fontSize: '0.8rem' }}>{bloque.tipo}</span>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#111', padding: '4px 10px', borderRadius: '20px', border: '1px solid #333' }}>
-                                        <input type="number" value={bloque.minutos} style={{ background: 'none', border: 'none', color: '#fff', width: '35px', fontSize: '0.9rem', textAlign: 'center' }} 
+                                        <input type="number" value={bloque.minutos} style={{ background: 'none', border: 'none', color: '#fff', width: '35px', fontSize: '0.9rem', textAlign: 'center' }}
                                             onChange={e => { const b = [...nuevaClase.bloques]; b[index].minutos = parseInt(e.target.value) || 0; setNuevaClase({ ...nuevaClase, bloques: b }); }} />
                                         <span style={{ fontSize: '0.6rem', color: '#d4af37', fontWeight: 'bold' }}>MIN</span>
                                     </div>
@@ -249,7 +255,7 @@ const playTripleCampana = () => {
                             <div key={i} style={{ ...styles.card, borderLeft: '4px solid #d4af37', padding: '15px', textAlign: 'left', boxSizing: 'border-box' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                                     <h4 style={{ color: '#d4af37', margin: 0, fontSize: '0.9rem' }}>{b.tipo}</h4>
-                                    <button onClick={() => startTimerWithPrep(b.minutos)} 
+                                    <button onClick={() => startTimerWithPrep(b.minutos)}
                                         style={{ background: '#d4af37', color: '#000', border: 'none', borderRadius: '4px', padding: '6px 12px', fontWeight: 'bold', fontSize: '0.7rem' }}>
                                         INICIAR {b.minutos}M
                                     </button>
@@ -257,12 +263,12 @@ const playTripleCampana = () => {
                                 <div style={{ fontSize: '0.85rem', color: '#ccc', lineHeight: '1.5' }}>
                                     {b.tipo === 'Calentamiento' ? (
                                         <>
-                                            <div style={{marginBottom: '5px'}}><strong>LIGERO:</strong> {b.ligero}</div>
+                                            <div style={{ marginBottom: '5px' }}><strong>LIGERO:</strong> {b.ligero}</div>
                                             <div><strong>INTENSO:</strong> {b.intenso}</div>
                                         </>
                                     ) : b.tipo === 'CLA' ? (
                                         <>
-                                            <div style={{marginBottom: '5px'}}><strong>ATK:</strong> {b.atacante}</div>
+                                            <div style={{ marginBottom: '5px' }}><strong>ATK:</strong> {b.atacante}</div>
                                             <div><strong>DEF:</strong> {b.defensor}</div>
                                         </>
                                     ) : <div>{b.contenido}</div>}
@@ -277,13 +283,13 @@ const playTripleCampana = () => {
                                 {alumnos.map(a => (
                                     <div key={a.id} style={{ display: 'flex', gap: '8px', alignItems: 'center', background: '#000', padding: '10px', borderRadius: '8px', border: '1px solid #222' }}>
                                         <span style={{ flex: 1, fontSize: '0.75rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.nombre}</span>
-                                        <input placeholder="Nota" style={{ ...styles.input, width: '70px', marginBottom: 0, padding: '5px', fontSize:'0.7rem' }} onBlur={(e) => e.target.value && registrarAsistenciaConNota(a.id, e.target.value)} />
+                                        <input placeholder="Nota" style={{ ...styles.input, width: '70px', marginBottom: 0, padding: '5px', fontSize: '0.7rem' }} onBlur={(e) => e.target.value && registrarAsistenciaConNota(a.id, e.target.value)} />
                                         <button onClick={() => registrarAsistenciaConNota(a.id, "Asistió")} style={{ backgroundColor: '#d4af37', border: 'none', padding: '8px 12px', borderRadius: '4px' }}>✓</button>
                                     </div>
                                 ))}
                             </div>
                         </div>
-                        <button onClick={() => { setModo('lista'); setTimerActive(false); }} style={{...styles.btnOutline, padding: '15px', gridColumn: '1 / -1'}}>TERMINAR SESIÓN</button>
+                        <button onClick={() => { setModo('lista'); setTimerActive(false); }} style={{ ...styles.btnOutline, padding: '15px', gridColumn: '1 / -1' }}>TERMINAR SESIÓN</button>
                     </div>
                 )}
             </div>
