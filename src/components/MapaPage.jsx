@@ -279,12 +279,16 @@ const MapaPage = ({
 
                     <div style={{
                         display: 'flex',
-                        flexDirection: 'column',
+                        flexDirection: esMovil ? 'row' : 'column',
                         gap: '8px',
                         maxHeight: esMovil ? 'auto' : '70vh', // Para que no se desborde el menú
-                        overflowY: 'auto', // Permite scroll si hay muchos ejes
+                        overflowX: esMovil ? 'auto' : 'hidden',
+                        overflowY: esMovil ? 'hidden' : 'auto',
+                        paddingBottom: esMovil ? '10px' : '0',
                         paddingRight: '5px',
-                        scrollbarWidth: 'thin',
+                        scrollbarWidth: 'none', // Ocultamos scrollbar feo en móviles
+                        msOverflowStyle: 'none',
+                        WebkitOverflowScrolling: 'touch',
                         scrollbarColor: '#d4af37 #000'
                     }}>
                         {['AUTORES', 'POSICIÓN', 'NO GI', 'GI', 'CLA',
@@ -315,7 +319,8 @@ const MapaPage = ({
                                             padding: esMovil ? '8px 15px' : '12px',
                                             borderRadius: esMovil ? '20px' : '5px',
                                             fontSize: esMovil ? '0.65rem' : '0.85rem',
-                                            cursor: 'pointer'
+                                            cursor: 'pointer',
+                                            flexShrink: 0
                                         }}
                                     >
                                         {cat}
