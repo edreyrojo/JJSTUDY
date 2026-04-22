@@ -7,6 +7,8 @@ const GestionAlumnosPage = ({ onBack, styles, usuario }) => {
     const [verArchivados, setVerArchivados] = useState(false);
     const [mostrarForm, setMostrarForm] = useState(false);
     const [editandoConfig, setEditandoConfig] = useState(false);
+    const [alumnoSeleccionado, setAlumnoSeleccionado] = useState(null); // Para el Panel Personal
+    const [editandoId, setEditandoId] = useState(null); // Para saber si estamos editando o creando
 
     // --- ESTADOS PARA CONFIGURACIÓN (CON LOGO Y HORARIOS OBJETOS) ---
     const [config, setConfig] = useState({
@@ -162,38 +164,43 @@ const GestionAlumnosPage = ({ onBack, styles, usuario }) => {
 
     // 6. FUNCIONES DE GUARDADO Y ELIMINACIÓN
     const handleGuardarAlumno = async () => {
-    // 1. Validaciones de seguridad
-    if (!nuevo.nombre || !nuevo.fechaPago) {
-        alert("Nombre y fecha de pago son obligatorios.");
-        return;
-    }
+        if (!nuevo.nombre || !nuevo.fechaPago) {
+            alert("Nombre y fecha de pago son obligatorios.");
+            return;
+        }
 
-    // 2. Extraer el día para el semáforo de pagos
-    const diaExtraido = nuevo.fechaPago.split('-')[2];
+        const diaExtraido = nuevo.fechaPago.split('-')[2];
+        const idSede = usuario.academiaId || usuario.uid;
 
-    // 3. Identificar la academia (Dueño o Instructor vinculado)
-    const idSede = usuario.academiaId || usuario.uid;
+        try {
+            if (editandoId) {
+                // ACTUALIZAR ALUMNO EXISTENTE
+                await setDoc(doc(db, "alumnos", editandoId), {
+                    ...nuevo,
+                    diaPago: diaExtraido
+                }, { merge: true });
+                alert("¡Expediente actualizado! 🛡️");
+            } else {
+                // REGISTRAR NUEVO ALUMNO
+                await addDoc(collection(db, "alumnos"), {
+                    ...nuevo,
+                    diaPago: diaExtraido,
+                    academiaId: idSede,
+                    registradoPor: usuario.uid,
+                    activo: true,
+                    fechaRegistro: new Date().toISOString()
+                });
+                alert("¡Alumno registrado con éxito en el Vault! 🛡️");
+            }
 
-    try {
-        await addDoc(collection(db, "alumnos"), {
-            ...nuevo, // Esparcimos los datos del formulario (edad, tel, etc.)
-            diaPago: diaExtraido,
-            academiaId: idSede, // <--- VITAL para la jerarquía
-            registradoPor: usuario.uid, // <--- NUEVO: Para saber qué instructor lo inscribió
-            activo: true, // Aseguramos que entre como activo
-            fechaRegistro: new Date().toISOString()
-        });
-
-        alert("¡Alumno registrado con éxito en el Vault! 🛡️");
-        setMostrarForm(false);
-        setNuevo(estadoAlumnoInicial);
-
-    } catch (e) {
-        console.error("Error en el registro:", e);
-        // Si falla por permisos de Firebase, aquí te avisará
-        alert("Error de acceso al Vault. Revisa tu conexión o permisos de instructor.");
-    }
-};
+            setMostrarForm(false);
+            setEditandoId(null);
+            setNuevo(estadoAlumnoInicial);
+        } catch (e) {
+            console.error("Error al guardar:", e);
+            alert("Error de acceso al Vault.");
+        }
+    };
 
     const eliminarDefinitivo = async (id) => {
         if (window.confirm("¿ELIMINAR DEFINITIVAMENTE? Esta acción no se puede deshacer.")) {
@@ -276,19 +283,26 @@ const GestionAlumnosPage = ({ onBack, styles, usuario }) => {
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                                         <button onClick={() => {
+                                            setNuevo(alumno);
+                                            setEditandoId(alumno.id);
+                                            setMostrarForm(true);
+                                        }} style={{ background: 'none', border: 'none', fontSize: '0.8rem', cursor: 'pointer' }}>EDITAR</button>
+                                        <button onClick={() => {
                                             const msj = alumno.activo ? "¿Archivar?" : "¿Reactivar?";
                                             if (window.confirm(msj)) updateDoc(doc(db, "alumnos", alumno.id), { activo: !alumno.activo });
-                                        }} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer' }}>
-                                            {alumno.activo ? '📦' : '♻️'}
+                                        }} style={{ background: 'none', border: 'none', fontSize: '0.8rem', cursor: 'pointer' }}>
+                                            {alumno.activo ? 'VAULT' : '♻️'}
                                         </button>
                                         {verArchivados && (
                                             <button onClick={() => eliminarDefinitivo(alumno.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem' }}>🗑️</button>
                                         )}
                                     </div>
                                 </div>
+
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#666', borderTop: '1px solid #222', paddingTop: '8px' }}>
-                                    <span>📱 {alumno.contacto || '-'}</span>
-                                    <span>📸 {alumno.redes || '-'}</span>
+                                    <span onClick={() => setAlumnoSeleccionado(alumno)} style={{ cursor: 'pointer', color: '#d4af37', fontWeight: 'bold' }}>📄 EXPEDIENTE</span>
+                                    <span>📱 {alumno.telefono || '-'}</span>
+                                    <span>📸 {alumno.instagram || '-'}</span>
                                 </div>
                             </div>
                         );
@@ -499,6 +513,51 @@ const GestionAlumnosPage = ({ onBack, styles, usuario }) => {
                             <button onClick={handleUpdateConfig} style={{ ...styles.btnGold, flex: 1 }}>GUARDAR TODO</button>
                             <button onClick={() => setEditandoConfig(false)} style={{ ...styles.btnOutline, flex: 1 }}>CERRAR</button>
                         </div>
+                    </div>
+                </div>
+            )}
+            {/* --- PEGAR AQUÍ EL PANEL PERSONAL --- */}
+            {alumnoSeleccionado && (
+                <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.98)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1300, padding: '20px', boxSizing: 'border-box' }}>
+                    <div style={{ ...styles.card, width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto', padding: '30px' }}>
+                        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                            <div style={{ width: '100px', height: '100px', borderRadius: '50%', backgroundColor: '#111', margin: '0 auto', overflow: 'hidden', border: '2px solid #d4af37' }}>
+                                {alumnoSeleccionado.fotoBase64 ? <img src={alumnoSeleccionado.fotoBase64} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : <div style={{lineHeight:'100px', fontSize:'2rem'}}>🥋</div>}
+                            </div>
+                            <h2 style={{ ...styles.goldTitle, marginTop: '15px' }}>{alumnoSeleccionado.nombre.toUpperCase()}</h2>
+                            <p style={{ color: '#666', fontSize: '0.8rem' }}>{alumnoSeleccionado.programa} | {alumnoSeleccionado.horario}</p>
+                        </div>
+
+                        <div style={{ backgroundColor: '#111', padding: '15px', borderRadius: '10px', marginBottom: '20px', border: '1px solid #222' }}>
+                            <h4 style={{ color: '#d4af37', margin: '0 0 10px 0', fontSize: '0.8rem' }}>NOTAS TÉCNICAS Y SEGUIMIENTO:</h4>
+                            <textarea 
+                                id="notasTecnicasInput"
+                                style={{ ...styles.input, width: '100%', height: '150px', resize: 'none', fontSize: '0.85rem', boxSizing: 'border-box', border: '1px solid #333' }}
+                                defaultValue={alumnoSeleccionado.notasTecnicas}
+                                placeholder="Escribe aquí el progreso técnico, debilidades o comentarios..."
+                            />
+                            <button 
+                                onClick={async () => {
+                                    const nuevasNotas = document.getElementById('notasTecnicasInput').value;
+                                    await updateDoc(doc(db, "alumnos", alumnoSeleccionado.id), { notasTecnicas: nuevasNotas });
+                                    alert("Notas actualizadas. OSS! 🛡️");
+                                }}
+                                style={{ ...styles.btnGold, marginTop: '10px', fontSize: '0.7rem', width: '100%' }}
+                            >
+                                GUARDAR NOTAS DEL PROFESOR
+                            </button>
+                        </div>
+
+                        <div style={{ fontSize: '0.8rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', textAlign: 'left', borderTop: '1px solid #222', paddingTop: '15px' }}>
+                            <div><strong style={{color:'#d4af37'}}>Edad:</strong> {alumnoSeleccionado.edad || '-'}</div>
+                            <div><strong style={{color:'#d4af37'}}>WhatsApp:</strong> {alumnoSeleccionado.telefono || '-'}</div>
+                            <div><strong style={{color:'#d4af37'}}>Instagram:</strong> {alumnoSeleccionado.instagram || '-'}</div>
+                            <div><strong style={{color:'#d4af37'}}>Experiencia:</strong> {alumnoSeleccionado.tieneExperiencia === 'si' ? alumnoSeleccionado.tiempoExperiencia : 'No'}</div>
+                            <div style={{ gridColumn: '1/-1' }}><strong style={{color:'#d4af37'}}>Emergencia:</strong> {alumnoSeleccionado.contactoEmergenciaNombre} ({alumnoSeleccionado.contactoEmergenciaTel})</div>
+                            <div style={{ gridColumn: '1/-1' }}><strong style={{color:'#d4af37'}}>Condición Médica:</strong> {alumnoSeleccionado.condicionEspecial || 'Ninguna'}</div>
+                        </div>
+
+                        <button onClick={() => setAlumnoSeleccionado(null)} style={{ ...styles.btnOutline, width: '100%', marginTop: '20px' }}>CERRAR EXPEDIENTE</button>
                     </div>
                 </div>
             )}
