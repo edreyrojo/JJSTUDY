@@ -1,14 +1,18 @@
 import React from 'react';
 import { DB_INSTRUCCIONALES } from '../data/instruccionales'; // Asegúrate de que la ruta sea correcta
 const SUB_POSICIONES = [
-    'GUARDIA CERRADA', 'MEDIA GUARDIA', 'GUARDIA ABIERTA', 'PASES',
-    'CONTROL LATERAL', 'MONTADA', 'ESPALDA', 'NORTE-SUR'
+    'GUARDIA', 'MONTURA', 'TOMA DE ESPALDA', 'CRUZADA',
+    '100 KILOS', 'NORTE SUR', 'RODILLA EN EL ESTOMAGO', 'NORTE-SUR'
 ];
 
 const SUB_DEFENSAS = [
     'ESCAPES MONTADA', 'ESCAPES LATERAL', 'DEFENSA ESPALDA', 'RE-GUARDIA',
     'DEFENSA LEG LOCKS', 'DEFENSA TRIANGULO', 'DEFENSA ARM BAR', 'DEFENSA STRANGLES'
 ];
+const EJES_MAESTROS = ['AUTORES', 'POSICIÓN', 'NO GI', 'GI', 'CLA',
+    'SOMETIMIENTOS', 'ESCAPES', 'SWEEPS', 'DERRIBOS',
+    'PASES', 'GUARDIAS', 'SISTEMAS', 'FUNDAMENTOS',
+    'DEFENSA PERSONAL', 'CINTA', 'ORTODOXO', 'NEW SCHOOL'];
 const mapStyles = {
     layout: { display: 'flex', height: '100vh', backgroundColor: '#050505', overflow: 'hidden' },
     sidebar: { width: '250px', borderRight: '1px solid #222', padding: '20px', backgroundColor: '#0a0a0a' },
@@ -31,58 +35,47 @@ const MapaPage = ({
     // 1. ESTADOS
     const [terminoBusqueda, setTerminoBusqueda] = React.useState("");
     const [esMovil, setEsMovil] = React.useState(window.innerWidth < 768);
-    // 3. EL CAZADOR DE TÉCNICAS (Primero declaramos la variable)
+    // 3. EL CAZADOR DE TÉCNICAS (Optimizado para Ejes y Tags)
     const todasLasTecnicas = React.useMemo(() => {
-        return Object.keys(DB_INSTRUCCIONALES).flatMap(cursoKey =>
-            DB_INSTRUCCIONALES[cursoKey].volumenes.flatMap(vol =>
+        return Object.keys(DB_INSTRUCCIONALES).flatMap(cursoKey => {
+            const curso = DB_INSTRUCCIONALES[cursoKey];
+            return curso.volumenes.flatMap(vol =>
                 vol.partes.map(parte => {
-                    let sub = parte.subcategoria || "";
-                    const n = parte.nombre.toLowerCase();
-                    const cursoNom = cursoKey.toLowerCase();
+                    // Mantenemos soporte para subcategoría manual si existe
+                    const sub = (parte.subcategoria || "").trim();
 
-                    if (!sub) {
-                        const esCursoDefensa = cursoNom.includes('pillars') || cursoNom.includes('escapes') || cursoNom.includes('retention');
-
-                        // --- FILTRO DE DEFENSAS ---
-                        if (n.includes('escape') || n.includes('defensa') || n.includes('defense') || n.includes('counter') || esCursoDefensa) {
-                            if (n.includes('mount') || n.includes('montada')) sub = "ESCAPES MONTADA";
-                            else if (n.includes('side') || n.includes('lateral')) sub = "ESCAPES LATERAL";
-                            else if (n.includes('back') || n.includes('espalda')) sub = "DEFENSA ESPALDA";
-                            else if (n.includes('leg lock') || n.includes('heel hook')) sub = "DEFENSA LEG LOCKS";
-                            else if (n.includes('triang')) sub = "DEFENSA TRIANGULO";
-                            else if (n.includes('arm bar') || n.includes('armbar') || n.includes('joint lock') || n.includes('armlock')) sub = "DEFENSA ARM BAR";
-                            else if (n.includes('darce') || n.includes('guillotine') || n.includes('choke')) sub = "DEFENSA STRANGLES";
-                            else sub = "RE-GUARDIA";
-                        }
-                        // --- FILTRO DE DERRIBOS ---
-                        else if (n.includes('takedown') || n.includes('take down') || n.includes('standing') || n.includes('derribo') || cursoNom.includes('feet to floor')) {
-                            sub = "DERRIBOS";
-                        }
-                        // --- POSICIONES ---
-                        else if (n.includes('side control') || n.includes('lateral') || n.includes('100 kilos')) sub = "CONTROL LATERAL";
-                        else if (n.includes('half guard') || n.includes('media guardia')) sub = "MEDIA GUARDIA";
-                        else if (n.includes('closed guard') || n.includes('guardia cerrada')) sub = "GUARDIA CERRADA";
-                        else if (n.includes('mount') || n.includes('montada')) sub = "MONTADA";
-                        else if (n.includes('back') || n.includes('espalda')) sub = "ESPALDA";
-                        else if (n.includes('north south') || n.includes('norte sur')) sub = "NORTE-SUR";
-                    }
-
-                    return { ...parte, subcategoria: sub, curso: cursoKey, volNombre: vol.nombre };
+                    return {
+                        ...parte,
+                        subcategoria: sub,
+                        curso: cursoKey,
+                        tituloCurso: curso.titulo,
+                        volNombre: vol.nombre,
+                        // --- LOS NUEVOS PILARES ---
+                        eje: curso.eje || "OTROS",
+                        tags: curso.tags || []
+                    };
                 })
-            )
-        );
+            );
+        });
     }, []);
 
-    // 4. CHEQUEO DE CONSOLA (Ahora sí, después de definir la variable)
-    const chequeoArmBar = todasLasTecnicas.filter(t => t.subcategoria === "DEFENSA ARM BAR");
-    console.log("Videos en DEFENSA ARM BAR encontrados:", chequeoArmBar.length);
+    // 4. CHEQUEO DE DEPURACIÓN
+    React.useEffect(() => {
+        console.log("Total Técnicas Indexadas:", todasLasTecnicas.length);
+        // Ejemplo: ver cuántos videos hay de un Eje específico
+        const checkGuards = todasLasTecnicas.filter(t => t.eje === "GUARDS");
+        console.log("Videos en Eje GUARDS:", checkGuards.length);
+    }, [todasLasTecnicas]);
 
-    // 5. RESULTADOS DE BÚSQUEDA
+    // 5. RESULTADOS DE BÚSQUEDA (Mejorado para buscar en Curso también)
     const resultadosBusqueda = terminoBusqueda
-        ? todasLasTecnicas.filter(t => t.nombre.toLowerCase().includes(terminoBusqueda.toLowerCase())).slice(0, 10)
+        ? todasLasTecnicas.filter(t =>
+            t.nombre.toLowerCase().includes(terminoBusqueda.toLowerCase()) ||
+            t.tituloCurso.toLowerCase().includes(terminoBusqueda.toLowerCase())
+        ).slice(0, 10)
         : [];
 
-    // 6. LÓGICA DE NODOS
+    // 6. LÓGICA DE NODOS (El cerebro del Mapa)
     let nodosAMostrar = [];
     let tituloCentral = "";
 
@@ -92,53 +85,123 @@ const MapaPage = ({
     } else if (instrSel) {
         const cursoData = DB_INSTRUCCIONALES[instrSel];
         nodosAMostrar = cursoData?.volumenes?.map(v => ({ nombre: v.nombre, type: 'volumen', raw: v })) || [];
-        tituloCentral = instrSel;
+        tituloCentral = cursoData?.titulo || instrSel;
     } else if (autorSel) {
-        nodosAMostrar = Object.keys(DB_INSTRUCCIONALES).filter(key => DB_INSTRUCCIONALES[key].autor === autorSel).map(key => ({ nombre: key, id: key, type: 'curso' }));
+        nodosAMostrar = Object.keys(DB_INSTRUCCIONALES)
+            .filter(key => DB_INSTRUCCIONALES[key].autor === autorSel)
+            .map(key => ({ nombre: DB_INSTRUCCIONALES[key].titulo, id: key, type: 'curso' }));
         tituloCentral = autorSel;
     } else if (categoriaSel) {
         tituloCentral = categoriaSel;
 
-        if (categoriaSel === 'POSICIÓN' || categoriaSel === 'DEFENSAS') {
-            const lista = categoriaSel === 'POSICIÓN' ? SUB_POSICIONES : SUB_DEFENSAS;
-            nodosAMostrar = lista.map(item => ({ nombre: item, type: 'subcategoria' }));
+        // NIVEL A: EJE (ej. GUARDS)
+        if (EJES_MAESTROS.includes(categoriaSel)) {
+
+            if (categoriaSel === 'AUTORES') {
+                // Obtenemos autores únicos de la BD
+                const autores = [...new Set(Object.values(DB_INSTRUCCIONALES).map(c => c.autor))];
+                nodosAMostrar = autores.map(a => ({ nombre: a, type: 'autor' }));
+            }
+            else if (categoriaSel === 'POSICIÓN') {
+                // En lugar de ir a los tags, mostramos las 8 subcategorías fijas
+                nodosAMostrar = SUB_POSICIONES.map(p => ({ nombre: p, type: 'sub_posicion' }));
+            }
+            else {
+                // Obtenemos los Tags específicos de este eje (PASES, SWEEPS, etc.)
+                // Soporta que t.eje sea un String o un Array
+                const tagsDelEje = [...new Set(todasLasTecnicas
+                    .filter(t => Array.isArray(t.eje) ? t.eje.includes(categoriaSel) : t.eje === categoriaSel)
+                    .flatMap(t => t.tags))];
+
+                nodosAMostrar = tagsDelEje.map(tag => ({ nombre: tag, type: 'tag' }));
+            }
         }
-        else if (SUB_POSICIONES.includes(categoriaSel) || SUB_DEFENSAS.includes(categoriaSel)) {
-            // FILTRO CRÍTICO: Usamos trim() para limpiar espacios
-            nodosAMostrar = todasLasTecnicas
-                .filter(t => t.subcategoria.trim() === categoriaSel.trim())
-                .map(t => ({ nombre: t.nombre, id: t.id, type: 'parte' }));
-        }
-        else if (categoriaSel === 'DERRIBOS') {
-            nodosAMostrar = todasLasTecnicas.filter(t => t.subcategoria === "DERRIBOS").map(t => ({ nombre: t.nombre, id: t.id, type: 'parte' }));
-        }
-        else if (categoriaSel === 'AUTORES') {
-            const autores = ['Craig Jones', 'Eddie Bravo', 'John Danaher', 'Levi Jones-Leary', 'Bernardo Faria', 'Bruno Malfacine', 'Josef Chen', 'Paulo Marmund', 'Gordon Ryan'];
-            nodosAMostrar = autores.map(a => ({ nombre: a, type: 'autor' }));
-        } else {
-            const cursosFiltrados = Object.keys(DB_INSTRUCCIONALES).filter(key => DB_INSTRUCCIONALES[key].categorias?.includes(categoriaSel));
-            nodosAMostrar = cursosFiltrados.map(key => ({ id: key, nombre: DB_INSTRUCCIONALES[key].titulo, type: 'curso' }));
+        // 2. CASO: NO ES UN EJE (Es un autor específico o un tag específico)
+        else {
+            // Filtramos la BD una sola vez buscando coincidencia en autor o en tags
+            const cursosFiltrados = Object.keys(DB_INSTRUCCIONALES).filter(key => {
+                const curso = DB_INSTRUCCIONALES[key];
+                return (
+                    curso.autor === categoriaSel ||
+                    curso.tags?.includes(categoriaSel) ||
+                    curso.categorias?.includes(categoriaSel)
+                );
+            });
+
+            nodosAMostrar = cursosFiltrados.map(key => ({
+                id: key,
+                nombre: DB_INSTRUCCIONALES[key].titulo,
+                type: 'curso'
+            }));
         }
     }
 
-    // ... (Siguen handleNodeClick, irAtras y el return del Aside/Main igual que antes)
     // 7. FUNCIONES DE INTERACCIÓN
     const handleNodeClick = (nodo) => {
-        if (nodo.type === 'subcategoria') setCategoriaSel(nodo.nombre);
-        else if (nodo.type === 'autor') setAutorSel(nodo.nombre);
-        else if (nodo.type === 'curso') setInstrSel(nodo.id || nodo.nombre);
-        else if (nodo.type === 'volumen') setVolSel(nodo.raw);
-        else if (nodo.type === 'parte') onSelectVideo({ titulo: nodo.nombre, id: nodo.id });
-    };
+    // 1. Nodos que profundizan en el Mapa (Cambian la categoría central)
+    if (nodo.type === 'sub_posicion' || nodo.type === 'tag' || nodo.type === 'autor') {
+        setCategoriaSel(nodo.nombre);
+    }
+    
+    // 2. Nodos que entran al contenido del Instruccional
+    else if (nodo.type === 'curso') {
+        setInstrSel(nodo.id || nodo.nombre);
+    }
+    else if (nodo.type === 'volumen') {
+        setVolSel(nodo.raw);
+    }
+    else if (nodo.type === 'parte') {
+        onSelectVideo({ titulo: nodo.nombre, id: nodo.id });
+    }
+};
 
     const irAtras = () => {
-        if (SUB_POSICIONES.includes(categoriaSel)) setCategoriaSel('POSICIÓN');
-        else if (SUB_DEFENSAS.includes(categoriaSel)) setCategoriaSel('DEFENSAS');
-        else if (volSel) setVolSel(null);
-        else if (instrSel) setInstrSel(null);
-        else if (autorSel) setAutorSel(null);
-        else onBack();
-    };
+    // 1. Si estamos viendo un Volumen, regresamos al Curso
+    if (volSel) {
+        setVolSel(null);
+    } 
+    // 2. Si estamos viendo un Curso, regresamos al nivel anterior (Autor, Sub-posición o Tag)
+    else if (instrSel) {
+        setInstrSel(null);
+    } 
+    // 3. Si estamos viendo un Autor, regresamos a la lista de Autores
+    else if (autorSel) {
+        setAutorSel(null);
+    } 
+    // 4. Lógica de Navegación Profunda (Tags y Sub-posiciones)
+    else if (categoriaSel) {
+        
+        // A. Si es una Sub-posición (ej: Guardia), regresamos al eje maestro 'POSICIÓN'
+        if (SUB_POSICIONES.includes(categoriaSel)) {
+            setCategoriaSel('POSICIÓN');
+        } 
+        
+        // B. Si es un Eje Maestro (ej: POSICIÓN, PASES, AUTORES), volvemos al Home
+        else if (EJES_MAESTROS.includes(categoriaSel)) {
+            onBack();
+        } 
+        
+        // C. Si es un Tag o un Autor (ej: "Half Guard" o "Craig Jones")
+        else {
+            // Buscamos a qué eje o sub-posición pertenece para saber a dónde volver
+            const tecnica = todasLasTecnicas.find(t => t.tags.includes(categoriaSel));
+            
+            if (tecnica) {
+                // Si el tag es de una sub-posición, volvemos a esa sub-posición
+                // Si no, volvemos al eje principal
+                const posibleSub = SUB_POSICIONES.find(p => tecnica.tags.includes(p));
+                setCategoriaSel(posibleSub || (Array.isArray(tecnica.eje) ? tecnica.eje[0] : tecnica.eje));
+            } else {
+                setCategoriaSel(null);
+                onBack();
+            }
+        }
+    } 
+    // 5. Seguridad: Si no hay nada seleccionado, al Home
+    else {
+        onBack();
+    }
+};
 
     // 8. RENDERIZADO
     return (
@@ -216,43 +279,49 @@ const MapaPage = ({
 
                     <div style={{
                         display: 'flex',
-                        flexDirection: esMovil ? 'row' : 'column',
-                        overflowX: esMovil ? 'auto' : 'visible',
+                        flexDirection: 'column',
                         gap: '8px',
-                        scrollbarWidth: 'none'
+                        maxHeight: esMovil ? 'auto' : '70vh', // Para que no se desborde el menú
+                        overflowY: 'auto', // Permite scroll si hay muchos ejes
+                        paddingRight: '5px',
+                        scrollbarWidth: 'thin',
+                        scrollbarColor: '#d4af37 #000'
                     }}>
-                        {['DEFENSAS', 'POSICIÓN', 'DERRIBOS', 'AUTORES', 'JUEGOS'].map(cat => {
-                            // Lógica para mantener encendido el botón si estamos en una subcategoría
-                            const estaActivo = categoriaSel === cat ||
-                                (cat === 'POSICIÓN' && SUB_POSICIONES.includes(categoriaSel)) ||
-                                (cat === 'DEFENSAS' && SUB_DEFENSAS.includes(categoriaSel));
+                        {['AUTORES', 'POSICIÓN', 'NO GI', 'GI', 'CLA',
+                            'SOMETIMIENTOS', 'ESCAPES', 'SWEEPS', 'DERRIBOS',
+                            'PASES', 'GUARDIAS', 'SISTEMAS', 'FUNDAMENTOS',
+                            'DEFENSA PERSONAL', 'CINTA', 'ORTODOXO', 'NEW SCHOOL'].map(cat => {
+                                // Lógica para mantener encendido el botón si estamos en una subcategoría
+                                const estaActivo = categoriaSel === cat ||
+                                    (cat === 'POSICIÓN' && SUB_POSICIONES.includes(categoriaSel)) ||
+                                    (cat === 'D EFENSAS' && SUB_DEFENSAS.includes(categoriaSel));
 
-                            return (
-                                <div
-                                    key={cat}
-                                    onClick={() => {
-                                        setCategoriaSel(cat);
-                                        setAutorSel(null);
-                                        setInstrSel(null);
-                                        setVolSel(null);
-                                        setTerminoBusqueda("");
-                                    }}
-                                    style={{
-                                        ...mapStyles.sideItem,
-                                        backgroundColor: estaActivo ? '#d4af37' : '#111',
-                                        color: estaActivo ? '#000' : '#fff',
-                                        border: '1px solid #d4af37',
-                                        whiteSpace: 'nowrap',
-                                        padding: esMovil ? '8px 15px' : '12px',
-                                        borderRadius: esMovil ? '20px' : '5px',
-                                        fontSize: esMovil ? '0.65rem' : '0.85rem',
-                                        cursor: 'pointer'
-                                    }}
-                                >
-                                    {cat}
-                                </div>
-                            );
-                        })}
+                                return (
+                                    <div
+                                        key={cat}
+                                        onClick={() => {
+                                            setCategoriaSel(cat);
+                                            setAutorSel(null);
+                                            setInstrSel(null);
+                                            setVolSel(null);
+                                            setTerminoBusqueda("");
+                                        }}
+                                        style={{
+                                            ...mapStyles.sideItem,
+                                            backgroundColor: estaActivo ? '#d4af37' : '#111',
+                                            color: estaActivo ? '#000' : '#fff',
+                                            border: '1px solid #d4af37',
+                                            whiteSpace: 'nowrap',
+                                            padding: esMovil ? '8px 15px' : '12px',
+                                            borderRadius: esMovil ? '20px' : '5px',
+                                            fontSize: esMovil ? '0.65rem' : '0.85rem',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        {cat}
+                                    </div>
+                                );
+                            })}
                     </div>
                 </div>
             </aside>

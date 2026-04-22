@@ -3,6 +3,8 @@ export const DB_INSTRUCCIONALES = {
     'Octopus Guard 2.0': {
         titulo: "Octopus Guard 2.0",
         autor: "Craig Jones",
+        eje: ["ESCAPES", "NO GI", "SWEEPS",],
+        tags: ["OCTOPUS"],
         volumenes: [
             {
                 id: "V1",
@@ -62,6 +64,8 @@ export const DB_INSTRUCCIONALES = {
     'OCTOPUS GUARD': {
         titulo: "OCTOPUS GUARD",
         autor: "Craig Jones",
+        eje: ["GUARDIAS","NO GI"],
+        tags: ["OCTOPUS"],
         volumenes: [
             {
                 nombre: "Volumen 1, 2 y 3",
@@ -79,6 +83,8 @@ export const DB_INSTRUCCIONALES = {
     'How To Pass Quickly': {
         titulo: "How To Pass Quickly",
         autor: "Craig Jones",
+        eje: "PASES",
+        tags: ["PASES CRAIG JONES"],
         volumenes: [
             {
                 nombre: "Volumenes",
@@ -97,6 +103,8 @@ export const DB_INSTRUCCIONALES = {
     'Get Off My Legs Gringo': {
         titulo: "Get Off My Legs Gringo",
         autor: "Craig Jones",
+        eje: "ESCAPES",
+        tags: ["LEG-LOCKS"],
         volumenes: [
             {
                 nombre: "Volumen 1",
@@ -136,9 +144,11 @@ export const DB_INSTRUCCIONALES = {
             },
         ]
     },
-    ' Xanadu Back Takes': {
+    'Xanadu Back Takes': {
         titulo: "Xanadu Back Takes",
         autor: "Levi Jones-Leary",
+        eje: "GUARDIAS",
+        tags: ["XANADU",],
         volumenes: [
             {
                 nombre: "Volumen 1",
@@ -169,6 +179,8 @@ export const DB_INSTRUCCIONALES = {
     'Xanadu Guard': {
         titulo: "Xanadu Guard",
         autor: "Levi Jones-Leary",
+        eje: "GUARDIAS" ,
+        tags: ["XANADU"],
         volumenes: [
             {
                 nombre: "Volumen 1",
@@ -209,6 +221,8 @@ export const DB_INSTRUCCIONALES = {
     'LEG DRAG': {
         titulo: "LEG DRAG",
         autor: "Levi Jones-Leary",
+        eje: "PASES" ,
+        tags: ["ENTRADAS"],
         volumenes: [
             {
                 nombre: "V1.- OVER VIEW",
@@ -317,6 +331,8 @@ export const DB_INSTRUCCIONALES = {
     'Crucifix - Levi Jones-Leary - Submeta': {
         titulo: "CRUCIFIX",
         autor: "Levi Jones-Leary",
+        eje: "SOMETIMIENTOS",
+        tags: ["CHOKES"],
         volumenes: [
             {
                 id: "1 · Intro to Course",
@@ -386,6 +402,8 @@ export const DB_INSTRUCCIONALES = {
     'OTROS': {
         titulo: "OTROS",
         autor: "Levi Jones-Leary",
+        eje: "NEW SCHOOL" ,
+        tags: ["XANADU"],
         volumenes: [
             {
                 id: "VARIOS",
@@ -401,6 +419,8 @@ export const DB_INSTRUCCIONALES = {
     'How To Beat Bigger Guys: Guard': {
         titulo: "How To Beat Bigger Guys: Guard",
         autor: "Bruno Malfacine",
+        eje: ["SWEEPS" ,"GI",],
+        tags: ["GUARDIA"],
         volumenes: [
             {
                 nombre: "Guard 1",
@@ -431,6 +451,8 @@ export const DB_INSTRUCCIONALES = {
     'How To Beat Bigger Guys: HalfGuard': {
         titulo: "How To Beat Bigger Guys: HalfGuard",
         autor: "Bruno Malfacine",
+        eje: "GUARDIAS" ,
+        tags: ["HALF GUARD",],
         volumenes: [
             {
                 id: "How To Beat Bigger Guys: HalfGuard 1",
@@ -465,6 +487,8 @@ export const DB_INSTRUCCIONALES = {
     'How To Beat Bigger Guys: Open Guard': {
         titulo: "How To Beat Bigger Guys: Open Guard",
         autor: "Bruno Malfacine",
+        eje: ["GUARDIAS" ,"SWEEPS",],
+        tags: ["GUARDIA ABIERTA"],
         volumenes: [
             {
                 id: "BrunoMalfacinePassingVol1",
@@ -499,6 +523,8 @@ export const DB_INSTRUCCIONALES = {
     'Buggy Choke The World From Everywhere': {
         titulo: "Buggy Choke The World From Everywhere",
         autor: "Paulo Marmund",
+        eje: "SOMETIMIENTOS" ,
+        tags: ["CHOKES"],
         volumenes: [
             {
                 id: "V1",
@@ -508,21 +534,21 @@ export const DB_INSTRUCCIONALES = {
                 ]
             },
             {
-                id: "V1",
+                id: "V2",
                 nombre: "Volumen 2",
                 partes: [
                     { nombre: "PauloMarmundVol2", id: "1uGVDNr3c2UP6EsIvIhxYlE-kp-2scSx3" },
                 ]
             },
             {
-                id: "V1",
+                id: "V3",
                 nombre: "Volumen 3",
                 partes: [
                     { nombre: "PauloMarmundVol3", id: "1nMsh7-HKDeu9pi1hpxPvb9Jkltua8kVQ" },
                 ]
             },
             {
-                id: "V1",
+                id: "V4",
                 nombre: "Volumen 4",
                 partes: [
                     { nombre: "PauloMarmundVol4", id: "1zhIpQ9MMKTmqaS9kjFrYL1-Y6BH2rfwC" },
@@ -533,6 +559,8 @@ export const DB_INSTRUCCIONALES = {
     'RICKSON GRACIE ACADEMY': {
         titulo: "RICKSON GRACIE ACADEMY",
         autor: "Gracies",
+        eje: ["FUNDAMENTOS" ,"DEFENSA PERSONAL","ORTODOXO",],
+        tags: ["GRACIES"],
         volumenes: [
             {
                 id: "Weight Distribution",
@@ -742,6 +770,8 @@ export const DB_INSTRUCCIONALES = {
     'Jiu-Jitsu For Old Guys': {
         titulo: "Jiu-Jitsu For Old Guys",
         autor: "Bernardo Faria",
+        eje: "FUNDAMENTOS" ,
+        tags: ["ADULTOS MAYORES"],
         volumenes: [
             {
                 id: "Jiu-JitsuForOldGuys",
@@ -758,13 +788,14 @@ export const DB_INSTRUCCIONALES = {
     'Mastering The Twister': {
         titulo: "Mastering The Twister",
         autor: "Eddie Bravo",
+        eje: "SISTEMAS" ,
+        tags: ["10TH PLANET"],
         volumenes: [
             {
                 id: "Mastering the Twister Eddie Bravo",
                 nombre: "Mastering the Twister",
                 partes: [
-                    { nombre: "Mastering The Twister", id: "1fynP5-iG_yjInzoXHyNHC31K1aiQ__IB" },
-                ]
+                    { nombre: "Mastering The Twister", id: "1fynP5-iG_yjInzoXHyNHC31K1aiQ__IB" },]
             },
             {
                 id: "The Twister Eddie Bravo - The Movie",
@@ -775,8 +806,10 @@ export const DB_INSTRUCCIONALES = {
         ]
     },
     'LOCK DOWN': {
-        titulo: "titulo",
+        titulo: "LOCK DOWN",
         autor: "Eddie Bravo",
+        eje: "SWEEPS" ,
+        tags: ["10TH PLANET"],
         volumenes: [
             {
                 id: "LOCKDOWN",
@@ -788,8 +821,10 @@ export const DB_INSTRUCCIONALES = {
         ]
     },
     'The RubberGuard': {
-        titulo: "titulo",
+        titulo: "THE RUBBERGUARD",
         autor: "Eddie Bravo",
+        eje: "NEW SCHOOL" ,
+        tags: ["10TH PLANET",],
         volumenes: [
             {
                 id: "Mastering the Rubber Guard",
@@ -812,9 +847,11 @@ export const DB_INSTRUCCIONALES = {
             },
         ]
     },
-    'Other': {
-        titulo: "Getting Swole as A Grappler by Gordon Ryan",
+    'Getting Swole as A Grappler by Gordon Ryan': {
+        titulo: "Getting Swole as A Grappler",
         autor: "Gordon Ryan",
+        eje: "SISTEMAS" ,
+        tags: ["NEW WAVE"],
         volumenes: [
             {
                 id: "Getting Swole as A Grappler",
@@ -841,6 +878,8 @@ export const DB_INSTRUCCIONALES = {
     'Passing': {
         titulo: "Passing",
         autor: "Gordon Ryan",
+        eje: "PASES" ,
+        tags: ["PINNING",],
         volumenes: [
             {
                 id: "High Percentage Gi Passes",
@@ -872,6 +911,8 @@ export const DB_INSTRUCCIONALES = {
     'Pillars Of Defense': {
         titulo: "Pillars Of Defense",
         autor: "Gordon Ryan",
+        eje: "SISTEMAS" ,
+        tags: ["NEW WAVE"],
         volumenes: [
             {
                 id: "The Pillars Of Defense_ Back Escapes By Gordon Ryan",
@@ -994,6 +1035,8 @@ export const DB_INSTRUCCIONALES = {
     'Systematically Attacking From': {
         titulo: "Systematically Attacking From",
         autor: "Gordon Ryan",
+        eje: "SOMETIMIENTOS" ,
+        tags: ["NEW WAVE"],
         volumenes: [
             {
                 id: "Systematically Attacking From Closed Guard By Gordon Ryan (formerly ‘Systemizing closed guard’)",
@@ -1082,6 +1125,8 @@ export const DB_INSTRUCCIONALES = {
     'Systematically Attacking The': {
         titulo: "Systematically Attacking The",
         autor: "Gordon Ryan",
+        eje: "SOMETIMIENTOS" ,
+        tags: ["NEW WAVE"],
         volumenes: [
             {
                 id: "Systematically Attacking The Arm Bar By Gordon Ryan",
@@ -1220,6 +1265,8 @@ export const DB_INSTRUCCIONALES = {
     'My Evolution Your Revolution': {
         titulo: "My Evolution Your Revolution",
         autor: "Gordon Ryan",
+        eje: "NO GI" ,
+        tags: ["NEW WAVE"],
         volumenes: [
             {
                 id: "My Evolution Your Revolution ADCC 2017",
@@ -1263,8 +1310,10 @@ export const DB_INSTRUCCIONALES = {
         ]
     },
     'TRIPOD PASSING JOZEF CHEN': {
-        titulo: "TRIPOD PASSING JOZEF CHEN",
+        titulo: "TRIPOD PASSING",
         autor: "Jozef Chen",
+        eje: ["PASES" ,"NO GI",],
+        tags: ["BODY LOCK"],
         volumenes: [
             {
                 id: "TRIPOD PASSING JOZEF CHEN",
@@ -1283,6 +1332,8 @@ export const DB_INSTRUCCIONALES = {
     'AOJ K Guard Masterclass by Cole Abate': {
         titulo: "K Guard Masterclass",
         autor: "Cole Abate",
+        eje: ["GUARDIAS" ,"GI"],
+        tags: ["ART OF JIU JITSU",],
         volumenes: [
             {
                 id: "AOJ K Guard Masterclass by Cole Abate",
@@ -1307,6 +1358,8 @@ export const DB_INSTRUCCIONALES = {
     'AOJ Duck Under Masterclass by Cole Abate': {
         titulo: "AOJ Duck Under Masterclass",
         autor: "Cole Abate",
+        eje: "PASES" ,
+        tags: ["ART OF JIU JITSU"],
         volumenes: [
             {
                 id: "Duck Under Masterclass",
@@ -1405,9 +1458,11 @@ export const DB_INSTRUCCIONALES = {
             },
         ]
     },
-    'Enter The System': {
-        titulo: "ARM BAR",
+    'Enter The System By John Danaher': {
+        titulo: "ENTER THE SYSTEM",
         autor: "John Danaher",
+        eje: ["SISTEMAS" , "NEW SCHOOL"],
+        tags: ["NEW WAVE"],
         volumenes: [
             {
                 id: "Enter The System Arm Bar - John Danaher",
@@ -1498,6 +1553,8 @@ export const DB_INSTRUCCIONALES = {
     'Go Further Faster': {
         titulo: "Go Further Faster",
         autor: "John Danaher",
+        eje: "SISTEMAS" ,
+        tags: ["NEW WAVE"],
         volumenes: [
             {
                 id: "Go Further Faster Closed Guard by John Danaher",
@@ -1613,9 +1670,11 @@ export const DB_INSTRUCCIONALES = {
             },
         ]
     },
-    'GI': {
-        titulo: "Ageless Jiu Jitsu_ Bottom Game Gi",
+    'GI AGELESS': {
+        titulo: "BOTTOM AND TOP GI",
         autor: "John Danaher",
+        eje: "GI" ,
+        tags: ["AGELESS"],
         volumenes: [
             {
                 id: "Ageless Jiu Jitsu_ Bottom Game Gi By John Danaher",
@@ -1646,9 +1705,11 @@ export const DB_INSTRUCCIONALES = {
             },
         ]
     },
-    'NO GI': {
-        titulo: "Ageless Jiu Jitsu_ Bottom Game NoGi",
+    'NO GI AGELESS': {
+        titulo: "BOTTOM AND TOP Game NoGi",
         autor: "John Danaher",
+        eje: "NO GI" ,
+        tags: ["AGELESS"],
         volumenes: [
             {
                 id: "Ageless Jiu Jitsu_ Bottom Game NoGi By John Danaher",
@@ -1683,6 +1744,8 @@ export const DB_INSTRUCCIONALES = {
     'Feet to Floor': {
         titulo: "Feet To Floor ; Volume 1 Fundamental Standing Skills",
         autor: "John Danaher",
+        eje: ["SISTEMAS" ,"DERRIBOS","GI"],
+        tags: ["NEW WAVE"],
         volumenes: [
             {
                 id: "Feet To Floor ; Volume 1 Fundamental Standing Skills",
@@ -1703,6 +1766,8 @@ export const DB_INSTRUCCIONALES = {
     'Youtube': {
         titulo: "videos",
         autor: "John Danaher",
+        eje: "OTROS" ,
+        tags: ["COMPETENCIAS", "YOUTUBE", "COACHING", "FUNDAMENTALS"],
         volumenes: [
             {
                 id: "YOUTUBE DANAHER",
@@ -1723,6 +1788,8 @@ export const DB_INSTRUCCIONALES = {
     'Gracie Combatives 2.0': {
         titulo: "Gracie Combatives 2.0",
         autor: "Gracies",
+        eje: "FUNDAMENTOS" ,
+        tags: ["GRACIES",],
         volumenes: [
             {
                 id: "Gracie Combatives 2.0",
@@ -1784,7 +1851,8 @@ export const DB_INSTRUCCIONALES = {
     'Task Based Games to Rapidly Improve your Jiu-jitsu by Kit Dale': {
         titulo: "Task Based Games to Rapidly Improve your Jiu-jitsu",
         autor: "Kit Dale",
-        categorias: ["DERRIBOS", "JUEGOS"],
+        eje: ["CLA" , "NO GI",],
+        tags: ["NO GI GAMES", ],
         volumenes: [
             {
                 id: "Control Games",
@@ -1893,10 +1961,11 @@ export const DB_INSTRUCCIONALES = {
             },
         ]
     },
-    'jiu jitsu Games': {
+    'jiu jitsu Games By Kyvanng': {
         titulo: "jiu jitsu Games",
         autor: "Kyvanng, Bodega Jiu-Jitsu",
-        categorias: ["DERRIBOS", "JUEGOS"],
+        eje: ["CLA","NO GI",] ,
+        tags: ["NO GI GAMES"],
         volumenes: [
             {
                 id: "Volumen 1",
@@ -2092,10 +2161,11 @@ export const DB_INSTRUCCIONALES = {
             },
         ]
     },
-    'GI GAMES': {
+    'GI GAMES BY Jordan Preisinger': {
         titulo: "GI GAMES",
         autor: "Jordan Preisinger",
-        categorias: ["", "JUEGOS"],
+        eje: ["CLA","GI",],
+        tags: ["GI GAMES",],
         volumenes: [
             {
                 id: "GI GAMES",
@@ -2140,10 +2210,11 @@ export const DB_INSTRUCCIONALES = {
             },
         ]
     },
-    'name': {
-        titulo: "name",
+    'PRUEBA': {
+        titulo: "TITULO",
         autor: "Autor",
-        categorias: ["DERRIBOS", "JUEGOS"],
+        eje: "EJEMPLO" ,
+        tags: ["EJEMPLO"],
         volumenes: [
             {
                 id: "Volumen",
