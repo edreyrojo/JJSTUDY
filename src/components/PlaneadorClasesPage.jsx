@@ -61,56 +61,109 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
         onBack();
     };
 
-    // --- LÓGICA DE SONIDO (CAMPANA) ---
-    const playBeep = (freq = 440, duration = 2) => {
-        try {
-            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            const oscillator = audioCtx.createOscillator();
-            const gainNode = audioCtx.createGain();
+    // 1. Necesitamos referencias persistentes para el audio y el bloqueo de pantalla
+const audioCtxRef = React.useRef(null);
+const wakeLockRef = React.useRef(null);
 
-            oscillator.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
+// Función para asegurar que el audio esté "despierto" en móviles
+const initAudio = async () => {
+    if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtxRef.current.state === 'suspended') {
+        await audioCtxRef.current.resume();
+    }
+};
 
-            oscillator.type = 'triangle';
-            oscillator.frequency.value = freq;
-
-            const now = audioCtx.currentTime;
-            gainNode.gain.setValueAtTime(0.5, now);
-            gainNode.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-
-            oscillator.start(now);
-            oscillator.stop(now + duration);
-        } catch (e) { console.error("Audio error", e); }
-    };
-
-    const playTripleCampana = () => {
-        playBeep(1200, 2);
-        setTimeout(() => playBeep(1200, 2), 300);
-        setTimeout(() => playBeep(1200, 3), 600);
-    };
-
-    // --- LÓGICA DEL TIMER ---
-    useEffect(() => {
-        let interval = null;
-        if (timerActive && timeLeft > 0) {
-            if (timeLeft <= 5) playBeep(600, 0.5);
-            interval = setInterval(() => {
-                setTimeLeft(prev => {
-                    if (prev <= 2 && isPrepTime) {
-                        setIsPrepTime(false);
-                        playBeep(800, 3);
-                        return currentTargetTime;
-                    }
-                    return prev - 1;
-                });
-            }, 1000);
-        } else if (timeLeft === 0 && timerActive) {
-            setTimerActive(false);
-            playTripleCampana();
-            if (interval) clearInterval(interval);
+// Función para evitar que el celular se apague (Wake Lock)
+const requestWakeLock = async () => {
+    try {
+        if ('wakeLock' in navigator) {
+            wakeLockRef.current = await navigator.wakeLock.request('screen');
         }
-        return () => { if (interval) clearInterval(interval); };
-    }, [timerActive, timeLeft, isPrepTime, currentTargetTime]);
+    } catch (err) {
+        console.error("WakeLock Error:", err);
+    }
+};
+
+const playBeep = (freq = 440, duration = 2, forceVibrate = false) => {
+    try {
+        // Usamos la referencia persistente
+        if (!audioCtxRef.current) return; 
+
+        const oscillator = audioCtxRef.current.createOscillator();
+        const gainNode = audioCtxRef.current.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtxRef.current.destination);
+
+        oscillator.type = 'triangle';
+        oscillator.frequency.value = freq;
+
+        const now = audioCtxRef.current.currentTime;
+        gainNode.gain.setValueAtTime(0.5, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+        oscillator.start(now);
+        oscillator.stop(now + duration);
+
+        // VIBRACIÓN: Si el audio falla o está en silencio, el alumno siente el round
+        if (forceVibrate && "vibrate" in navigator) {
+            navigator.vibrate(duration * 200); // Vibra proporcional a la duración
+        }
+    } catch (e) { console.error("Audio error", e); }
+};
+
+const playTripleCampana = () => {
+    playBeep(1200, 1, true); // Añadimos vibración al final
+    setTimeout(() => playBeep(1200, 1, false), 300);
+    setTimeout(() => playBeep(1200, 2, true), 600);
+};
+
+// --- CAMBIO CLAVE EN EL INICIO DEL TIMER ---
+const startTimerWithPrep = async (minutos) => {
+    // ESTO DESBLOQUEA EL CELULAR: Debe ser gatillado por el click del usuario
+    await initAudio(); 
+    await requestWakeLock(); 
+
+    setCurrentTargetTime(minutos * 60);
+    setTimeLeft(30);
+    setIsPrepTime(true);
+    setTimerActive(true);
+    playBeep(500, 2, true);
+};
+
+// --- LÓGICA DEL TIMER (Se mantiene igual, solo ajustamos los beeps) ---
+useEffect(() => {
+    let interval = null;
+    if (timerActive && timeLeft > 0) {
+        // Beeps de cuenta regresiva (añadimos vibración corta)
+        if (timeLeft <= 5) playBeep(600, 0.5, true); 
+
+        interval = setInterval(() => {
+            setTimeLeft(prev => {
+                if (prev <= 1 && isPrepTime) { // Ajustado a 1 para mejor sincronía
+                    setIsPrepTime(false);
+                    playBeep(800, 3, true); // Inicio de round: vibración fuerte
+                    return currentTargetTime;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+    } else if (timeLeft === 0 && timerActive) {
+        setTimerActive(false);
+        playTripleCampana();
+        
+        // Liberamos el bloqueo de pantalla al terminar
+        if (wakeLockRef.current) {
+            wakeLockRef.current.release();
+            wakeLockRef.current = null;
+        }
+    }
+    return () => { 
+        if (interval) clearInterval(interval); 
+    };
+}, [timerActive, timeLeft, isPrepTime, currentTargetTime]);
 
     const startTimerWithPrep = (minutos) => {
         setCurrentTargetTime(minutos * 60);
