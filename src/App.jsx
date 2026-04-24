@@ -37,6 +37,23 @@ import LoginPage from './components/LoginPage';
 import HubPage from './components/HubPage';
 import InstalacionModal from './components/InstalacionModal';
 import { getAdjacentVideo } from './utils/videoHelpers';
+
+import Swal from 'sweetalert2';
+
+const notify = (mensaje, tipo = 'success') => {
+    Swal.fire({
+        text: mensaje,
+        icon: tipo, // 'success', 'error', 'warning', 'info'
+        background: '#0a0a0a',
+        color: '#fff',
+        confirmButtonColor: '#d4af37',
+        iconColor: tipo === 'success' ? '#4CAF50' : '#ff4444',
+        border: '1px solid #d4af37',
+        customClass: {
+            popup: 'gold-border-alert'
+        }
+    });
+};
 // --- 1. CONFIGURACIÓN DE ESTILOS ---
 const styles = {
   containerCenter: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh' },
@@ -191,11 +208,11 @@ export default function App() {
 
       // Feedback personalizado
       if (isAdmin) {
-        alert("¡Bienvenido, Ngasi! Acceso total concedido.");
+        notify("¡Bienvenido, Ngasi! Acceso total concedido.");
       } else if (rolAsignado === 'instructor') {
-        alert("Solicitud de Instructor enviada. El profesor debe validar tu cuenta para vincularte a la sede.");
+        notify("Solicitud de Instructor enviada. El profesor debe validar tu cuenta para vincularte a la sede.");
       } else {
-        alert("Solicitud enviada a La Fortuna. Espera a que el profesor valide tu perfil.");
+        notify("Solicitud enviada a La Fortuna. Espera a que el profesor valide tu perfil.");
       }
 
       setPage('login');
@@ -220,7 +237,7 @@ export default function App() {
           setVistos(data.vistos || []);
           setPage('hub');
         } else {
-          alert("Tu cuenta aún no ha sido validada por el profesor.");
+          notify("Tu cuenta aún no ha sido validada por el profesor.");
           // Usamos handleLogout para asegurar que Firebase cierre la sesión 
           // técnica que se abrió al intentar el login.
           handleLogout();
@@ -433,11 +450,11 @@ export default function App() {
         setUsuario(prev => ({ ...prev, notas: nuevasNotas }));
         localStorage.setItem('lafortuna_notas', JSON.stringify(nuevasNotas));
 
-        alert("Nota eliminada del Vault.");
+        notify("Nota eliminada del Vault.");
       }
     } catch (err) {
       console.error("Error al eliminar nota:", err);
-      alert("No se pudo eliminar la nota.");
+      notify("No se pudo eliminar la nota.");
     }
   };
 

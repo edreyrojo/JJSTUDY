@@ -7,7 +7,21 @@ import {
     updateDoc,
     deleteDoc
 } from 'firebase/firestore';
-
+import Swal from 'sweetalert2';
+const notify = (mensaje, tipo = 'success') => {
+    Swal.fire({
+        text: mensaje,
+        icon: tipo, // 'success', 'error', 'warning', 'info'
+        background: '#0a0a0a',
+        color: '#fff',
+        confirmButtonColor: '#d4af37',
+        iconColor: tipo === 'success' ? '#4CAF50' : '#ff4444',
+        border: '1px solid #d4af37',
+        customClass: {
+            popup: 'gold-border-alert'
+        }
+    });
+};
 const AdminPage = ({ onBack }) => {
     const [usuarios, setUsuarios] = useState([]);
     const [tickets, setTickets] = useState([]);
@@ -49,7 +63,7 @@ const AdminPage = ({ onBack }) => {
             await updateDoc(userRef, nuevosDatos);
             obtenerDatos(); // Refrescar lista
         } catch (error) {
-            alert("Error: " + error.message);
+            notify("Error: " + error.message);
         }
     };
 
@@ -59,7 +73,7 @@ const AdminPage = ({ onBack }) => {
             await deleteDoc(doc(db, "soporte", id));
             obtenerDatos(); // Refrescar lista
         } catch (error) {
-            alert("Error al eliminar ticket.");
+            notify("Error al eliminar ticket.");
         }
     };
 
@@ -256,7 +270,7 @@ const AdminPage = ({ onBack }) => {
                                                     if (!cursoId) return;
 
                                                     const listaActual = u.cursos_liberados || [];
-                                                    if (listaActual.includes(cursoId)) return alert("El usuario ya tiene este acceso.");
+                                                    if (listaActual.includes(cursoId)) return notify("El usuario ya tiene este acceso.");
 
                                                     actualizarUsuario(u.id, { cursos_liberados: [...listaActual, cursoId] });
                                                     el.value = ""; // Limpiar input

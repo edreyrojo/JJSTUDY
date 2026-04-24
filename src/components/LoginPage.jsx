@@ -1,5 +1,19 @@
 import React from 'react';
-
+import Swal from 'sweetalert2';
+const notify = (mensaje, tipo = 'success') => {
+    Swal.fire({
+        text: mensaje,
+        icon: tipo, // 'success', 'error', 'warning', 'info'
+        background: '#0a0a0a',
+        color: '#fff',
+        confirmButtonColor: '#d4af37',
+        iconColor: tipo === 'success' ? '#4CAF50' : '#ff4444',
+        border: '1px solid #d4af37',
+        customClass: {
+            popup: 'gold-border-alert'
+        }
+    });
+};
 const LoginPage = ({
     onLogin,
     onRegister,

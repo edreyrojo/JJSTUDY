@@ -2,6 +2,21 @@ import React, { useState, useEffect } from 'react';
 // IMPORTANTE: Necesitas estas importaciones para Firestore
 import { db } from '../firebase';
 import { doc, setDoc, addDoc, collection } from 'firebase/firestore';
+import Swal from 'sweetalert2';
+const notify = (mensaje, tipo = 'success') => {
+    Swal.fire({
+        text: mensaje,
+        icon: tipo, // 'success', 'error', 'warning', 'info'
+        background: '#0a0a0a',
+        color: '#fff',
+        confirmButtonColor: '#d4af37',
+        iconColor: tipo === 'success' ? '#4CAF50' : '#ff4444',
+        border: '1px solid #d4af37',
+        customClass: {
+            popup: 'gold-border-alert'
+        }
+    });
+};
 
 const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos = [], toggleVisto, usuario, styles = {}, getAdjacentVideo }) => {
     // --- ESTADOS EXISTENTES ---

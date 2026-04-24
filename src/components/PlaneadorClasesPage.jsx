@@ -13,7 +13,21 @@ import {
     deleteDoc,
     where
 } from 'firebase/firestore';
-
+import Swal from 'sweetalert2';
+const notify = (mensaje, tipo = 'success') => {
+    Swal.fire({
+        text: mensaje,
+        icon: tipo, // 'success', 'error', 'warning', 'info'
+        background: '#0a0a0a',
+        color: '#fff',
+        confirmButtonColor: '#d4af37',
+        iconColor: tipo === 'success' ? '#4CAF50' : '#ff4444',
+        border: '1px solid #d4af37',
+        customClass: {
+            popup: 'gold-border-alert'
+        }
+    });
+};
 const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
     const [clases, setClases] = useState([]);
     const [alumnos, setAlumnos] = useState([]);
@@ -24,11 +38,25 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
     const [isPrepTime, setIsPrepTime] = useState(false);
     const [currentTargetTime, setCurrentTargetTime] = useState(0);
 
-    const intentarVolver = () => {
+    const intentarVolver = async () => {
         if (modo === 'clase_activa') {
-            const confirmar = window.confirm("¡Atención! Tienes una sesión de entrenamiento activa. Si sales ahora, el cronómetro se detendrá y perderás el progreso actual. ¿Realmente quieres abandonar?");
-            if (!confirmar) return;
+            const result = await Swal.fire({
+                title: '¿ABANDONAR SESIÓN?',
+                text: "¡Atención! Tienes una sesión de entrenamiento activa. Si sales ahora, el cronómetro se detendrá y perderás el progreso actual.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'SÍ, ABANDONAR',
+                cancelButtonText: 'MANTENER SESIÓN',
+                background: '#0a0a0a',
+                color: '#fff',
+                confirmButtonColor: '#ff4444', // Rojo para advertencia de pérdida de datos
+                cancelButtonColor: '#d4af37', // Dorado para quedarse
+                iconColor: '#ff4444'
+            });
+
+            if (!result.isConfirmed) return;
         }
+
         setTimerActive(false);
         onBack();
     };
@@ -135,12 +163,12 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
     };
 
     const guardarClase = async () => {
-        if (!nuevaClase.titulo) return alert("Falta título");
+        if (!nuevaClase.titulo) return notify("Falta título");
         try {
             await addDoc(collection(db, "clases"), { ...nuevaClase, academiaId: usuario.academiaId || usuario.uid, fechaRegistro: new Date().toISOString() });
             setModo('lista');
             setNuevaClase(estadoInicial);
-        } catch (e) { alert("Error al guardar"); }
+        } catch (e) { notify("Error al guardar"); }
     };
 
     const registrarAsistenciaConNota = async (alumnoId, nota) => {

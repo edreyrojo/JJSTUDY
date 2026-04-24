@@ -1,5 +1,20 @@
 import React from 'react';
 import { DB_INSTRUCCIONALES } from '../data/instruccionales'; // Asegúrate de que la ruta sea correcta
+import Swal from 'sweetalert2';
+const notify = (mensaje, tipo = 'success') => {
+    Swal.fire({
+        text: mensaje,
+        icon: tipo, // 'success', 'error', 'warning', 'info'
+        background: '#0a0a0a',
+        color: '#fff',
+        confirmButtonColor: '#d4af37',
+        iconColor: tipo === 'success' ? '#4CAF50' : '#ff4444',
+        border: '1px solid #d4af37',
+        customClass: {
+            popup: 'gold-border-alert'
+        }
+    });
+};
 const SUB_POSICIONES = [
     'GUARDIA', 'MONTURA', 'TOMA DE ESPALDA', 'CRUZADA',
     '100 KILOS', 'NORTE SUR', 'RODILLA EN EL ESTOMAGO', 'NORTE-SUR'

@@ -34,12 +34,12 @@ const HubPage = ({
                 estado: "pendiente",
                 rolAlMomento: userRole
             });
-            alert("Mensaje enviado a Ngasi. Revisaré el sistema pronto. 🛡️");
+            notify("Mensaje enviado a Ngasi. Revisaré el sistema pronto. 🛡️");
             setMensajeSoporte("");
             setShowSoporte(false);
         } catch (error) {
             console.error("Error soporte:", error);
-            alert("No se pudo enviar el reporte.");
+            notify("No se pudo enviar el reporte.");
         } finally {
             setEnviando(false);
         }
