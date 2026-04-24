@@ -52,8 +52,8 @@ const GestionAlumnosPage = ({ onBack, styles, usuario }) => {
     // 1. CARGAR CONFIGURACIÓN DE LA ACADEMIA
     useEffect(() => {
         if (!usuario?.uid) return;
-        const academiaId = usuario.academiaId || usuario.uid;
-        const docRef = doc(db, "academias", academiaId);
+        const idSede = usuario.academiaId || usuario.uid;
+        const docRef = doc(db, "academias", idSede);
 
         const unsubConfig = onSnapshot(docRef, (docSnap) => {
             if (docSnap.exists()) {
@@ -67,10 +67,12 @@ const GestionAlumnosPage = ({ onBack, styles, usuario }) => {
                         horario: data.horarios[0] ? `${data.horarios[0].hora} - ${data.horarios[0].nombre}` : ''
                     }));
                 }
+            } else {
+                console.warn("No se encontró el documento de la academia para la ID:", idSede);
             }
         });
         return () => unsubConfig();
-    }, [usuario]);
+    }, [usuario.academiaId, usuario.uid]);
 
     // 2. ESCUCHA DE ALUMNOS (CON FILTRO MULTISEDE)
     useEffect(() => {
@@ -92,7 +94,7 @@ const GestionAlumnosPage = ({ onBack, styles, usuario }) => {
         });
 
         return () => unsub();
-    }, [verArchivados, usuario]);
+    }, [verArchivados, usuario.academiaId, usuario.uid]);
 
     // 3. MANEJO DE FOTO ALUMNO Y LOGO ACADEMIA
     const handleFotoChange = (e) => {
@@ -170,22 +172,24 @@ const GestionAlumnosPage = ({ onBack, styles, usuario }) => {
         }
 
         const diaExtraido = nuevo.fechaPago.split('-')[2];
-        const idSede = usuario.academiaId || usuario.uid;
+        const idSede = usuario.academiaId || usuario.uid; // ID de Gustavo o la tuya
 
         try {
             if (editandoId) {
-                // ACTUALIZAR ALUMNO EXISTENTE
+                // --- ACTUALIZAR ALUMNO EXISTENTE ---
                 await setDoc(doc(db, "alumnos", editandoId), {
                     ...nuevo,
-                    diaPago: diaExtraido
+                    diaPago: diaExtraido,
+                    academiaId: idSede // <--- FORZAMOS EL ID AQUÍ PARA LAS REGLAS
                 }, { merge: true });
+                
                 alert("¡Expediente actualizado! 🛡️");
             } else {
-                // REGISTRAR NUEVO ALUMNO
+                // --- REGISTRAR NUEVO ALUMNO ---
                 await addDoc(collection(db, "alumnos"), {
                     ...nuevo,
                     diaPago: diaExtraido,
-                    academiaId: idSede,
+                    academiaId: idSede, // <--- VITAL
                     registradoPor: usuario.uid,
                     activo: true,
                     fechaRegistro: new Date().toISOString()
@@ -198,7 +202,8 @@ const GestionAlumnosPage = ({ onBack, styles, usuario }) => {
             setNuevo(estadoAlumnoInicial);
         } catch (e) {
             console.error("Error al guardar:", e);
-            alert("Error de acceso al Vault.");
+            // Si el error persiste, es casi seguro que es el tamaño de la foto o tu validación
+            alert("Error de acceso al Vault. Revisa el tamaño de la foto (max 1MB) o tu estado en ADMIN.");
         }
     };
 
