@@ -212,7 +212,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
 
                     <button
                         onClick={() => setMostrarReporte(true)}
-                        style={{ background: 'none', border: 'none', color: '#444', fontSize: '0.65rem', cursor: 'pointer', textDecoration: 'underline' }}
+                        style={{ background: 'none', border: 'none', color: '#ff6905', fontSize: '0.65rem', cursor: 'pointer', textDecoration: 'underline' }}
                     >
                         ¿Problemas con el video? Reportar fallo técnico
                     </button>

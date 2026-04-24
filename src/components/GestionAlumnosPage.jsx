@@ -9,7 +9,7 @@ const GestionAlumnosPage = ({ onBack, styles, usuario }) => {
     const [editandoConfig, setEditandoConfig] = useState(false);
     const [alumnoSeleccionado, setAlumnoSeleccionado] = useState(null); // Para el Panel Personal
     const [editandoId, setEditandoId] = useState(null); // Para saber si estamos editando o creando
-
+    const [codigoVinculacion, setCodigoVinculacion] = useState("");
     // --- ESTADOS PARA CONFIGURACIÓN (CON LOGO Y HORARIOS OBJETOS) ---
     const [config, setConfig] = useState({
         nombreAcademia: 'Tu Dojo',
@@ -234,7 +234,25 @@ const GestionAlumnosPage = ({ onBack, styles, usuario }) => {
             console.error("Error en Firebase:", e);
         }
     };
+    const handleVincularAcademia = async () => {
+        if (!codigoVinculacion.trim()) return alert("Por favor, pega un código válido.");
 
+        try {
+            const userRef = doc(db, "usuarios", usuario.uid);
+            await updateDoc(userRef, {
+                academiaId: codigoVinculacion.trim()
+            });
+
+            alert("¡Vinculación exitosa! Ahora eres parte de esta sede. Oss! 🛡️");
+            setEditandoConfig(false);
+
+            // Recargamos la página para que el sistema reconozca la nueva academiaId
+            window.location.reload();
+        } catch (e) {
+            console.error("Error al vincular:", e);
+            alert("Error al vincular. Verifica el código.");
+        }
+    };
     return (
         <div style={{ padding: '20px', backgroundColor: '#000', minHeight: '100vh', color: '#fff', boxSizing: 'border-box' }}>
 
@@ -457,6 +475,40 @@ const GestionAlumnosPage = ({ onBack, styles, usuario }) => {
                                 </p>
                             </div>
                         )}
+                        {/* SECCIÓN DE VINCULACIÓN DINÁMICA */}
+                        <div style={{
+                            backgroundColor: '#111',
+                            padding: '15px',
+                            borderRadius: '10px',
+                            border: '1px solid #d4af37',
+                            marginBottom: '20px',
+                            textAlign: 'left'
+                        }}>
+                            <p style={{ color: '#d4af37', fontSize: '0.75rem', fontWeight: 'bold', margin: '0 0 10px 0' }}>
+                                {usuario.academiaId ? "ESTÁS VINCULADO A UNA SEDE" : "VINCULARSE A UNA ACADEMIA"}
+                            </p>
+
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                                <input
+                                    placeholder="Pega el código de tu profesor aquí..."
+                                    style={{ ...styles.input, flex: 1, margin: 0, fontSize: '0.75rem' }}
+                                    value={codigoVinculacion}
+                                    onChange={(e) => setCodigoVinculacion(e.target.value)}
+                                />
+                                <button
+                                    onClick={handleVincularAcademia}
+                                    style={{ ...styles.btnGold, width: 'auto', padding: '0 15px', fontSize: '0.7rem' }}
+                                >
+                                    {usuario.academiaId ? "CAMBIAR" : "VINCULAR"}
+                                </button>
+                            </div>
+
+                            {usuario.academiaId && (
+                                <p style={{ fontSize: '0.6rem', color: '#666', marginTop: '8px' }}>
+                                    ID Actual: <code style={{ color: '#999' }}>{usuario.academiaId}</code>
+                                </p>
+                            )}
+                        </div>
                         {/* GESTOR DE HORARIOS */}
                         <div style={{ border: '1px solid #222', padding: '15px', borderRadius: '10px', marginTop: '15px', boxSizing: 'border-box' }}>
                             <p style={{ color: '#d4af37', fontSize: '0.7rem', textAlign: 'left', marginBottom: '10px' }}>GESTIÓN DE CLASES:</p>
@@ -522,7 +574,7 @@ const GestionAlumnosPage = ({ onBack, styles, usuario }) => {
                     <div style={{ ...styles.card, width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto', padding: '30px' }}>
                         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
                             <div style={{ width: '100px', height: '100px', borderRadius: '50%', backgroundColor: '#111', margin: '0 auto', overflow: 'hidden', border: '2px solid #d4af37' }}>
-                                {alumnoSeleccionado.fotoBase64 ? <img src={alumnoSeleccionado.fotoBase64} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : <div style={{lineHeight:'100px', fontSize:'2rem'}}>🥋</div>}
+                                {alumnoSeleccionado.fotoBase64 ? <img src={alumnoSeleccionado.fotoBase64} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : <div style={{ lineHeight: '100px', fontSize: '2rem' }}>🥋</div>}
                             </div>
                             <h2 style={{ ...styles.goldTitle, marginTop: '15px' }}>{alumnoSeleccionado.nombre.toUpperCase()}</h2>
                             <p style={{ color: '#666', fontSize: '0.8rem' }}>{alumnoSeleccionado.programa} | {alumnoSeleccionado.horario}</p>
@@ -530,13 +582,13 @@ const GestionAlumnosPage = ({ onBack, styles, usuario }) => {
 
                         <div style={{ backgroundColor: '#111', padding: '15px', borderRadius: '10px', marginBottom: '20px', border: '1px solid #222' }}>
                             <h4 style={{ color: '#d4af37', margin: '0 0 10px 0', fontSize: '0.8rem' }}>NOTAS TÉCNICAS Y SEGUIMIENTO:</h4>
-                            <textarea 
+                            <textarea
                                 id="notasTecnicasInput"
                                 style={{ ...styles.input, width: '100%', height: '150px', resize: 'none', fontSize: '0.85rem', boxSizing: 'border-box', border: '1px solid #333' }}
                                 defaultValue={alumnoSeleccionado.notasTecnicas}
                                 placeholder="Escribe aquí el progreso técnico, debilidades o comentarios..."
                             />
-                            <button 
+                            <button
                                 onClick={async () => {
                                     const nuevasNotas = document.getElementById('notasTecnicasInput').value;
                                     await updateDoc(doc(db, "alumnos", alumnoSeleccionado.id), { notasTecnicas: nuevasNotas });
@@ -549,12 +601,12 @@ const GestionAlumnosPage = ({ onBack, styles, usuario }) => {
                         </div>
 
                         <div style={{ fontSize: '0.8rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', textAlign: 'left', borderTop: '1px solid #222', paddingTop: '15px' }}>
-                            <div><strong style={{color:'#d4af37'}}>Edad:</strong> {alumnoSeleccionado.edad || '-'}</div>
-                            <div><strong style={{color:'#d4af37'}}>WhatsApp:</strong> {alumnoSeleccionado.telefono || '-'}</div>
-                            <div><strong style={{color:'#d4af37'}}>Instagram:</strong> {alumnoSeleccionado.instagram || '-'}</div>
-                            <div><strong style={{color:'#d4af37'}}>Experiencia:</strong> {alumnoSeleccionado.tieneExperiencia === 'si' ? alumnoSeleccionado.tiempoExperiencia : 'No'}</div>
-                            <div style={{ gridColumn: '1/-1' }}><strong style={{color:'#d4af37'}}>Emergencia:</strong> {alumnoSeleccionado.contactoEmergenciaNombre} ({alumnoSeleccionado.contactoEmergenciaTel})</div>
-                            <div style={{ gridColumn: '1/-1' }}><strong style={{color:'#d4af37'}}>Condición Médica:</strong> {alumnoSeleccionado.condicionEspecial || 'Ninguna'}</div>
+                            <div><strong style={{ color: '#d4af37' }}>Edad:</strong> {alumnoSeleccionado.edad || '-'}</div>
+                            <div><strong style={{ color: '#d4af37' }}>WhatsApp:</strong> {alumnoSeleccionado.telefono || '-'}</div>
+                            <div><strong style={{ color: '#d4af37' }}>Instagram:</strong> {alumnoSeleccionado.instagram || '-'}</div>
+                            <div><strong style={{ color: '#d4af37' }}>Experiencia:</strong> {alumnoSeleccionado.tieneExperiencia === 'si' ? alumnoSeleccionado.tiempoExperiencia : 'No'}</div>
+                            <div style={{ gridColumn: '1/-1' }}><strong style={{ color: '#d4af37' }}>Emergencia:</strong> {alumnoSeleccionado.contactoEmergenciaNombre} ({alumnoSeleccionado.contactoEmergenciaTel})</div>
+                            <div style={{ gridColumn: '1/-1' }}><strong style={{ color: '#d4af37' }}>Condición Médica:</strong> {alumnoSeleccionado.condicionEspecial || 'Ninguna'}</div>
                         </div>
 
                         <button onClick={() => setAlumnoSeleccionado(null)} style={{ ...styles.btnOutline, width: '100%', marginTop: '20px' }}>CERRAR EXPEDIENTE</button>

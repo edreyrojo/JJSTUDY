@@ -11,6 +11,7 @@ import {
 const AdminPage = ({ onBack }) => {
     const [usuarios, setUsuarios] = useState([]);
     const [tickets, setTickets] = useState([]);
+    const [busquedaCurso, setBusquedaCurso] = useState("");
     const [cargando, setCargando] = useState(true);
     const [tabActiva, setTabActiva] = useState('tickets');
 
@@ -195,11 +196,95 @@ const AdminPage = ({ onBack }) => {
                                     {!u.validado && (
                                         <button onClick={() => actualizarUsuario(u.uid, { validado: true })} style={{ backgroundColor: '#d4af37', color: '#000', border: 'none', padding: '10px', fontWeight: 'bold', borderRadius: '4px', cursor: 'pointer' }}>DAR ACCESO</button>
                                     )}
+                                    {/* --- GESTIÓN DE CONTENIDO (LIBERAR CURSOS) --- */}
+                                    <div style={{
+                                        gridColumn: window.innerWidth < 600 ? '1' : '1 / -1',
+                                        marginTop: '15px',
+                                        paddingTop: '15px',
+                                        borderTop: '1px solid #222'
+                                    }}>
+                                        <div style={{ fontSize: '0.7rem', color: '#d4af37', marginBottom: '10px', fontWeight: 'bold' }}>CURSOS LIBERADOS:</div>
+
+                                        {/* Lista de etiquetas de cursos ya liberados */}
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+                                            {u.cursos_liberados && u.cursos_liberados.length > 0 ? (
+                                                u.cursos_liberados.map(cursoId => (
+                                                    <div key={cursoId} style={{
+                                                        backgroundColor: '#111',
+                                                        border: '1px solid #4CAF50',
+                                                        color: '#4CAF50',
+                                                        padding: '4px 10px',
+                                                        borderRadius: '4px',
+                                                        fontSize: '0.7rem',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '8px'
+                                                    }}>
+                                                        {cursoId.toUpperCase()}
+                                                        <span
+                                                            onClick={() => {
+                                                                const nuevaLista = u.cursos_liberados.filter(id => id !== cursoId);
+                                                                actualizarUsuario(u.id, { cursos_liberados: nuevaLista });
+                                                            }}
+                                                            style={{ cursor: 'pointer', color: '#ff4444', fontWeight: 'bold', fontSize: '1rem' }}>×</span>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <span style={{ color: '#444', fontSize: '0.7rem' }}>Sin cursos adicionales (Solo acceso básico)</span>
+                                            )}
+                                        </div>
+
+                                        {/* Formulario rápido para liberar nuevo curso */}
+                                        <div style={{ display: 'flex', gap: '10px' }}>
+                                            <input
+                                                placeholder="ID exacto del instruccional..."
+                                                id={`input-curso-${u.id}`}
+                                                style={{
+                                                    flex: 1,
+                                                    backgroundColor: '#000',
+                                                    border: '1px solid #333',
+                                                    color: '#fff',
+                                                    padding: '10px',
+                                                    fontSize: '0.8rem',
+                                                    borderRadius: '4px'
+                                                }}
+                                            />
+                                            <button
+                                                onClick={() => {
+                                                    const el = document.getElementById(`input-curso-${u.id}`);
+                                                    const cursoId = el.value.trim();
+                                                    if (!cursoId) return;
+
+                                                    const listaActual = u.cursos_liberados || [];
+                                                    if (listaActual.includes(cursoId)) return alert("El usuario ya tiene este acceso.");
+
+                                                    actualizarUsuario(u.id, { cursos_liberados: [...listaActual, cursoId] });
+                                                    el.value = ""; // Limpiar input
+                                                }}
+                                                style={{
+                                                    backgroundColor: '#4CAF50',
+                                                    color: '#fff',
+                                                    border: 'none',
+                                                    padding: '0 20px',
+                                                    borderRadius: '4px',
+                                                    cursor: 'pointer',
+                                                    fontWeight: 'bold',
+                                                    fontSize: '0.75rem'
+                                                }}
+                                            >
+                                                LIBERAR CURSO
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {/* --- FIN GESTIÓN DE CONTENIDO --- */}
                                 </div>
                             ))}
                         </div>
+
+
                     )}
                 </div>
+
             )}
         </div>
     );

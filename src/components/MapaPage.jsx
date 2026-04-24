@@ -24,7 +24,7 @@ const mapStyles = {
     subNodeFloating: { position: 'absolute', width: '110px', height: '110px', borderRadius: '50%', border: '1px solid #d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', textAlign: 'center', backgroundColor: '#111', cursor: 'pointer', zIndex: 6, padding: '10px', transition: '0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)' },
 };
 const MapaPage = ({
-    onBack, onSelectVideo, onNavigateToNotes, onContinue, hasSession,
+    onBack, onSelectVideo, onNavigateToNotes, onContinue, hasSession, usuario,
     categoriaSel, setCategoriaSel,
     autorSel, setAutorSel,
     instrSel, setInstrSel,
@@ -80,7 +80,10 @@ const MapaPage = ({
     let tituloCentral = "";
 
     if (volSel) {
-        nodosAMostrar = volSel?.partes?.map(p => ({ nombre: p.nombre, type: 'parte', id: p.id })) || [];
+        nodosAMostrar = volSel?.partes?.map((p, index) => ({
+            nombre: p.nombre, type: 'parte', id: p.id, cursoId: instrSel, // <--- PASAMOS EL ID DEL CURSO
+            indice: index
+        })) || [];
         tituloCentral = volSel?.nombre || "";
     } else if (instrSel) {
         const cursoData = DB_INSTRUCCIONALES[instrSel];
@@ -138,70 +141,93 @@ const MapaPage = ({
 
     // 7. FUNCIONES DE INTERACCIÓN
     const handleNodeClick = (nodo) => {
-    // 1. Nodos que profundizan en el Mapa (Cambian la categoría central)
-    if (nodo.type === 'sub_posicion' || nodo.type === 'tag' || nodo.type === 'autor') {
-        setCategoriaSel(nodo.nombre);
-    }
-    
-    // 2. Nodos que entran al contenido del Instruccional
-    else if (nodo.type === 'curso') {
-        setInstrSel(nodo.id || nodo.nombre);
-    }
-    else if (nodo.type === 'volumen') {
-        setVolSel(nodo.raw);
-    }
-    else if (nodo.type === 'parte') {
-        onSelectVideo({ titulo: nodo.nombre, id: nodo.id });
-    }
-};
+        // 1. Nodos que profundizan en el Mapa (Cambian la categoría central)
+        if (nodo.type === 'sub_posicion' || nodo.type === 'tag' || nodo.type === 'autor') {
+            setCategoriaSel(nodo.nombre);
+        }
 
-    const irAtras = () => {
-    // 1. Si estamos viendo un Volumen, regresamos al Curso
-    if (volSel) {
-        setVolSel(null);
-    } 
-    // 2. Si estamos viendo un Curso, regresamos al nivel anterior (Autor, Sub-posición o Tag)
-    else if (instrSel) {
-        setInstrSel(null);
-    } 
-    // 3. Si estamos viendo un Autor, regresamos a la lista de Autores
-    else if (autorSel) {
-        setAutorSel(null);
-    } 
-    // 4. Lógica de Navegación Profunda (Tags y Sub-posiciones)
-    else if (categoriaSel) {
-        
-        // A. Si es una Sub-posición (ej: Guardia), regresamos al eje maestro 'POSICIÓN'
-        if (SUB_POSICIONES.includes(categoriaSel)) {
-            setCategoriaSel('POSICIÓN');
-        } 
-        
-        // B. Si es un Eje Maestro (ej: POSICIÓN, PASES, AUTORES), volvemos al Home
-        else if (EJES_MAESTROS.includes(categoriaSel)) {
-            onBack();
-        } 
-        
-        // C. Si es un Tag o un Autor (ej: "Half Guard" o "Craig Jones")
-        else {
-            // Buscamos a qué eje o sub-posición pertenece para saber a dónde volver
-            const tecnica = todasLasTecnicas.find(t => t.tags.includes(categoriaSel));
-            
-            if (tecnica) {
-                // Si el tag es de una sub-posición, volvemos a esa sub-posición
-                // Si no, volvemos al eje principal
-                const posibleSub = SUB_POSICIONES.find(p => tecnica.tags.includes(p));
-                setCategoriaSel(posibleSub || (Array.isArray(tecnica.eje) ? tecnica.eje[0] : tecnica.eje));
+        // 2. Nodos que entran al contenido del Instruccional
+        else if (nodo.type === 'curso') {
+            setInstrSel(nodo.id || nodo.nombre);
+        }
+        else if (nodo.type === 'volumen') {
+            setVolSel(nodo.raw);
+        }
+
+        // 3. Selección de video con lógica de bloqueo 🔒
+        else if (nodo.type === 'parte') {
+            const cursoId = nodo.cursoId; // ID del curso al que pertenece el video
+            const esPrimerVideo = nodo.indice === 0; // Solo el primer video del volumen es gratis
+
+            // Reglas de acceso:
+            // - Si eres Admin: Acceso total.
+            // - Si es el primer video: Acceso libre.
+            // - Si el curso está en tu lista de 'cursos_liberados': Acceso concedido.
+            const tieneAcceso = usuario.rol === 'admin' ||
+                esPrimerVideo ||
+                usuario.cursos_liberados?.includes(cursoId);
+
+            if (tieneAcceso) {
+                onSelectVideo({ titulo: nodo.nombre, id: nodo.id });
             } else {
-                setCategoriaSel(null);
-                onBack();
+                // Mensaje de acción para el alumno
+                if (window.confirm(
+                    `CONTENIDO BLOQUEADO 🔒\n\nEste video requiere autorización. Solo el primer video de cada volumen es gratuito.\n\n¿Deseas enviar un WhatsApp al administrador para solicitar acceso a "${cursoId}"?`
+                )) {
+                    const mensaje = `Hola! Me gustaría solicitar acceso al instruccional: ${cursoId}. Mi correo es: ${usuario.email}`;
+                    window.open(`https://wa.me/524731632614?text=${encodeURIComponent(mensaje)}`);
+                }
             }
         }
-    } 
-    // 5. Seguridad: Si no hay nada seleccionado, al Home
-    else {
-        onBack();
-    }
-};
+    };
+
+    const irAtras = () => {
+        // 1. Si estamos viendo un Volumen, regresamos al Curso
+        if (volSel) {
+            setVolSel(null);
+        }
+        // 2. Si estamos viendo un Curso, regresamos al nivel anterior (Autor, Sub-posición o Tag)
+        else if (instrSel) {
+            setInstrSel(null);
+        }
+        // 3. Si estamos viendo un Autor, regresamos a la lista de Autores
+        else if (autorSel) {
+            setAutorSel(null);
+        }
+        // 4. Lógica de Navegación Profunda (Tags y Sub-posiciones)
+        else if (categoriaSel) {
+
+            // A. Si es una Sub-posición (ej: Guardia), regresamos al eje maestro 'POSICIÓN'
+            if (SUB_POSICIONES.includes(categoriaSel)) {
+                setCategoriaSel('POSICIÓN');
+            }
+
+            // B. Si es un Eje Maestro (ej: POSICIÓN, PASES, AUTORES), volvemos al Home
+            else if (EJES_MAESTROS.includes(categoriaSel)) {
+                onBack();
+            }
+
+            // C. Si es un Tag o un Autor (ej: "Half Guard" o "Craig Jones")
+            else {
+                // Buscamos a qué eje o sub-posición pertenece para saber a dónde volver
+                const tecnica = todasLasTecnicas.find(t => t.tags.includes(categoriaSel));
+
+                if (tecnica) {
+                    // Si el tag es de una sub-posición, volvemos a esa sub-posición
+                    // Si no, volvemos al eje principal
+                    const posibleSub = SUB_POSICIONES.find(p => tecnica.tags.includes(p));
+                    setCategoriaSel(posibleSub || (Array.isArray(tecnica.eje) ? tecnica.eje[0] : tecnica.eje));
+                } else {
+                    setCategoriaSel(null);
+                    onBack();
+                }
+            }
+        }
+        // 5. Seguridad: Si no hay nada seleccionado, al Home
+        else {
+            onBack();
+        }
+    };
 
     // 8. RENDERIZADO
     return (
