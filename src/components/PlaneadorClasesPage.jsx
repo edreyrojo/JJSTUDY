@@ -165,14 +165,6 @@ useEffect(() => {
     };
 }, [timerActive, timeLeft, isPrepTime, currentTargetTime]);
 
-    const startTimerWithPrep = (minutos) => {
-        setCurrentTargetTime(minutos * 60);
-        setTimeLeft(30);
-        setIsPrepTime(true);
-        setTimerActive(true);
-        playBeep(500, 2);
-    };
-
     const formatTime = (seconds) => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
