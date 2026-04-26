@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
 import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import Swal from 'sweetalert2';
-
+import { DB_INSTRUCCIONALES } from '../data/instruccionales';
 // Iconos rápidos (puedes reemplazarlos por Lucide o FontAwesome)
 const Icons = {
     User: "👤",
@@ -21,6 +21,16 @@ const AdminPage = ({ onBack }) => {
     const [cargando, setCargando] = useState(true);
     const [tabActiva, setTabActiva] = useState('tickets');
     const [filtroUser, setFiltroUser] = useState("");
+    const listaTitulosDisponibles = useMemo(() => Object.keys(DB_INSTRUCCIONALES).sort(), []);
+    const instruccionalesPorAutor = useMemo(() => {
+        const autores = {};
+        Object.keys(DB_INSTRUCCIONALES).forEach(id => {
+            const curso = DB_INSTRUCCIONALES[id];
+            if (!autores[curso.autor]) autores[curso.autor] = [];
+            autores[curso.autor].push({ id, titulo: curso.titulo });
+        });
+        return autores;
+    }, []);
 
     const notify = (mensaje, tipo = 'success') => {
         Swal.fire({
@@ -38,7 +48,7 @@ const AdminPage = ({ onBack }) => {
                 getDocs(collection(db, "usuarios")),
                 getDocs(collection(db, "soporte"))
             ]);
-            
+
             setUsuarios(uSnap.docs.map(d => ({ id: d.id, ...d.data() })));
             const listaT = tSnap.docs.map(d => ({ id: d.id, ...d.data() }));
             setTickets(listaT.sort((a, b) => new Date(b.fecha) - new Date(a.fecha)));
@@ -50,8 +60,8 @@ const AdminPage = ({ onBack }) => {
     useEffect(() => { obtenerDatos(); }, []);
 
     const usuariosFiltrados = useMemo(() => {
-        return usuarios.filter(u => 
-            u.nombre?.toLowerCase().includes(filtroUser.toLowerCase()) || 
+        return usuarios.filter(u =>
+            u.nombre?.toLowerCase().includes(filtroUser.toLowerCase()) ||
             u.email?.toLowerCase().includes(filtroUser.toLowerCase())
         );
     }, [usuarios, filtroUser]);
@@ -99,15 +109,15 @@ const AdminPage = ({ onBack }) => {
 
             {/* Navegación Principal */}
             <div style={s.tabBar}>
-                <button 
-                    onClick={() => setTabActiva('tickets')} 
-                    style={{...s.tab, borderBottom: tabActiva === 'tickets' ? '3px solid #ff4444' : 'none'}}
+                <button
+                    onClick={() => setTabActiva('tickets')}
+                    style={{ ...s.tab, borderBottom: tabActiva === 'tickets' ? '3px solid #ff4444' : 'none' }}
                 >
                     ALERTA DE SOPORTE {tickets.length > 0 && <span style={s.badge}>{tickets.length}</span>}
                 </button>
-                <button 
-                    onClick={() => setTabActiva('usuarios')} 
-                    style={{...s.tab, borderBottom: tabActiva === 'usuarios' ? '3px solid #d4af37' : 'none'}}
+                <button
+                    onClick={() => setTabActiva('usuarios')}
+                    style={{ ...s.tab, borderBottom: tabActiva === 'usuarios' ? '3px solid #d4af37' : 'none' }}
                 >
                     BASE DE USUARIOS
                 </button>
@@ -139,20 +149,21 @@ const AdminPage = ({ onBack }) => {
                     ) : (
                         <div style={s.userSection}>
                             <div style={s.searchBar}>
-                                <span style={{marginRight: '10px'}}>{Icons.Search}</span>
-                                <input 
-                                    placeholder="Buscar por nombre o email..." 
+                                <span style={{ marginRight: '10px' }}>{Icons.Search}</span>
+                                <input
+                                    placeholder="Buscar por nombre o email..."
                                     style={s.searchInput}
                                     onChange={(e) => setFiltroUser(e.target.value)}
                                 />
                             </div>
-                            
+
                             <div style={s.userList}>
                                 {usuariosFiltrados.map(u => (
-                                    <UserRow 
-                                        key={u.id} 
-                                        user={u} 
-                                        onUpdate={(data) => handleAction(u.id, 'usuarios', 'update', data)} 
+                                    <UserRow
+                                        key={u.id}
+                                        user={u}
+                                        autores={instruccionalesPorAutor} // <--- ASEGÚRATE DE QUE ESTO ESTÉ AQUÍ
+                                        onUpdate={(data) => handleAction(u.id, 'usuarios', 'update', data)}
                                     />
                                 ))}
                             </div>
@@ -167,8 +178,8 @@ const AdminPage = ({ onBack }) => {
 // --- SUBCOMPONENTES ---
 
 const StatCard = ({ label, value, icon, color }) => (
-    <div style={{...s.statCard, borderLeft: `4px solid ${color}`}}>
-        <span style={{fontSize: '1.5rem'}}>{icon}</span>
+    <div style={{ ...s.statCard, borderLeft: `4px solid ${color}` }}>
+        <span style={{ fontSize: '1.5rem' }}>{icon}</span>
         <div>
             <div style={s.statValue}>{value}</div>
             <div style={s.statLabel}>{label}</div>
@@ -176,60 +187,97 @@ const StatCard = ({ label, value, icon, color }) => (
     </div>
 );
 
-const UserRow = ({ user, onUpdate }) => {
-    const [newCourse, setNewCourse] = useState("");
+const UserRow = ({ user, autores = {}, onUpdate }) => { // autores = {} por seguridad
+    const [selectedCourse, setSelectedCourse] = useState("");
+
+    const handleLiberarTodo = async () => {
+        // Validación de seguridad para autores
+        if (!autores || Object.keys(autores).length === 0) {
+            return Swal.fire("Error", "No hay catálogo cargado para liberar.", "error");
+        }
+
+        const todosLosIds = Object.values(autores).flat().map(curso => curso.id);
+
+        const result = await Swal.fire({
+            title: '¿LIBERAR TODO EL VAULT?',
+            text: `Se le dará acceso a ${todosLosIds.length} instruccionales a ${user.nombre?.toUpperCase()}.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'SÍ, ACCESO TOTAL',
+            cancelButtonText: 'CANCELAR',
+            background: '#0a0a0a',
+            color: '#fff',
+            confirmButtonColor: '#d4af37',
+            cancelButtonColor: '#333'
+        });
+
+        if (result.isConfirmed) {
+            onUpdate({ cursos_liberados: todosLosIds });
+        }
+    };
 
     return (
         <div style={s.userCard}>
             <div style={s.userInfo}>
                 <div style={s.userMainInfo}>
                     <span style={user.validado ? s.statusOnline : s.statusOffline}>●</span>
-                    <strong>{user.nombre?.toUpperCase() || 'SIN NOMBRE'}</strong>
+                    <strong style={{ fontSize: '1.1rem' }}>{user.nombre?.toUpperCase() || 'ANÓNIMO'}</strong>
                     <span style={s.userEmail}>{user.email}</span>
                 </div>
-                
                 <div style={s.userControls}>
-                    <select 
-                        value={user.rol || 'alumno'} 
-                        onChange={(e) => onUpdate({ rol: e.target.value })}
-                        style={s.select}
-                    >
+                    <select value={user.rol || 'alumno'} onChange={(e) => onUpdate({ rol: e.target.value })} style={s.select}>
                         <option value="alumno">Alumno</option>
                         <option value="instructor">Instructor</option>
                         <option value="profesor">Profesor</option>
                         <option value="admin">Admin</option>
                     </select>
-
-                    {!user.validado && (
-                        <button onClick={() => onUpdate({ validado: true })} style={s.btnAccess}>DAR ACCESO</button>
-                    )}
+                    {!user.validado && <button onClick={() => onUpdate({ validado: true })} style={s.btnAccess}>AUTORIZAR</button>}
                 </div>
             </div>
 
             <div style={s.courseSection}>
-                <label style={s.courseLabel}>INSTRUCCIONALES DESBLOQUEADOS:</label>
-                <div style={s.courseChips}>
-                    {user.cursos_liberados?.map(c => (
-                        <div key={c} style={s.chip}>
-                            {c} <span style={s.chipX} onClick={() => {
-                                const list = user.cursos_liberados.filter(id => id !== c);
-                                onUpdate({ cursos_liberados: list });
-                            }}>×</span>
-                        </div>
-                    ))}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <label style={s.courseLabel}>CONTENIDO DESBLOQUEADO:</label>
+                    <button onClick={handleLiberarTodo} style={{ background: 'none', border: '1px solid #4CAF50', color: '#4CAF50', fontSize: '0.6rem', padding: '3px 8px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+                        + LIBERAR TODO EL CATÁLOGO
+                    </button>
                 </div>
+
+                <div style={s.courseChips}>
+                    {user.cursos_liberados?.length > 0 ? user.cursos_liberados.map(c => (
+                        <div key={c} style={s.chip}>
+                            {/* PROTECCIÓN: Si DB_INSTRUCCIONALES no existe, mostramos el ID 'c' */}
+                            {(typeof DB_INSTRUCCIONALES !== 'undefined' && DB_INSTRUCCIONALES[c]?.titulo) || c}
+                            <span style={s.chipX} onClick={() => onUpdate({ cursos_liberados: user.cursos_liberados.filter(id => id !== c) })}>×</span>
+                        </div>
+                    )) : <span style={{ color: '#333', fontSize: '0.8rem' }}>Sin cursos extra</span>}
+                </div>
+
                 <div style={s.addCourseBox}>
-                    <input 
-                        placeholder="ID Instruccional (Ej: bjj-nogi-01)" 
-                        style={s.inputSmall} 
-                        value={newCourse}
-                        onChange={(e) => setNewCourse(e.target.value)}
-                    />
-                    <button onClick={() => {
-                        if(!newCourse) return;
-                        onUpdate({ cursos_liberados: [...(user.cursos_liberados || []), newCourse.trim()] });
-                        setNewCourse("");
-                    }} style={s.btnAdd}>+</button>
+                    <select
+                        style={s.selectFull}
+                        value={selectedCourse}
+                        onChange={(e) => setSelectedCourse(e.target.value)}
+                    >
+                        <option value="">-- SELECCIONAR INSTRUCCIONAL --</option>
+                        {autores && Object.keys(autores).map(autor => (
+                            <optgroup key={autor} label={autor.toUpperCase()}>
+                                {autores[autor].map(curso => (
+                                    <option key={curso.id} value={curso.id}>{curso.titulo}</option>
+                                ))}
+                            </optgroup>
+                        ))}
+                    </select>
+                    <button
+                        onClick={() => {
+                            if (!selectedCourse) return;
+                            onUpdate({ cursos_liberados: [...(user.cursos_liberados || []), selectedCourse] });
+                            setSelectedCourse("");
+                        }}
+                        style={s.btnAdd}
+                    >
+                        LIBERAR
+                    </button>
                 </div>
             </div>
         </div>
@@ -283,7 +331,7 @@ const s = {
     userName: { margin: '0 0 10px 0', fontSize: '1rem', color: '#d4af37' },
     message: { fontSize: '0.85rem', color: '#aaa', lineHeight: '1.5' },
     btnResolve: {
-        backgroundColor: '#d4af37', color: '#000', border: 'none', 
+        backgroundColor: '#d4af37', color: '#000', border: 'none',
         padding: '8px 15px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer'
     },
     btnMail: {
@@ -331,7 +379,7 @@ const s = {
         padding: '8px', borderRadius: '4px', flex: 1, fontSize: '0.8rem'
     },
     btnAdd: {
-        backgroundColor: '#d4af37', border: 'none', color: '#000', 
+        backgroundColor: '#d4af37', border: 'none', color: '#000',
         padding: '0 15px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer'
     }
 };
