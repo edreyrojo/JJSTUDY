@@ -29,6 +29,7 @@ import GestionAlumnosPage from './components/GestionAlumnosPage';
 import PlaneadorClasesPage from './components/PlaneadorClasesPage';
 import { DB_INSTRUCCIONALES } from './data/instruccionales';
 import MapaPage from './components/MapaPage';
+import MiCuenta from './components/MiCuenta';
 import NotasHubPage from './components/NotasHubPage';
 import EstudioPage from './components/EstudioPage';
 import AdminPage from './components/AdminPage';
@@ -401,6 +402,14 @@ export default function App() {
           );
         }
         return <HubPage usuario={usuario} onNavigate={setPage} userRole={userRole} onLogout={handleLogout} />;
+        case 'mi_cuenta':
+        return (
+          <MiCuenta 
+            usuario={usuario} 
+            onBack={() => setPage('hub')} 
+            styles={styles} 
+          />
+        );
 
       case 'admin':
         // Protección de acceso: si no es admin, regresa al Hub

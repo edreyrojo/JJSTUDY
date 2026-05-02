@@ -82,6 +82,13 @@ const HubPage = ({
                         GESTIÓN DOJO
                     </button>
                 )}
+                {/* --- Nuevo Botón: Mi Cuenta --- */}
+                <button
+                    style={{ ...styles.hubBtn, backgroundColor: '#111', border: '1px solid #d4af37' }}
+                    onClick={() => onNavigate('mi_cuenta')}
+                >
+                    MI CUENTA
+                </button>
 
                 {/* --- BOTONES DE APOYO --- */}
                 <div style={{ gridColumn: 'span 2', display: 'flex', gap: '10px' }}>
