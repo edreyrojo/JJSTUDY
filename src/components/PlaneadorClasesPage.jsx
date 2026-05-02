@@ -123,11 +123,11 @@ const playTripleCampana = () => {
 // --- CAMBIO CLAVE EN EL INICIO DEL TIMER ---
 const startTimerWithPrep = async (minutos) => {
     // ESTO DESBLOQUEA EL CELULAR: Debe ser gatillado por el click del usuario
-    await initAudio(); 
-    await requestWakeLock(); 
+    await initAudio();
+    await requestWakeLock();
 
     setCurrentTargetTime(minutos * 60);
-    setTimeLeft(30);
+    setTimeLeft(10);
     setIsPrepTime(true);
     setTimerActive(true);
     playBeep(500, 2, true);
