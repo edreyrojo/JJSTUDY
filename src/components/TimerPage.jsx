@@ -380,7 +380,7 @@ export default function TimerPage({ onBack, styles }) {
         <div style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto', color: '#fff', fontFamily: 'sans-serif' }}>
 
             <button onClick={handleBack} style={{ ...styles.btnOutline, width: 'auto', marginBottom: '20px' }}>
-                ← VOLVER AL HUB
+                ←
             </button>
             <div style={{ textAlign: 'center' }}>
                 <h2 style={styles.goldTitle}>RELOJ DE ENTRENAMIENTO</h2>

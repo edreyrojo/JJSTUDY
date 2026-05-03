@@ -250,10 +250,10 @@ useEffect(() => {
             {/* ── HEADER ── (sin cambios visuales, datos dinámicos) */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '30px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <button onClick={onBack} style={{ ...styles.btnOutline, width: 'auto', padding: '10px 20px' }}>← VOLVER</button>
+                    <button onClick={onBack} style={{ ...styles.btnOutline, width: 'auto', padding: '10px 20px' }}>←</button>
                     <div style={{ textAlign: 'center', display: 'flex', alignItems: 'center', gap: '12px' }}>
                         {config.logoBase64 && (
-                            <img src={config.logoBase64} alt="logo" style={{ width: '45px', height: '45px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #d4af37' }} />
+                            <img src={config.logoBase64} alt="logo" style={{ width: '80px', height: '80px', borderRadius: '10px', objectFit: 'cover', border: '1px solid #d4af37' }} />
                         )}
                         <div>
                             <h2 style={{ ...styles.goldTitle, margin: 0, fontSize: '1.4rem' }}>
@@ -299,7 +299,7 @@ useEffect(() => {
                 {alumnos.length === 0 ? (
                     <div style={{ textAlign: 'center', gridColumn: '1/-1', marginTop: '60px', opacity: 0.5 }}>
                         <div style={{ fontSize: '3rem' }}>🥋</div>
-                        <p>No se encontraron guerreros en esta sección.</p>
+                        <p>No se encontraron Alumnos en esta sección.</p>
                         <p style={{ fontSize: '0.8rem', color: '#d4af37' }}>
                             {esPropietario
                                 ? "Gestiona tus sedes desde el Panel Maestro ⚙️"

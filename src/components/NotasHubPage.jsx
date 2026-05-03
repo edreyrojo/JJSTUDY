@@ -75,7 +75,7 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles }) => {
                 width: '100%',
                 boxSizing: 'border-box'
             }}>
-                <button onClick={onBack} style={{ ...styles.btnOutline, width: 'auto', padding: '8px 15px', fontSize: '0.7rem' }}>← VOLVER</button>
+                <button onClick={onBack} style={{ ...styles.btnOutline, width: 'auto', padding: '8px 15px', fontSize: '0.7rem' }}>←</button>
                 <h2 style={{ ...styles.goldTitle, margin: 0, fontSize: '1rem' }}>BITÁCORA</h2>
             </div>
 
