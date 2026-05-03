@@ -51,18 +51,18 @@ import OnboardingModal from './components/OnboardingModal';
 import Swal from 'sweetalert2';
 
 const notify = (mensaje, tipo = 'success') => {
-    Swal.fire({
-        text: mensaje,
-        icon: tipo, 
-        background: '#0a0a0a',
-        color: '#fff',
-        confirmButtonColor: '#d4af37',
-        iconColor: tipo === 'success' ? '#4CAF50' : '#ff4444',
-        border: '1px solid #d4af37',
-        customClass: {
-            popup: 'gold-border-alert'
-        }
-    });
+  Swal.fire({
+    text: mensaje,
+    icon: tipo,
+    background: '#0a0a0a',
+    color: '#fff',
+    confirmButtonColor: '#d4af37',
+    iconColor: tipo === 'success' ? '#4CAF50' : '#ff4444',
+    border: '1px solid #d4af37',
+    customClass: {
+      popup: 'gold-border-alert'
+    }
+  });
 };
 
 // --- 1. CONFIGURACIÓN DE ESTILOS ---
@@ -106,20 +106,22 @@ export default function App() {
   const [academiaIdInput, setAcademiaIdInput] = useState('');
 
   // --- 2. EFECTO DE AUTENTICACIÓN ---
+  // --- 2. EFECTO DE AUTENTICACIÓN (VERSIÓN BLINDADA) ---
   React.useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
+    let unsubSnapshot = null; // Referencia para limpiar el escucha de Firestore
+
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
       // Iniciamos carga para bloquear la UI mientras verificamos
       setCargando(true);
 
       if (user) {
-        try {
-          const docRef = doc(db, "usuarios", user.uid);
-          const docSnap = await getDoc(docRef);
-
+        // USAMOS onSnapshot: Si el admin te valida o la migración termina, 
+        // la App reacciona al instante sin refrescar.
+        unsubSnapshot = onSnapshot(doc(db, "usuarios", user.uid), (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data();
 
-            // Guardamos todo el perfil
+            // Guardamos el perfil completo en el estado
             setUsuario({
               uid: user.uid,
               email: user.email,
@@ -134,42 +136,47 @@ export default function App() {
               localStorage.setItem('lafortuna_notas', JSON.stringify(data.notas));
             }
 
-            // Lógica para mostrar Onboarding si es usuario nuevo (opcional)
-            if (data.necesitaOnboarding) {
-               setShowOnboarding(true);
+            // --- EL DOBLE CANDADO ---
+            // Solo mostramos Onboarding si tiene la bandera activa Y NO tiene teamId.
+            // Si ya tiene teamId (porque tú se lo pusiste en la BD), el modal se oculta solo.
+            if (data.necesitaOnboarding === true && !data.teamId) {
+              setShowOnboarding(true);
+            } else {
+              setShowOnboarding(false);
             }
 
             // REDIRECCIÓN INTELIGENTE
             if (data.validado) {
-              // Solo mandamos al Hub si el usuario estaba en la pantalla de Login
               setPage(prev => (prev === 'login' || prev === 'espera' ? 'hub' : prev));
             } else {
               setPage('espera');
             }
 
           } else {
-            // Si el usuario existe en Auth pero borraste su documento en Firestore
             console.warn("Usuario sin documento en Firestore");
             setUsuario(user);
             setPage('espera');
           }
-        } catch (error) {
-          console.error("Error en el flujo de Auth/Firestore:", error);
-          if (error.message?.includes("ASSERTION")) {
-            console.warn("Error interno de Firebase detectado.");
-          }
-        }
+          setCargando(false); // Quitamos carga dentro del snapshot
+        }, (err) => {
+          console.error("Error en Firestore Snapshot:", err);
+          setCargando(false);
+        });
+
       } else {
-        // No hay sesión activa
+        // No hay sesión: limpiamos todo
+        if (unsubSnapshot) unsubSnapshot();
         setUsuario(null);
         setPage('login');
+        setCargando(false);
       }
-
-      // Quitamos la pantalla de carga
-      setCargando(false);
     });
 
-    return () => unsub();
+    // Limpieza al desmontar el componente
+    return () => {
+      unsubAuth();
+      if (unsubSnapshot) unsubSnapshot();
+    };
   }, []);
 
   // --- 3. FUNCIONES DE LÓGICA ---
@@ -313,6 +320,20 @@ export default function App() {
     }
   };
 
+  // --- FUNCIÓN PARA FINALIZAR EL ONBOARDING ---
+  const handleOnboardingComplete = (datosActualizados) => {
+    // 1. Actualizamos el estado local del usuario con su nuevo teamId y sedeId
+    setUsuario(prev => ({
+      ...prev,
+      ...datosActualizados
+    }));
+
+    // 2. Cerramos el modal
+    setShowOnboarding(false);
+
+    notify("¡Bóveda configurada con éxito! Oss.");
+  };
+
   // --- 4. RENDERIZADO DE PÁGINAS ---
   const getContent = () => {
     // 1. Si no hay usuario, directo a Login
@@ -357,17 +378,19 @@ export default function App() {
               hasSession={!!videoActual}
               userRole={userRole}
               onLogout={handleLogout}
-              styles={styles} 
+              styles={styles}
             />
             <InstalacionModal
               isOpen={showInstalar}
               onClose={() => setShowInstalar(false)}
             />
-            <OnboardingModal
-              isOpen={showOnboarding}
-              onClose={() => setShowOnboarding(false)}
-              usuario={usuario}
-            />
+            {showOnboarding && (
+              <OnboardingModal
+                usuario={usuario}
+                styles={styles}
+                onComplete={handleOnboardingComplete}
+              />
+            )}
           </>
         );
 
@@ -390,7 +413,7 @@ export default function App() {
             toggleVisto={toggleVisto}
             styles={styles}
             getAdjacentVideo={getAdjacentVideo}
-            usuario={usuario} 
+            usuario={usuario}
             onNavigateToNotes={() => setPage('notas_hub')}
             onSelectVideo={(v) => {
               setVideoActual(v);
@@ -418,7 +441,7 @@ export default function App() {
               setVideoActual(v);
               setPage('estudio');
             }}
-            styles={styles} 
+            styles={styles}
           />
         );
 
@@ -448,18 +471,18 @@ export default function App() {
 
       case 'mi_cuenta':
         return (
-          <MiCuenta 
-            usuario={usuario} 
-            onBack={() => setPage('hub')} 
-            styles={styles} 
+          <MiCuenta
+            usuario={usuario}
+            onBack={() => setPage('hub')}
+            styles={styles}
           />
         );
 
       case 'timer':
         return (
-          <TimerPage 
-            onBack={() => setPage('hub')} 
-            styles={styles} 
+          <TimerPage
+            onBack={() => setPage('hub')}
+            styles={styles}
           />
         );
 
@@ -467,7 +490,7 @@ export default function App() {
       case 'panel_maestro':
         if (['admin', 'profesor'].includes(userRole)) {
           return (
-            <PanelMaestro 
+            <PanelMaestro
               usuario={usuario}
               onBack={() => setPage('hub')}
               styles={styles}
@@ -507,17 +530,17 @@ export default function App() {
   if (cargando) {
     return (
       <div style={{
-        position: 'fixed', 
+        position: 'fixed',
         top: 0,
         left: 0,
-        width: '100vw',    
-        height: '100vh',   
+        width: '100vw',
+        height: '100vh',
         backgroundColor: '#000',
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
         flexDirection: 'column',
-        zIndex: 9999,       
+        zIndex: 9999,
         margin: 0,
         padding: 0
       }}>
@@ -525,7 +548,7 @@ export default function App() {
         <h2 style={{
           color: '#d4af37',
           marginTop: '25px',
-          fontSize: 'clamp(0.8rem, 2vw, 1.2rem)', 
+          fontSize: 'clamp(0.8rem, 2vw, 1.2rem)',
           letterSpacing: '4px',
           fontWeight: '300',
           textAlign: 'center'

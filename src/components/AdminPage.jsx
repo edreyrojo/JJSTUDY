@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs, doc, updateDoc, deleteDoc, addDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, addDoc, getDoc,} from 'firebase/firestore';
 import Swal from 'sweetalert2';
 import { DB_INSTRUCCIONALES } from '../data/instruccionales';
 
@@ -125,7 +125,45 @@ const AdminPage = ({ onBack }) => {
             setEnviandoAnuncio(false);
         }
     };
+    // Script de migración para La Fortuna Vault
+    async function migrarConfiguracionSede() {
+        console.log("🛠️ Iniciando transferencia de configuración técnica...");
 
+        // ID corregido según la captura image_5d98fc.png
+        const MIGRACION_CONFIG = {
+            teamId: "0xwL28fPsjcij3AVltJVElmPr072",
+            sedeId: "ID_SEDE_XALAPA",
+            oldAcademiaId: "0xwL28fPsjcij3AVltJVElmPr072"
+        };
+
+        try {
+            const academiaRef = doc(db, "academias", MIGRACION_CONFIG.oldAcademiaId);
+            const academiaSnap = await getDoc(academiaRef);
+
+            if (academiaSnap.exists()) {
+                const d = academiaSnap.data();
+                const sedeRef = doc(db, "sedes", MIGRACION_CONFIG.sedeId);
+
+                // Mapeo preciso de campos según tu base de datos
+                await updateDoc(sedeRef, {
+                    nombreSede: d.nombreAcademia || "BUJUTSU VERACRUZ",
+                    horarios: d.horarios || [],
+                    logobase64: d.logoBase64 || null,
+                    programas: d.programas || [],
+                    ciudad: d.sede || "Xalapa",
+                    ultimaActualizacion: d.ultimaActualizacion || new Date().toISOString(),
+                    teamId: MIGRACION_CONFIG.teamId
+                });
+
+                console.log("✅ Configuración técnica migrada con éxito.");
+                alert("¡Configuración vinculada! Logo y horarios ya deben ser visibles. Oss!");
+            } else {
+                console.error("❌ El documento sigue sin aparecer. ID buscado: " + MIGRACION_CONFIG.oldAcademiaId);
+            }
+        } catch (error) {
+            console.error("❌ Error en la migración:", error);
+        }
+    }
     return (
         <div style={s.container}>
             {/* Sidebar / Topbar */}
@@ -135,6 +173,22 @@ const AdminPage = ({ onBack }) => {
                     <p style={s.subtitle}>Gestión de Usuarios, Accesos y Comunicados</p>
                 </div>
                 <button onClick={onBack} style={s.btnBack}>VOLVER AL HUB</button>
+                <button 
+                    onClick={migrarConfiguracionSede}
+                    style={{
+                        padding: '20px',
+                        background: 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)',
+                        color: 'white',
+                        fontWeight: 'bold',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        marginTop: '20px',
+                        width: '100%'
+                    }}
+                >
+                    ⚙️ MIGRAR CONFIGURACIÓN (LOGO Y HORARIOS) ⚙️
+                </button>
             </header>
 
             {/* Estadísticas Rápidas */}
@@ -426,6 +480,7 @@ const UserRow = ({ user, autores = {}, onUpdate }) => {
                         >
                             OTORGAR ACCESO
                         </button>
+                        
                     </div>
                 </div>
             )}

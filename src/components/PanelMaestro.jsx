@@ -8,11 +8,7 @@ import {
     collection, query, where, onSnapshot,
     orderBy, doc, updateDoc
 } from 'firebase/firestore';
-import {
-    escucharSedesDeTeam,
-    crearSedeAfiliada,
-    obtenerStatsDeTeam
-} from './teamsService';
+import { escucharSedesDeTeam, crearSedeAfiliada, obtenerStatsDeTeam } from '../utils/teamsService';
 import Swal from 'sweetalert2';
 
 const notify = (mensaje, tipo = 'success') => {

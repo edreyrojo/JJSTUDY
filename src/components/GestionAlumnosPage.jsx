@@ -1,12 +1,3 @@
-// GestionAlumnosPage.jsx — v2.0 Multi-Team Architecture
-// Cambios respecto a v1:
-//   - Query de alumnos filtra por sedeId (instructor) o teamId (propietario)
-//   - Config de academia viene de "sedes/{sedeId}" en lugar de "academias/{id}"
-//   - Al guardar alumnos se añade teamId + sedeId
-//   - Chip de sede visible cuando el propietario ve la vista global
-//   - Vinculación de instructores usa código de sede, no uid directo
-//   - TODO LO DEMÁS (UI, estilos, formulario, expediente, pagos) INTACTO
-
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import {
@@ -15,7 +6,7 @@ import {
     getDoc, setDoc, deleteDoc
 } from 'firebase/firestore';
 import Swal from 'sweetalert2';
-import { buildAlumnosQuery, vincularInstructorASede } from './teamsService';
+import { buildAlumnosQuery, vincularInstructorASede } from '../utils/teamsService';
 
 const notify = (mensaje, tipo = 'success') => {
     Swal.fire({
@@ -92,44 +83,55 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
     const esPropietario = rol === 'propietario';
 
     // ── 1. CARGA DE CONFIGURACIÓN DE LA SEDE ──
-    useEffect(() => {
-        if (!sedeIdEfectiva) return;
-        const docRef = doc(db, "sedes", sedeIdEfectiva);
-        const unsub = onSnapshot(docRef, (snap) => {
-            if (snap.exists()) {
-                const data = snap.data();
-                setConfig({
-                    nombre: data.nombre || 'Mi Dojo',
-                    ciudad: data.ciudad || '',
-                    logoBase64: data.logoBase64 || '',
-                    horarios: data.horarios || [],
-                    programas: data.programas || [],
-                    codigoAcceso: data.codigoAcceso || ''
-                });
-            }
-        });
-        return () => unsub();
-    }, [sedeIdEfectiva]);
+    // ── 1. CARGA DE CONFIGURACIÓN DE LA SEDE (AJUSTADO A MIGRACIÓN) ──
+useEffect(() => {
+    if (!sedeIdEfectiva) return;
 
-    // ── 2. ESCUCHA DE ALUMNOS — Filtrado por rol ──
-    // Propietario en vista global: ve todos sus alumnos (teamId)
-    // Propietario entrando a una sede específica desde PanelMaestro: ve solo esa sede
-    // Instructor: siempre solo su sede
-    useEffect(() => {
-        if (!teamId && !sedeIdEfectiva) return;
+    const docRef = doc(db, "sedes", sedeIdEfectiva);
+    const unsub = onSnapshot(docRef, (snap) => {
+        if (snap.exists()) {
+            const data = snap.data();
+            setConfig({
+                // Ajustamos los nombres de los campos a lo que hay en Firestore
+                nombre: data.nombreSede || 'Mi Dojo', 
+                ciudad: data.ciudad || '',
+                logoBase64: data.logobase64 || '', // Minúscula según el script
+                horarios: data.horarios || [],
+                programas: data.programas || [],
+                codigoAcceso: data.codigoAcceso || ''
+            });
+        }
+    }, (error) => {
+        console.error("Error cargando configuración de sede:", error);
+    });
 
-        const q = buildAlumnosQuery({
-            rol: sedeActual ? 'instructor' : rol, // Si viene de PanelMaestro, filtrar por sede
-            teamId,
-            sedeId: sedeIdEfectiva,
-            soloArchivados: verArchivados
-        });
+    return () => unsub();
+}, [sedeIdEfectiva]);
+    // ── 2. ESCUCHA DE ALUMNOS (SINCRONIZACIÓN MAESTRA) ──
+useEffect(() => {
+    // Si no hay teamId, no podemos filtrar por seguridad multi-tenant
+    if (!teamId) return;
 
-        const unsub = onSnapshot(q, (snap) => {
-            setAlumnos(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        });
-        return () => unsub();
-    }, [verArchivados, teamId, sedeIdEfectiva, rol, sedeActual]);
+    // Si el rol es instructor o estamos en vista de sede específica, 
+    // necesitamos obligatoriamente la sedeIdEfectiva
+    const modoSedeEspecifica = !!sedeActual || rol === 'instructor' || rol === 'profesor';
+    if (modoSedeEspecifica && !sedeIdEfectiva) return;
+
+    const q = buildAlumnosQuery({
+        rol: sedeActual ? 'instructor' : rol, 
+        teamId: teamId,
+        sedeId: sedeIdEfectiva,
+        soloArchivados: verArchivados
+    });
+
+    const unsub = onSnapshot(q, (snap) => {
+        setAlumnos(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (error) => {
+        console.error("Error en la boveda de alumnos:", error);
+    });
+
+    return () => unsub();
+}, [verArchivados, teamId, sedeIdEfectiva, rol, sedeActual]);
 
     // --- HANDLERS DE ARCHIVOS (sin cambios) ---
     const handleFotoChange = (e) => {

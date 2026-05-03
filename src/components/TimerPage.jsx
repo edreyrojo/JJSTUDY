@@ -1,10 +1,12 @@
 // src/components/TimerPage.jsx
 import React, { useState, useEffect, useRef } from 'react';
+import Swal from 'sweetalert2';
 
 export default function TimerPage({ onBack, styles }) {
     // ==========================================
     // ESTADO GENERAL Y DE PREPARACIÓN
     // ==========================================
+
     const [isCasualMode, setIsCasualMode] = useState(true);
     const [isPreparing, setIsPreparing] = useState(false);
     const [prepTimeLeft, setPrepTimeLeft] = useState(3);
@@ -202,13 +204,13 @@ export default function TimerPage({ onBack, styles }) {
                         // No necesitamos llamar startMatchTimer, el intervalo se limpia y se debe reiniciar
                         // Hacemos que corra directo
                         setIsMatchRunning(false);
-                        setTimeout(() => setIsMatchRunning(true), 100); 
+                        setTimeout(() => setIsMatchRunning(true), 100);
                     } else {
                         if (currentMatchRound < matchRounds) {
                             setCurrentMatchRound(prev => prev + 1);
                             setMatchTimeLeft(matchDuration);
                             setIsMatchRunning(false);
-                            setTimeout(() => setIsMatchRunning(true), 100); 
+                            setTimeout(() => setIsMatchRunning(true), 100);
                         } else {
                             setIsMatchRunning(false);
                             designateWinner();
@@ -228,7 +230,7 @@ export default function TimerPage({ onBack, styles }) {
     // ==========================================
     const startCasualTimer = () => {
         if (isCasualRunning || isPreparing) return;
-        
+
         // Configuramos el estado inicial antes de la preparación
         if (currentRepetition === 0) {
             setCurrentRepetition(1);
@@ -237,7 +239,7 @@ export default function TimerPage({ onBack, styles }) {
         } else if (casualTimeLeft === 0) {
             setCasualTimeLeft(isRestPhase ? rest : duration);
         }
-        
+
         // Iniciamos la preparación
         setPrepMode('casual');
         setPrepTimeLeft(3);
@@ -265,7 +267,7 @@ export default function TimerPage({ onBack, styles }) {
     const startMatchTimer = () => {
         if (isMatchRunning || isPreparing) return;
         setWinner('');
-        
+
         if (currentMatchRound === 0) {
             if (warmupTime > 0 && !isWarmupPhase) {
                 setIsWarmupPhase(true);
@@ -276,7 +278,7 @@ export default function TimerPage({ onBack, styles }) {
                 setMatchTimeLeft(matchDuration);
             }
         }
-        
+
         // Iniciamos la preparación
         setPrepMode('match');
         setPrepTimeLeft(3);
@@ -315,7 +317,46 @@ export default function TimerPage({ onBack, styles }) {
     };
 
     const puntosBloqueados = !isMatchRunning || isWarmupPhase || isPreparing;
+    // ==========================================
+    // INTERCEPTOR DE SALIDA (VERSIÓN SWEETALERT2)
+    // ==========================================
+    const handleBack = async () => {
+        // Evaluamos si hay progreso sin terminar en el modo Casual
+        const hayActividadCasual = isCasualMode &&
+            (isCasualRunning || currentRepetition > 0 || casualTimeLeft !== duration);
 
+        // Evaluamos si hay progreso sin terminar en el modo Competición
+        const hayActividadMatch = !isCasualMode &&
+            (isMatchRunning || currentMatchRound > 0 || matchTimeLeft !== matchDuration ||
+                score1 > 0 || score2 > 0 || advantage1 > 0 || advantage2 > 0 || penalty1 > 0 || penalty2 > 0);
+
+        // Si hay preparación activa o alguna actividad en los relojes, lanzamos Swal
+        if (isPreparing || hayActividadCasual || hayActividadMatch) {
+            const result = await Swal.fire({
+                text: "¿Seguro que quieres salir? El temporizador y los puntos se perderán.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ff4444', // Rojo para la acción destructiva (salir)
+                cancelButtonColor: '#333',
+                confirmButtonText: 'Sí, salir',
+                cancelButtonText: 'Cancelar',
+                background: '#0a0a0a',
+                color: '#fff',
+                iconColor: '#ffcc00', // Amarillo de advertencia
+                customClass: { popup: 'gold-border-alert' }
+            });
+
+            // Si el usuario no confirma (cancela o cierra la alerta), detenemos la salida
+            if (!result.isConfirmed) return;
+        }
+
+        // Si no había actividad o el usuario confirmó la salida: limpiamos intervalos
+        clearInterval(prepInterval.current);
+        clearInterval(casualTimerInterval.current);
+        clearInterval(matchTimerInterval.current);
+
+        onBack();
+    };
     // ==========================================
     // ESTILOS LOCALES
     // ==========================================
@@ -338,10 +379,9 @@ export default function TimerPage({ onBack, styles }) {
     return (
         <div style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto', color: '#fff', fontFamily: 'sans-serif' }}>
 
-            <button onClick={onBack} style={{ ...styles.btnOutline, width: 'auto', marginBottom: '20px' }}>
+            <button onClick={handleBack} style={{ ...styles.btnOutline, width: 'auto', marginBottom: '20px' }}>
                 ← VOLVER AL HUB
             </button>
-
             <div style={{ textAlign: 'center' }}>
                 <h2 style={styles.goldTitle}>RELOJ DE ENTRENAMIENTO</h2>
 
@@ -383,7 +423,7 @@ export default function TimerPage({ onBack, styles }) {
                                 formatTime(casualTimeLeft)
                             )}
                         </div>
-                        
+
                         {!isPreparing && (
                             <p style={{ fontSize: '1.2rem', color: '#aaa' }}>Ronda: <span style={{ color: '#fff' }}>{currentRepetition > 0 ? currentRepetition : 1} / {repetitions}</span></p>
                         )}
