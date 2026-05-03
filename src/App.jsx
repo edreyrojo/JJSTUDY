@@ -38,6 +38,7 @@ import LoginPage from './components/LoginPage';
 import HubPage from './components/HubPage';
 import InstalacionModal from './components/InstalacionModal';
 import { getAdjacentVideo } from './utils/videoHelpers';
+import TimerPage from './components/TimerPage';
 
 import Swal from 'sweetalert2';
 
@@ -406,6 +407,13 @@ export default function App() {
         return (
           <MiCuenta 
             usuario={usuario} 
+            onBack={() => setPage('hub')} 
+            styles={styles} 
+          />
+        );
+        case 'timer':
+        return (
+          <TimerPage 
             onBack={() => setPage('hub')} 
             styles={styles} 
           />

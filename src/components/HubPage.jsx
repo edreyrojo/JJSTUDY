@@ -261,14 +261,19 @@ const HubPage = ({
 
             {/* BOTONES DEL HUB */}
             <div style={{ ...styles.grid, position: 'relative', zIndex: 10 }}>
+                
+                {/* --- NUEVA POSICIÓN: CONTINUAR ESTUDIO --- */}
+                {hasSession && (
+                    <button style={{ ...styles.hubBtn, gridColumn: 'span 2', border: '1px solid #d4af37', backgroundColor: 'rgba(212, 175, 55, 0.1)', backdropFilter: 'blur(5px)' }} onClick={onContinue}>CONTINUAR ESTUDIO</button>
+                )}
+
                 <button style={{ ...styles.hubBtn, backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)' }} onClick={() => onNavigate('mapa')}>MAPA</button>
                 <button style={{ ...styles.hubBtn, backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)' }} onClick={() => onNavigate('notas_hub')}>BITÁCORA</button>
                 <button style={{ ...styles.hubBtn, backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)' }} onClick={() => onNavigate('busqueda')}>BUSCAR</button>
                 <button style={{ ...styles.hubBtn, backgroundColor: 'rgba(5,5,5,0.8)', border: '1px dashed #444', backdropFilter: 'blur(5px)' }} onClick={() => onNavigate('instalar')}>INSTALAR APP</button>
 
-                {hasSession && (
-                    <button style={{ ...styles.hubBtn, border: '1px solid #d4af37', backgroundColor: 'rgba(212, 175, 55, 0.1)', backdropFilter: 'blur(5px)' }} onClick={onContinue}>CONTINUAR ESTUDIO</button>
-                )}
+                {/* --- NUEVO BOTÓN: TIMER (En lugar de Continuar Estudio) --- */}
+                <button style={{ ...styles.hubBtn, border: '1px solid #d4af37', backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)' }} onClick={() => onNavigate('timer')}>TIMER</button>
 
                 <button style={{ ...styles.hubBtn, border: '1px solid #d4af37', backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)' }} onClick={() => onNavigate('planeador')}>PLANEAR CLASE</button>
 
