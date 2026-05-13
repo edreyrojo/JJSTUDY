@@ -200,22 +200,25 @@ export const escucharSedesDeTeam = (teamId, callback) => {
 export const buildAlumnosQuery = ({ rol, teamId, sedeId, soloArchivados = false }) => {
     const activo = !soloArchivados;
 
-    if (rol === 'propietario') {
-        // Ve TODO el team
+    // 1. Definimos quiénes pueden ver TODO el equipo (Admin, Propietario o Profesor)
+    const veTodoElTeam = ['propietario', 'profesor', 'admin'].includes(rol);
+
+    if (veTodoElTeam) {
         return query(
-            collection(db, "alumnos"),
-            where("teamId", "==", teamId),
-            where("activo", "==", activo),
-            orderBy("nombre", "asc")
-        );
+        collection(db, "alumnos"),
+        where("academiaId", "==", teamId), // <--- CAMBIA teamId por academiaId aquí
+        where("activo", "==", activo),
+        orderBy("nombre", "asc")
+    );
     } else {
-        // Solo su sede
+        // Instructores o vista de sede específica
         return query(
-            collection(db, "alumnos"),
-            where("sedeId", "==", sedeId),
-            where("activo", "==", activo),
-            orderBy("nombre", "asc")
-        );
+    collection(db, "alumnos"),
+    where("academiaId", "==", teamId), // <--- Y AQUÍ
+    where("sedeId", "==", sedeId),
+    where("activo", "==", activo),
+    orderBy("nombre", "asc")
+);
     }
 };
 

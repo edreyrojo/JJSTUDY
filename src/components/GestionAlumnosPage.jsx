@@ -84,43 +84,39 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
 
     // ── 1. CARGA DE CONFIGURACIÓN DE LA SEDE ──
     // ── 1. CARGA DE CONFIGURACIÓN DE LA SEDE (AJUSTADO A MIGRACIÓN) ──
-useEffect(() => {
-    if (!sedeIdEfectiva) return;
+    useEffect(() => {
+        if (!sedeIdEfectiva) return;
 
-    const docRef = doc(db, "sedes", sedeIdEfectiva);
-    const unsub = onSnapshot(docRef, (snap) => {
-        if (snap.exists()) {
-            const data = snap.data();
-            setConfig({
-                // Ajustamos los nombres de los campos a lo que hay en Firestore
-                nombre: data.nombreSede || 'Mi Dojo', 
-                ciudad: data.ciudad || '',
-                logoBase64: data.logobase64 || '', // Minúscula según el script
-                horarios: data.horarios || [],
-                programas: data.programas || [],
-                codigoAcceso: data.codigoAcceso || ''
-            });
-        }
-    }, (error) => {
-        console.error("Error cargando configuración de sede:", error);
-    });
+        const docRef = doc(db, "sedes", sedeIdEfectiva);
+        const unsub = onSnapshot(docRef, (snap) => {
+            if (snap.exists()) {
+                const data = snap.data();
+                setConfig({
+                    // Ajustamos los nombres de los campos a lo que hay en Firestore
+                    nombre: data.nombreSede || 'Mi Dojo',
+                    ciudad: data.ciudad || '',
+                    logoBase64: data.logobase64 || '', // Minúscula según el script
+                    horarios: data.horarios || [],
+                    programas: data.programas || [],
+                    codigoAcceso: data.codigoAcceso || ''
+                });
+            }
+        }, (error) => {
+            console.error("Error cargando configuración de sede:", error);
+        });
 
-    return () => unsub();
-}, [sedeIdEfectiva]);
+        return () => unsub();
+    }, [sedeIdEfectiva]);
     // ── 2. ESCUCHA DE ALUMNOS (SINCRONIZACIÓN MAESTRA) ──
-useEffect(() => {
-    // Si no hay teamId, no podemos filtrar por seguridad multi-tenant
-    if (!teamId) return;
-
-    // Si el rol es instructor o estamos en vista de sede específica, 
-    // necesitamos obligatoriamente la sedeIdEfectiva
-    const modoSedeEspecifica = !!sedeActual || rol === 'instructor' || rol === 'profesor';
-    if (modoSedeEspecifica && !sedeIdEfectiva) return;
+    useEffect(() => {
+    // El único requisito real es tener el ID del equipo
+    const idSeguro = teamId || usuario.academiaId || usuario.uid;
+    if (!idSeguro) return;
 
     const q = buildAlumnosQuery({
-        rol: sedeActual ? 'instructor' : rol, 
-        teamId: teamId,
-        sedeId: sedeIdEfectiva,
+        rol: rol, 
+        teamId: idSeguro,
+        sedeId: sedeIdEfectiva, // Si es null, la nueva función cargará todo el team
         soloArchivados: verArchivados
     });
 
@@ -131,7 +127,7 @@ useEffect(() => {
     });
 
     return () => unsub();
-}, [verArchivados, teamId, sedeIdEfectiva, rol, sedeActual]);
+}, [verArchivados, teamId, sedeIdEfectiva, rol, usuario]);
 
     // --- HANDLERS DE ARCHIVOS (sin cambios) ---
     const handleFotoChange = (e) => {
