@@ -17,7 +17,7 @@ const notify = (mensaje, tipo = 'success') => {
 };
 
 
-const MiCuenta = ({ usuario, onBack, styles, notify }) => {
+const MiCuenta = ({ usuario, onBack, styles, notify, sedeActual }) => {
     const [editando, setEditando] = useState(false);
     const [cargando, setCargando] = useState(false);
 
@@ -306,28 +306,65 @@ const MiCuenta = ({ usuario, onBack, styles, notify }) => {
                     </div>
                 </div>
 
-                {/* 4. SECCIÓN: VINCULACIÓN ACADÉMICA (Mantenida igual, solo re-estilizada) */}
+                {/* 4. SECCIÓN: VINCULACIÓN ACADÉMICA */}
                 <div style={{ marginBottom: '25px', borderTop: '1px solid #222', paddingTop: '20px' }}>
                     <p style={{ color: '#d4af37', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '15px' }}>ESTADO DE ALIANZA:</p>
                     <div style={{ backgroundColor: '#111', padding: '15px', borderRadius: '10px', border: '1px solid #d4af3744' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: editando ? '15px' : '0' }}>
-                            <div style={{ width: '40px', height: '40px', borderRadius: '8px', backgroundColor: usuario?.academiaId ? '#d4af37' : '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>
-                                {usuario?.academiaId ? "🏯" : "⛺"}
+                            
+                            {/* CONTENEDOR DEL LOGO O EMOJI */}
+                            <div style={{ 
+                                width: '50px', height: '50px', borderRadius: '8px', 
+                                backgroundColor: usuario?.academiaId ? '#d4af37' : '#333', 
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                                fontSize: '1.5rem', overflow: 'hidden', border: '1px solid #333' 
+                            }}>
+                                {usuario?.academiaId ? (
+                                    /* 🔥 FIX: Buscamos el logoBase64 directamente en la info de la sede */
+                                    sedeActual?.logoBase64 ? (
+                                        <img 
+                                            src={sedeActual.logoBase64} 
+                                            alt="Logo Dojo" 
+                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                        />
+                                    ) : "🏯"
+                                ) : "⛺"}
                             </div>
+
+                            {/* INFORMACIÓN DE LA ACADEMIA Y ROL */}
                             <div style={{ flex: 1 }}>
-                                <p style={{ margin: 0, color: usuario?.academiaId ? '#fff' : '#888', fontSize: '0.9rem', fontWeight: 'bold' }}>
-                                    {usuario?.academiaNombre || (usuario?.academiaId ? "Sede Vinculada" : "Lobo Solitario (Sin Academia)")}
-                                </p>
-                                <p style={{ margin: 0, color: '#666', fontSize: '0.7rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                    <p style={{ margin: 0, color: usuario?.academiaId ? '#fff' : '#888', fontSize: '0.95rem', fontWeight: 'bold' }}>
+                                        {/* 🔥 FIX: Mostramos el 'nombre' del documento de la sede */}
+                                        {sedeActual?.nombre || (usuario?.academiaId ? "Sede Vinculada" : "Lobo Solitario (Sin Academia)")}
+                                    </p>
+                                    
+                                    {/* ETIQUETA DE ROL */}
+                                    {usuario?.rol && (
+                                        <span style={{ 
+                                            backgroundColor: '#d4af3722', color: '#d4af37', 
+                                            padding: '2px 6px', borderRadius: '4px', 
+                                            fontSize: '0.65rem', textTransform: 'uppercase',
+                                            border: '1px solid #d4af3744', fontWeight: 'bold'
+                                        }}>
+                                            {usuario.rol}
+                                        </span>
+                                    )}
+                                </div>
+                                <p style={{ margin: '4px 0 0 0', color: '#666', fontSize: '0.7rem' }}>
                                     {usuario?.academiaId ? `ID: ${usuario.academiaId}` : "Usa el modo edición para unirte a una Sede."}
                                 </p>
                             </div>
+
+                            {/* BOTÓN DESERTAR */}
                             {editando && usuario?.academiaId && (
                                 <button onClick={handleDesvincular} style={{ background: 'none', border: '1px solid #ff4444', color: '#ff4444', padding: '5px 10px', borderRadius: '4px', fontSize: '0.7rem', cursor: 'pointer' }}>
                                     DESERTAR
                                 </button>
                             )}
                         </div>
+                        
+                        {/* INPUT PARA NUEVA VINCULACIÓN */}
                         {editando && (
                             <div style={{ borderTop: '1px solid #222', paddingTop: '15px' }}>
                                 <p style={{ color: '#888', fontSize: '0.65rem', margin: '0 0 8px 0', fontWeight: 'bold' }}>VINCULARSE A UNA NUEVA SEDE:</p>
@@ -350,9 +387,21 @@ const MiCuenta = ({ usuario, onBack, styles, notify }) => {
                     ) : (
                         <>
                             <button onClick={() => setEditando(false)} style={{ ...styles.btnOutline, flex: 1 }}>CANCELAR</button>
-                            <button onClick={handleGuardar} disabled={cargando} style={{ ...styles.btnGold, flex: 1, fontWeight: 'bold', backgroundColor: cargando ? '#ffbb00' : '' }}>
-                                {cargando ? "FORJANDO..." : "GUARDAR CAMBIOS"}
-                            </button>
+                                <button
+                                    onClick={handleGuardar}
+                                    disabled={cargando}
+                                    style={{
+                                        ...styles.btnGold,
+                                        flex: 1,
+                                        fontWeight: 'bold',
+                                        // Aseguramos que siempre sea dorado, y si carga, aplicamos opacidad
+                                        backgroundColor: cargando ? '#b8962d' : '#d4af37',
+                                        opacity: cargando ? 0.7 : 1,
+                                        cursor: cargando ? 'not-allowed' : 'pointer'
+                                    }}
+                                >
+                                    {cargando ? "FORJANDO..." : "GUARDAR CAMBIOS"}
+                                </button>
                         </>
                     )}
                 </div>

@@ -58,7 +58,6 @@ const notify = (mensaje, tipo = 'success') => {
     color: '#fff',
     confirmButtonColor: '#d4af37',
     iconColor: tipo === 'success' ? '#4CAF50' : '#ff4444',
-    border: '1px solid #d4af37',
     customClass: {
       popup: 'gold-border-alert'
     }
@@ -81,6 +80,7 @@ const styles = {
 // --- 4. COMPONENTE PRINCIPAL (EXPORT DEFAULT) ---//
 export default function App() {
   // --- 1. ESTADOS ---
+  const [academiaData, setAcademiaData] = useState(null);
   const [showInstalar, setShowInstalar] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false); // Estado para el nuevo OnboardingModal
   const [usuario, setUsuario] = React.useState(null);
@@ -108,63 +108,74 @@ export default function App() {
   // --- 2. EFECTO DE AUTENTICACIÓN ---
   // --- 2. EFECTO DE AUTENTICACIÓN (VERSIÓN BLINDADA) ---
   React.useEffect(() => {
-    let unsubSnapshot = null; // Referencia para limpiar el escucha de Firestore
+    let unsubSnapshot = null;
 
-    const unsubAuth = onAuthStateChanged(auth, (user) => {
-      // Iniciamos carga para bloquear la UI mientras verificamos
+    const unsubAuth = onAuthStateChanged(auth, async (user) => {
       setCargando(true);
 
       if (user) {
-        // USAMOS onSnapshot: Si el admin te valida o la migración termina, 
-        // la App reacciona al instante sin refrescar.
+        // 1. Limpiamos cualquier escucha previo antes de crear uno nuevo
+        if (unsubSnapshot) unsubSnapshot();
+
         unsubSnapshot = onSnapshot(doc(db, "usuarios", user.uid), (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data();
 
-            // Guardamos el perfil completo en el estado
-            setUsuario({
-              uid: user.uid,
-              email: user.email,
-              ...data
-            });
-
+            // --- Sincronización de Estado Global ---
+            setUsuario({ uid: user.uid, email: user.email, ...data });
             setUserRole(data.rol || 'usuario');
-            if (data.vistos) setVistos(data.vistos);
 
-            // Sincronizamos notas localmente
+            // --- 🚨 NUEVO: Buscar datos de la sede (academiaData) 🚨 ---
+            // Si el usuario tiene un teamId, buscamos la sede correspondiente
+            // para que la pantalla de "Mi Cuenta" no quede vacía.
+            if (data.teamId) {
+              const q = query(collection(db, "sedes"), where("teamId", "==", data.teamId));
+              getDocs(q).then((querySnapshot) => {
+                if (!querySnapshot.empty) {
+                  setAcademiaData(querySnapshot.docs[0].data());
+                } else {
+                  setAcademiaData(null);
+                }
+              }).catch(err => console.error("Error cargando sede:", err));
+            } else {
+              // Si no tiene equipo, limpiamos el estado por seguridad
+              setAcademiaData(null);
+            }
+
+            // --- Sincronización de Datos (Vistos y Notas) ---
+            // Mantenemos la lógica de LocalStorage para resiliencia
+            if (data.vistos) {
+              setVistos(data.vistos);
+              localStorage.setItem('lafortuna_vistos', JSON.stringify(data.vistos));
+            }
             if (data.notas) {
               localStorage.setItem('lafortuna_notas', JSON.stringify(data.notas));
             }
 
-            // --- EL DOBLE CANDADO ---
-            // Solo mostramos Onboarding si tiene la bandera activa Y NO tiene teamId.
-            // Si ya tiene teamId (porque tú se lo pusiste en la BD), el modal se oculta solo.
-            if (data.necesitaOnboarding === true && !data.teamId) {
-              setShowOnboarding(true);
-            } else {
-              setShowOnboarding(false);
-            }
+            // --- Lógica de Onboarding y TeamID ---
+            // Si el usuario tiene teamId, ya no necesita onboarding, sin importar la bandera
+            const necesitaOnboarding = data.necesitaOnboarding === true && !data.teamId;
+            setShowOnboarding(necesitaOnboarding);
 
-            // REDIRECCIÓN INTELIGENTE
+            // --- Redirección Inteligente ---
             if (data.validado) {
-              setPage(prev => (prev === 'login' || prev === 'espera' ? 'hub' : prev));
+              // Solo redireccionamos si estábamos en pantallas de espera o login
+              setPage(prev => (['login', 'espera'].includes(prev) ? 'hub' : prev));
             } else {
               setPage('espera');
             }
-
           } else {
+            // Caso: Usuario autenticado pero sin documento en BD (posible error de registro)
             console.warn("Usuario sin documento en Firestore");
-            setUsuario(user);
             setPage('espera');
           }
-          setCargando(false); // Quitamos carga dentro del snapshot
+          setCargando(false);
         }, (err) => {
-          console.error("Error en Firestore Snapshot:", err);
+          console.error("Error crítico en Snapshot de usuario:", err);
           setCargando(false);
         });
-
       } else {
-        // No hay sesión: limpiamos todo
+        // Caso: Usuario deslogueado
         if (unsubSnapshot) unsubSnapshot();
         setUsuario(null);
         setPage('login');
@@ -172,7 +183,7 @@ export default function App() {
       }
     });
 
-    // Limpieza al desmontar el componente
+    // --- Limpieza al desmontar el componente ---
     return () => {
       unsubAuth();
       if (unsubSnapshot) unsubSnapshot();
@@ -351,7 +362,7 @@ export default function App() {
           password={password} setPassword={setPassword}
           nombreCompleto={nombreCompleto} setNombreCompleto={setNombreCompleto}
           onLogin={handleLogin} onRegister={handleRegister} error={error} styles={styles}
-          academiaIdInput={academiaIdInput} 
+          academiaIdInput={academiaIdInput}
           setAcademiaIdInput={setAcademiaIdInput}
         />
       );
@@ -482,6 +493,10 @@ export default function App() {
         return (
           <MiCuenta
             usuario={usuario}
+            // Pasamos el objeto de la sede que seguramente ya cargas en tu App
+            sedeActual={academiaData}
+            // Pasamos la función de notificaciones si la tienes disponible en App
+            notify={notify}
             onBack={() => setPage('hub')}
             styles={styles}
           />
