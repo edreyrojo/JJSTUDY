@@ -272,23 +272,23 @@ const MiCuenta = ({ usuario, onBack, styles, notify, sedeActual }) => {
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
 
                         {/* Teléfono con Botón de WhatsApp integrado */}
-                        <div style={{ flex: '1 1 45%' }}>
+                        <div style={{ flex: '1 1 30%' }}>
                             <p style={{ color: '#888', fontSize: '0.65rem', marginBottom: '5px' }}>TELÉFONO (Móvil)</p>
                             <div style={{ display: 'flex', gap: '5px' }}>
                                 <input disabled={!editando} placeholder="Ej. 5512345678" style={{ ...styles.input, flex: 1, margin: 0, opacity: editando ? 1 : 0.8 }} value={datos.telefono} onChange={e => setDatos({ ...datos, telefono: e.target.value })} />
                                 {!editando && datos.telefono && (
-                                    <a href={getWhatsAppLink(datos.telefono)} target="_blank" rel="noreferrer" style={{ ...styles.btnGold, padding: '10px', textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
-                                        WA
+                                    <a href={getWhatsAppLink(datos.telefono)} target="_blank" rel="noreferrer" style={{ ...styles.btnGold, padding: '10px', textDecoration: 'none', width: '34%', alignItems: 'center' }}>
+                                        CONTACTAR
                                     </a>
                                 )}
                             </div>
                         </div>
 
-                        <div style={{ flex: '1 1 45%' }}>
+                        <div style={{ flex: '1 1 28%' }}>
                             <p style={{ color: '#888', fontSize: '0.65rem', marginBottom: '5px' }}>INSTAGRAM</p>
                             <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#000', border: '1px solid #333', borderRadius: '6px', padding: '0 10px' }}>
                                 <span style={{ color: '#666' }}>@</span>
-                                <input disabled={!editando} style={{ backgroundColor: 'transparent', color: '#fff', border: 'none', outline: 'none', padding: '10px', width: '90%', opacity: editando ? 1 : 0.8 }} value={datos.instagram} onChange={e => setDatos({ ...datos, instagram: e.target.value.replace('@', '') })} />
+                                <input disabled={!editando} style={{ backgroundColor: 'transparent', color: '#fff', border: 'none', outline: 'none', padding: '10px', width: '40%', opacity: editando ? 1 : 0.8 }} value={datos.instagram} onChange={e => setDatos({ ...datos, instagram: e.target.value.replace('@', '') })} />
                             </div>
                         </div>
 

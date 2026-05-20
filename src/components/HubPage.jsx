@@ -38,24 +38,14 @@ const HubPage = ({
 
     // Efecto para cargar Fondo de Academia
     useEffect(() => {
-        // DEBUG: Ver qué tiene el usuario en la mano
-        console.log("--- INICIO DE AUDITORÍA ---");
-        console.log("Usuario actual (objeto completo):", usuario);
-        console.log("TeamID presente:", usuario?.teamId);
-        console.log("AcademiaID presente:", usuario?.academiaId);
-
         const fetchFondoApp = async () => {
             // 🛡️ SALVAVIDAS: Si nada funciona, esta imagen salvará la interfaz de la demo
             const IMAGEN_POR_DEFECTO = "https://images.unsplash.com/photo-1564415315949-26bf26eb4e3e?q=80&w=1000&auto=format&fit=crop";
 
             try {
-                console.log("DEBUG: Iniciando fetch de datos...");
-
                 // 1. Intentar con Sede usando QUERY (Busca dentro de los campos, no por ID de documento)
                 if (usuario?.teamId || usuario?.uid) {
                     const idBusquedaSede = usuario.teamId || usuario.uid;
-                    console.log("DEBUG: Buscando en 'sedes' donde el campo teamId sea:", idBusquedaSede);
-
                     // Creamos la consulta
                     const qSede = query(collection(db, "sedes"), where("teamId", "==", idBusquedaSede));
                     const sedeSnap = await getDocs(qSede);
@@ -66,7 +56,6 @@ const HubPage = ({
                         const imagen = data.avatarSede || data.logoBase64 || data.logobase64;
                         if (imagen) {
                             setFondoAcademia(imagen);
-                            console.log("ÉXITO: Fondo cargado desde SEDE");
                             return; // 🛑 Salimos inmediatamente si encontramos la imagen aquí
                         }
                     } else {
@@ -77,7 +66,6 @@ const HubPage = ({
                 // 2. Respaldo: Intentar con Academia usando QUERY
                 if (usuario?.academiaId || usuario?.uid) {
                     const idBusquedaAcademia = usuario.academiaId || usuario.uid;
-                    console.log("DEBUG: Buscando en 'academias' donde el campo academiaId sea:", idBusquedaAcademia);
 
                     // Creamos la consulta
                     const qAcademia = query(collection(db, "academias"), where("academiaId", "==", idBusquedaAcademia));
@@ -89,11 +77,10 @@ const HubPage = ({
                         const imagen = data.logoBase64 || data.logobase64;
                         if (imagen) {
                             setFondoAcademia(imagen);
-                            console.log("ÉXITO: Fondo cargado desde ACADEMIA");
                             return; // 🛑 Salimos inmediatamente si encontramos la imagen aquí
                         }
                     } else {
-                        console.log("AVISO: Ninguna academia tiene el academiaId:", idBusquedaAcademia);
+                        console.log("AVISO: Ninguna academia tiene el academiaId:", idBusquedaAcademia)
                     }
                 }
 
