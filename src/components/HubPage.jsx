@@ -30,21 +30,48 @@ const HubPage = ({
 
     // Efecto para cargar Fondo de Academia
     useEffect(() => {
-        const fetchAcademiaInfo = async () => {
-            if (usuario?.academiaId) {
-                try {
+        const fetchFondoApp = async () => {
+            try {
+                // RUTA NUEVA: Profesores con TeamId
+                if (usuario?.teamId) {
+                    const sedeRef = doc(db, "sedes", usuario.teamId);
+                    const sedeSnap = await getDoc(sedeRef);
+
+                    if (sedeSnap.exists()) {
+                        const data = sedeSnap.data();
+                        // Búsqueda inteligente: intenta encontrar el primer campo válido disponible
+                        const imagenEncontrada = data.avatarSede || data.logoBase64 || data.logobase64;
+
+                        if (imagenEncontrada) {
+                            setFondoAcademia(imagenEncontrada);
+                            return; // Éxito, terminamos aquí
+                        }
+                    }
+                }
+
+                // RUTA ANTIGUA: Respaldo para usuarios antiguos (Gustavo)
+                if (usuario?.academiaId) {
                     const academiaRef = doc(db, "academias", usuario.academiaId);
                     const academiaSnap = await getDoc(academiaRef);
-                    if (academiaSnap.exists() && academiaSnap.data().logoBase64) {
-                        setFondoAcademia(academiaSnap.data().logoBase64);
+
+                    if (academiaSnap.exists()) {
+                        const data = academiaSnap.data();
+                        // Igual que arriba, protegemos contra nombres de campos inconsistentes
+                        const imagenEncontrada = data.logoBase64 || data.logobase64;
+
+                        if (imagenEncontrada) {
+                            setFondoAcademia(imagenEncontrada);
+                        }
                     }
-                } catch (error) {
-                    console.error("Error al cargar el logo:", error);
                 }
+            } catch (error) {
+                // Log silencioso para la demo, no queremos que un error de carga detenga la UI
+                console.warn("Fallo en la carga del fondo, usando estilo por defecto:", error);
             }
         };
-        fetchAcademiaInfo();
-    }, [usuario?.academiaId]);
+
+        fetchFondoApp();
+    }, [usuario?.teamId, usuario?.academiaId]);
 
     // Efecto para buscar el último anuncio
     useEffect(() => {
@@ -261,7 +288,7 @@ const HubPage = ({
 
             {/* BOTONES DEL HUB */}
             <div style={{ ...styles.grid, position: 'relative', zIndex: 10 }}>
-                
+
                 {/* --- NUEVA POSICIÓN: CONTINUAR ESTUDIO --- */}
                 {hasSession && (
                     <button style={{ ...styles.hubBtn, gridColumn: 'span 2', border: '1px solid #d4af37', backgroundColor: 'rgba(212, 175, 55, 0.1)', backdropFilter: 'blur(5px)' }} onClick={onContinue}>CONTINUAR ESTUDIO</button>

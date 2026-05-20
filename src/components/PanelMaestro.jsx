@@ -53,18 +53,28 @@ const PanelMaestro = ({ usuario, teamData, sedeData, styles, onVerSede, onBack }
             .finally(() => setCargandoStats(false));
     }, [teamId, sedes]); // recalcular si cambian las sedes
 
-    // 3. Escuchar alumnos de la sede seleccionada
+    // 3. Escuchar alumnos de la sede seleccionada (Optimizado para Demo sin necesidad de índices)
     useEffect(() => {
         if (!sedeSeleccionada) { setAlumnosDeSede([]); return; }
+
+        // Consulta simple (Firestore NO requiere índices complejos para esto)
         const q = query(
             collection(db, "alumnos"),
             where("sedeId", "==", sedeSeleccionada.id),
-            where("activo", "==", true),
-            orderBy("nombre", "asc")
+            where("activo", "==", true)
         );
+
         const unsub = onSnapshot(q, snap => {
-            setAlumnosDeSede(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            const listaAlumnos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+            // Ordenamos por nombre nativamente en JavaScript para que la UX siga siendo perfecta
+            listaAlumnos.sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
+
+            setAlumnosDeSede(listaAlumnos);
+        }, error => {
+            console.error("Error en tiempo real de alumnos:", error);
         });
+
         return () => unsub();
     }, [sedeSeleccionada]);
 
