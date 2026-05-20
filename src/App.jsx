@@ -455,7 +455,7 @@ export default function App() {
         );
 
       case 'alumnos':
-        if (['admin', 'profesor'].includes(userRole)) {
+        if (['admin', 'profesor', 'instructor'].includes(userRole)) {
           return (
             <GestionAlumnosPage
               onBack={() => setPage('hub')}

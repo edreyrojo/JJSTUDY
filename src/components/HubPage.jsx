@@ -11,6 +11,14 @@ const HubPage = ({
     usuario,
     styles = {}
 }) => {
+    // 🛡️ BLINDAJE: Si no existe el usuario, mostramos pantalla de carga
+    if (!usuario) {
+        return (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#d4af37', fontSize: '1.5rem' }}>
+                <p>Conectando al tatami digital...</p>
+            </div>
+        );
+    }
     // Estados Originales
     const [showSoporte, setShowSoporte] = useState(false);
     const [mensajeSoporte, setMensajeSoporte] = useState("");

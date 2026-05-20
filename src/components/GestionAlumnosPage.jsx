@@ -105,27 +105,42 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
 
         return () => unsub();
     }, [sedeIdEfectiva]);
-    // ── 2. ESCUCHA DE ALUMNOS (SINCRONIZACIÓN MAESTRA) ──
+    // ── 2. ESCUCHA DE ALUMNOS (Blindado y Estable) ──
     useEffect(() => {
-        // El único requisito real es tener el ID del equipo
-        const idSeguro = teamId || usuario.academiaId || usuario.uid;
-        if (!idSeguro) return;
+        // 1. Aseguramos que tenemos los IDs necesarios
+        const idSeguro = teamId || usuario?.academiaId || usuario?.uid;
 
+        // 2. Si el usuario no está cargado o no tiene IDs de pertenencia, no hacemos nada
+        if (!usuario || !idSeguro) {
+            console.log("Esperando datos de usuario o IDs...");
+            return;
+        }
+
+        // 3. Construimos la query
         const q = buildAlumnosQuery({
-            rol: rol,
+            rol: usuario.rol, // Usamos el rol del usuario, no una variable externa
             teamId: idSeguro,
-            sedeId: sedeIdEfectiva, // Si es null, la nueva función cargará todo el team
+            sedeId: sedeIdEfectiva,
             soloArchivados: verArchivados
         });
 
-        const unsub = onSnapshot(q, (snap) => {
-            setAlumnos(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        }, (error) => {
-            console.error("Error en la boveda de alumnos:", error);
-        });
+        // 4. Suscripción con manejo de errores real
+        const unsub = onSnapshot(q,
+            (snap) => {
+                setAlumnos(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            },
+            (error) => {
+                console.error("Error en la boveda de alumnos:", error);
+                if (error.code === 'permission-denied') {
+                    notify("No tienes permiso para ver estos alumnos. Verifica si estás validado.", 'error');
+                }
+            }
+        );
 
         return () => unsub();
-    }, [verArchivados, teamId, sedeIdEfectiva, rol, usuario]);
+
+        // 5. Array de dependencias ESTABLE: Usamos solo el ID (string) y no el objeto 'usuario' completo
+    }, [verArchivados, teamId, sedeIdEfectiva, usuario?.uid, usuario?.rol]);
 
     // --- HANDLERS DE ARCHIVOS (sin cambios) ---
     const handleFotoChange = (e) => {
