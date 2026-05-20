@@ -339,7 +339,7 @@ const HubPage = ({
 
                 <button style={{ ...styles.hubBtn, border: '1px solid #d4af37', backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)' }} onClick={() => onNavigate('planeador')}>PLANEAR CLASE</button>
 
-                {['admin', 'profesor'].includes(userRole) && (
+                {['admin', 'profesor', 'instructor'].includes(userRole) && (
                     <button style={{ ...styles.hubBtn, border: '1px solid #d4af37', backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)' }} onClick={() => onNavigate('alumnos')}>GESTIÓN DOJO</button>
                 )}
 

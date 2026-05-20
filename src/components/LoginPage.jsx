@@ -16,6 +16,7 @@ const notify = (mensaje, tipo = 'success') => {
 };
 const LoginPage = ({
     onLogin,
+    onBack,
     onRegister,
     email = "",
     setEmail,
@@ -96,94 +97,106 @@ const LoginPage = ({
                     <input
                         type="text"
                         placeholder="Nombre completo"
-                        style={{ ...styles.input, width: '100%', marginBottom: '15px' }}
+                        style={{
+                            ...styles.input,
+                            width: '100%',
+                            maxWidth: '280px',
+                            margin: '10px auto',
+                            display: 'block'
+                        }}
                         value={nombreCompleto}
                         onChange={(e) => setNombreCompleto(e.target.value)}
                     />
                     {/* NUEVO CAMPO: CÓDIGO DE ACADEMIA */}
-                        <div style={{ marginBottom: '15px' }}>
-                            <label style={{ color: '#666', fontSize: '0.65rem', display: 'block', marginBottom: '5px' }}>¿ERES INSTRUCTOR? PEGA EL CÓDIGO DEL PROFESOR:</label>
-                            <input
-                                type="text"
-                                placeholder="Código de Academia (Opcional)"
-                                style={{ ...styles.input, width: '100%', border: '1px solid #333' }}
-                                value={academiaIdInput}
-                                onChange={(e) => setAcademiaIdInput(e.target.value)}
-                            />
-                        </div>
-                    </>
+                    <div style={{ marginBottom: '15px' }}>
+                        <label style={{ color: '#666', fontSize: '0.65rem', display: 'block', marginBottom: '5px' }}>¿ERES INSTRUCTOR? PEGA EL CÓDIGO DEL PROFESOR:</label>
+                        <input
+                            type="text"
+                            placeholder="Código de Academia (Opcional)"
+                            style={{
+                                ...styles.input,
+                                width: '100%',
+                                maxWidth: '280px',
+                                margin: '10px auto',
+                                display: 'block'
+                            }}
+                            value={academiaIdInput}
+                            onChange={(e) => setAcademiaIdInput(e.target.value)}
+                        />
+                    </div>
+                </>
                 )}
-            {/* INPUT EMAIL */}
-            <input
-                type="email"
-                placeholder="Email"
-                style={{
-                    ...styles.input,
-                    width: '100%',
-                    maxWidth: '280px',
-                    margin: '10px auto',
-                    display: 'block'
-                }}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-            />
+                {/* INPUT EMAIL */}
+                <input
+                    type="email"
+                    placeholder="Email"
+                    style={{
+                        ...styles.input,
+                        width: '100%',
+                        maxWidth: '280px',
+                        margin: '10px auto',
+                        display: 'block'
+                    }}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                />
 
-            {/* INPUT PASSWORD */}
-            <input
-                type="password"
-                placeholder="Contraseña"
-                style={{
-                    ...styles.input,
-                    width: '100%',
-                    maxWidth: '280px',
-                    margin: '10px auto',
-                    display: 'block'
-                }}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-            />
+                {/* INPUT PASSWORD */}
+                <input
+                    type="password"
+                    placeholder="Contraseña"
+                    style={{
+                        ...styles.input,
+                        width: '100%',
+                        maxWidth: '280px',
+                        margin: '10px auto',
+                        display: 'block'
+                    }}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                />
 
-            {/* CHECKBOX */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '15px auto', maxWidth: '320px' }}>
-                <input type="checkbox" id="recordar" defaultChecked style={{ accentColor: '#d4af37' }} />
-                <label htmlFor="recordar" style={{ color: '#666', fontSize: '0.75rem', cursor: 'pointer' }}>
-                    Mantener sesión iniciada
-                </label>
+                {/* CHECKBOX */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '15px auto', maxWidth: '320px' }}>
+                    <input type="checkbox" id="recordar" defaultChecked style={{ accentColor: '#d4af37' }} />
+                    <label htmlFor="recordar" style={{ color: '#666', fontSize: '0.75rem', cursor: 'pointer' }}>
+                        Mantener sesión iniciada
+                    </label>
+                </div>
+
+                {/* BOTÓN PRINCIPAL */}
+                <button
+                    style={{
+                        ...styles.btnGold,
+                        width: '100%',
+                        maxWidth: '320px',
+                        display: 'block',
+                        margin: '20px auto 10px auto',
+                        padding: '12px'
+                    }}
+                    onClick={esRegistro ? onRegister : onLogin}
+                >
+                    {esRegistro ? 'ENVIAR SOLICITUD' : 'ENTRAR'}
+                </button>
+
+                {/* LINK CAMBIO MODO */}
+                <button
+                    onClick={() => setEsRegistro(!esRegistro)}
+                    style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#666',
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                        marginTop: '15px',
+                        width: '100%',
+                        textAlign: 'center',
+                        textDecoration: 'underline'
+                    }}
+                >
+                    {esRegistro ? '¿Ya tienes cuenta? Entra' : '¿Eres nuevo? Solicita acceso'}
+                </button>
             </div>
-
-            {/* BOTÓN PRINCIPAL */}
-            <button
-                style={{
-                    ...styles.btnGold,
-                    width: '100%',
-                    maxWidth: '320px',
-                    display: 'block',
-                    margin: '20px auto 10px auto',
-                    padding: '12px'
-                }}
-                onClick={esRegistro ? onRegister : onLogin}
-            >
-                {esRegistro ? 'ENVIAR SOLICITUD' : 'ENTRAR'}
-            </button>
-
-            {/* LINK CAMBIO MODO */}
-            <button
-                onClick={() => setEsRegistro(!esRegistro)}
-                style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#666',
-                    fontSize: '0.8rem',
-                    cursor: 'pointer',
-                    marginTop: '15px',
-                    width: '100%',
-                    textAlign: 'center',
-                    textDecoration: 'underline'
-                }}
-            >
-                {esRegistro ? '¿Ya tienes cuenta? Entra' : '¿Eres nuevo? Solicita acceso'}
-            </button>
-        </div>
         </div >
     );
 };

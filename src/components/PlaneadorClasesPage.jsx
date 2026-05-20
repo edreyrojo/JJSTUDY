@@ -22,7 +22,6 @@ const notify = (mensaje, tipo = 'success') => {
         color: '#fff',
         confirmButtonColor: '#d4af37',
         iconColor: tipo === 'success' ? '#4CAF50' : '#ff4444',
-        border: '1px solid #d4af37',
         customClass: {
             popup: 'gold-border-alert'
         }
@@ -62,108 +61,108 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
     };
 
     // 1. Necesitamos referencias persistentes para el audio y el bloqueo de pantalla
-const audioCtxRef = React.useRef(null);
-const wakeLockRef = React.useRef(null);
+    const audioCtxRef = React.useRef(null);
+    const wakeLockRef = React.useRef(null);
 
-// Función para asegurar que el audio esté "despierto" en móviles
-const initAudio = async () => {
-    if (!audioCtxRef.current) {
-        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (audioCtxRef.current.state === 'suspended') {
-        await audioCtxRef.current.resume();
-    }
-};
-
-// Función para evitar que el celular se apague (Wake Lock)
-const requestWakeLock = async () => {
-    try {
-        if ('wakeLock' in navigator) {
-            wakeLockRef.current = await navigator.wakeLock.request('screen');
+    // Función para asegurar que el audio esté "despierto" en móviles
+    const initAudio = async () => {
+        if (!audioCtxRef.current) {
+            audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
         }
-    } catch (err) {
-        console.error("WakeLock Error:", err);
-    }
-};
-
-const playBeep = (freq = 440, duration = 2, forceVibrate = false) => {
-    try {
-        // Usamos la referencia persistente
-        if (!audioCtxRef.current) return; 
-
-        const oscillator = audioCtxRef.current.createOscillator();
-        const gainNode = audioCtxRef.current.createGain();
-
-        oscillator.connect(gainNode);
-        gainNode.connect(audioCtxRef.current.destination);
-
-        oscillator.type = 'triangle';
-        oscillator.frequency.value = freq;
-
-        const now = audioCtxRef.current.currentTime;
-        gainNode.gain.setValueAtTime(0.5, now);
-        gainNode.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-
-        oscillator.start(now);
-        oscillator.stop(now + duration);
-
-        // VIBRACIÓN: Si el audio falla o está en silencio, el alumno siente el round
-        if (forceVibrate && "vibrate" in navigator) {
-            navigator.vibrate(duration * 200); // Vibra proporcional a la duración
+        if (audioCtxRef.current.state === 'suspended') {
+            await audioCtxRef.current.resume();
         }
-    } catch (e) { console.error("Audio error", e); }
-};
-
-const playTripleCampana = () => {
-    playBeep(1200, 1, true); // Añadimos vibración al final
-    setTimeout(() => playBeep(1200, 1, false), 300);
-    setTimeout(() => playBeep(1200, 2, true), 600);
-};
-
-// --- CAMBIO CLAVE EN EL INICIO DEL TIMER ---
-const startTimerWithPrep = async (minutos) => {
-    // ESTO DESBLOQUEA EL CELULAR: Debe ser gatillado por el click del usuario
-    await initAudio();
-    await requestWakeLock();
-
-    setCurrentTargetTime(minutos * 60);
-    setTimeLeft(10);
-    setIsPrepTime(true);
-    setTimerActive(true);
-    playBeep(500, 2, true);
-};
-
-// --- LÓGICA DEL TIMER (Se mantiene igual, solo ajustamos los beeps) ---
-useEffect(() => {
-    let interval = null;
-    if (timerActive && timeLeft > 0) {
-        // Beeps de cuenta regresiva (añadimos vibración corta)
-        if (timeLeft <= 5) playBeep(600, 0.5, true); 
-
-        interval = setInterval(() => {
-            setTimeLeft(prev => {
-                if (prev <= 1 && isPrepTime) { // Ajustado a 1 para mejor sincronía
-                    setIsPrepTime(false);
-                    playBeep(800, 3, true); // Inicio de round: vibración fuerte
-                    return currentTargetTime;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-    } else if (timeLeft === 0 && timerActive) {
-        setTimerActive(false);
-        playTripleCampana();
-        
-        // Liberamos el bloqueo de pantalla al terminar
-        if (wakeLockRef.current) {
-            wakeLockRef.current.release();
-            wakeLockRef.current = null;
-        }
-    }
-    return () => { 
-        if (interval) clearInterval(interval); 
     };
-}, [timerActive, timeLeft, isPrepTime, currentTargetTime]);
+
+    // Función para evitar que el celular se apague (Wake Lock)
+    const requestWakeLock = async () => {
+        try {
+            if ('wakeLock' in navigator) {
+                wakeLockRef.current = await navigator.wakeLock.request('screen');
+            }
+        } catch (err) {
+            console.error("WakeLock Error:", err);
+        }
+    };
+
+    const playBeep = (freq = 440, duration = 2, forceVibrate = false) => {
+        try {
+            // Usamos la referencia persistente
+            if (!audioCtxRef.current) return;
+
+            const oscillator = audioCtxRef.current.createOscillator();
+            const gainNode = audioCtxRef.current.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtxRef.current.destination);
+
+            oscillator.type = 'triangle';
+            oscillator.frequency.value = freq;
+
+            const now = audioCtxRef.current.currentTime;
+            gainNode.gain.setValueAtTime(0.5, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+            oscillator.start(now);
+            oscillator.stop(now + duration);
+
+            // VIBRACIÓN: Si el audio falla o está en silencio, el alumno siente el round
+            if (forceVibrate && "vibrate" in navigator) {
+                navigator.vibrate(duration * 200); // Vibra proporcional a la duración
+            }
+        } catch (e) { console.error("Audio error", e); }
+    };
+
+    const playTripleCampana = () => {
+        playBeep(1200, 1, true); // Añadimos vibración al final
+        setTimeout(() => playBeep(1200, 1, false), 300);
+        setTimeout(() => playBeep(1200, 2, true), 600);
+    };
+
+    // --- CAMBIO CLAVE EN EL INICIO DEL TIMER ---
+    const startTimerWithPrep = async (minutos) => {
+        // ESTO DESBLOQUEA EL CELULAR: Debe ser gatillado por el click del usuario
+        await initAudio();
+        await requestWakeLock();
+
+        setCurrentTargetTime(minutos * 60);
+        setTimeLeft(10);
+        setIsPrepTime(true);
+        setTimerActive(true);
+        playBeep(500, 2, true);
+    };
+
+    // --- LÓGICA DEL TIMER (Se mantiene igual, solo ajustamos los beeps) ---
+    useEffect(() => {
+        let interval = null;
+        if (timerActive && timeLeft > 0) {
+            // Beeps de cuenta regresiva (añadimos vibración corta)
+            if (timeLeft <= 5) playBeep(600, 0.5, true);
+
+            interval = setInterval(() => {
+                setTimeLeft(prev => {
+                    if (prev <= 1 && isPrepTime) { // Ajustado a 1 para mejor sincronía
+                        setIsPrepTime(false);
+                        playBeep(800, 3, true); // Inicio de round: vibración fuerte
+                        return currentTargetTime;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+        } else if (timeLeft === 0 && timerActive) {
+            setTimerActive(false);
+            playTripleCampana();
+
+            // Liberamos el bloqueo de pantalla al terminar
+            if (wakeLockRef.current) {
+                wakeLockRef.current.release();
+                wakeLockRef.current = null;
+            }
+        }
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [timerActive, timeLeft, isPrepTime, currentTargetTime]);
 
     const formatTime = (seconds) => {
         const mins = Math.floor(seconds / 60);
@@ -183,21 +182,70 @@ useEffect(() => {
     const [nuevaClase, setNuevaClase] = useState(estadoInicial);
 
     useEffect(() => {
-        if (!usuario?.uid) return;
-        let isMounted = true;
-        const idParaFiltrar = usuario.academiaId || usuario.uid;
+        // 1. Validar que tengamos datos mínimos para la query
+        if (!usuario || !usuario.uid) return;
 
-        const qClases = query(collection(db, "clases"), orderBy("fecha", "desc"));
-        const unsubClases = onSnapshot(qClases, (snap) => {
-            if (isMounted) setClases(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        let unsub = null;
+
+        const iniciarSuscripcion = async () => {
+            try {
+                // Asegúrate de que esta query coincide con las nuevas reglas
+                const q = query(
+                    collection(db, "clases"),
+                    where("teamId", "==", usuario.teamId || usuario.academiaId)
+                );
+
+                unsub = onSnapshot(q,
+                    (snap) => {
+                        setClases(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+                    },
+                    (error) => {
+                        // SI ES ERROR DE PERMISO, NO HACEMOS NADA O AVISAMOS CON CALMA
+                        if (error.code === 'permission-denied') {
+                            console.warn("Permiso denegado en PlaneadorClasesPage. Revisa las reglas de 'clases'.");
+                        } else {
+                            console.error("Error en snapshot:", error);
+                        }
+                    }
+                );
+            } catch (err) {
+                console.error("Error al iniciar suscripción:", err);
+            }
+        };
+
+        iniciarSuscripcion();
+
+        // LIMPIEZA ESENCIAL (El "regresar" no debería crashear si esto es correcto)
+        return () => {
+            if (unsub) {
+                unsub();
+            }
+        };
+    }, [usuario]); useEffect(() => {
+        if (!usuario) return;
+
+        // Quitamos el 'where' restrictivo por ahora para ver todos los datos
+        // o al menos asegurar que traemos la colección completa
+        const q = collection(db, "clases");
+
+        const unsub = onSnapshot(q, (snap) => {
+            const todasLasClases = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+            // FILTRO MANUAL EN EL CLIENTE (A prueba de balas)
+            const filtradas = todasLasClases.filter(c =>
+                c.teamId === usuario.teamId ||
+                c.teamId === usuario.academiaId ||
+                c.academiaId === usuario.academiaId ||
+                c.academiaId === usuario.teamId
+            );
+
+            setClases(filtradas);
+            console.log("Clases cargadas:", filtradas.length); // DEBUG: Mira esto en F12
+        }, (error) => {
+            console.error("Error en suscripción:", error);
         });
 
-        const qAlumnos = query(collection(db, "alumnos"), where("academiaId", "==", idParaFiltrar), orderBy("nombre", "asc"));
-        const unsubAlumnos = onSnapshot(qAlumnos, (snap) => {
-            if (isMounted) setAlumnos(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(a => a.activo));
-        });
-
-        return () => { isMounted = false; unsubClases(); unsubAlumnos(); };
+        return () => unsub();
     }, [usuario]);
 
     const agregarBloqueCLA = () => {

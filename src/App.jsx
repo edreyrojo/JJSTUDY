@@ -351,6 +351,8 @@ export default function App() {
           password={password} setPassword={setPassword}
           nombreCompleto={nombreCompleto} setNombreCompleto={setNombreCompleto}
           onLogin={handleLogin} onRegister={handleRegister} error={error} styles={styles}
+          academiaIdInput={academiaIdInput} 
+          setAcademiaIdInput={setAcademiaIdInput}
         />
       );
     }
