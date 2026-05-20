@@ -16,8 +16,20 @@ const notify = (mensaje, tipo = 'success') => {
     });
 };
 
-const MiCuenta = ({ usuario, onBack, styles }) => {
+
+const MiCuenta = ({ usuario, onBack, styles, notify }) => {
     const [editando, setEditando] = useState(false);
+    const [cargando, setCargando] = useState(false);
+
+    // 🔥 FIX: Estilo blindado para el botón guardar
+    const estiloBotonGuardar = {
+        ...styles.btnGold,
+        flex: 1,
+        fontWeight: 'bold',
+        backgroundColor: cargando ? '#ffbb00' : '#d4af37', // Color forzado
+        color: '#000', // Texto siempre negro para contraste
+        cursor: cargando ? 'not-allowed' : 'pointer'
+    };
 
     // Estado ampliado con TODOS los nuevos campos
     const [datos, setDatos] = useState({
@@ -40,8 +52,6 @@ const MiCuenta = ({ usuario, onBack, styles }) => {
         instagram: usuario?.instagram || '',
         tallaGi: usuario?.tallaGi || ''
     });
-
-    const [cargando, setCargando] = useState(false);
 
     const coloresCinturon = {
         'Blanco': '#FFFFFF', 'Azul': '#2196F3', 'Morado': '#9C27B0',
@@ -216,7 +226,7 @@ const MiCuenta = ({ usuario, onBack, styles }) => {
                         </div>
                         <div style={{ flex: '1 1 45%' }}>
                             <p style={{ color: '#888', fontSize: '0.65rem', marginBottom: '5px' }}>TIEMPO ENTRENANDO</p>
-                            <input disabled={!editando} placeholder="Ej. 2 años y 3 meses" style={{ ...styles.input, width: '100%', margin: 0, opacity: editando ? 1 : 0.8 }} value={datos.tiempoEntrenando} onChange={e => setDatos({ ...datos, tiempoEntrenando: e.target.value })} />
+                            <input disabled={!editando} placeholder="Ej. 2 años y 3 meses" style={{ ...styles.input, width: '90%', margin: 0, opacity: editando ? 1 : 0.8 }} value={datos.tiempoEntrenando} onChange={e => setDatos({ ...datos, tiempoEntrenando: e.target.value })} />
                         </div>
                         <div style={{ flex: '1 1 45%' }}>
                             <p style={{ color: '#888', fontSize: '0.65rem', marginBottom: '5px' }}>TALLA DE GI</p>
@@ -234,15 +244,15 @@ const MiCuenta = ({ usuario, onBack, styles }) => {
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                         <div style={{ flex: '1 1 100%' }}>
                             <p style={{ color: '#888', fontSize: '0.65rem', marginBottom: '5px' }}>NOMBRE COMPLETO</p>
-                            <input disabled={!editando} style={{ ...styles.input, width: '100%', margin: 0, opacity: editando ? 1 : 0.8 }} value={datos.nombre} onChange={e => setDatos({ ...datos, nombre: e.target.value })} />
+                            <input disabled={!editando} style={{ ...styles.input, width: '95%', margin: 0, opacity: editando ? 1 : 0.8 }} value={datos.nombre} onChange={e => setDatos({ ...datos, nombre: e.target.value })} />
                         </div>
                         <div style={{ flex: '1 1 30%' }}>
                             <p style={{ color: '#888', fontSize: '0.65rem', marginBottom: '5px' }}>EDAD</p>
-                            <input type="number" disabled={!editando} style={{ ...styles.input, width: '100%', margin: 0, opacity: editando ? 1 : 0.8 }} value={datos.edad} onChange={e => setDatos({ ...datos, edad: e.target.value })} />
+                            <input type="number" disabled={!editando} style={{ ...styles.input, width: '80%', margin: 0, opacity: editando ? 1 : 0.8 }} value={datos.edad} onChange={e => setDatos({ ...datos, edad: e.target.value })} />
                         </div>
                         <div style={{ flex: '1 1 30%' }}>
                             <p style={{ color: '#888', fontSize: '0.65rem', marginBottom: '5px' }}>GÉNERO</p>
-                            <select disabled={!editando} value={datos.genero} onChange={e => setDatos({ ...datos, genero: e.target.value })} style={{ ...styles.input, width: '100%', margin: 0, opacity: editando ? 1 : 0.8 }}>
+                            <select disabled={!editando} value={datos.genero} onChange={e => setDatos({ ...datos, genero: e.target.value })} style={{ ...styles.input, width: '95%', margin: 0, opacity: editando ? 1 : 0.8 }}>
                                 <option value="">Seleccionar...</option>
                                 <option value="Masculino">Masculino</option>
                                 <option value="Femenino">Femenino</option>
@@ -251,7 +261,7 @@ const MiCuenta = ({ usuario, onBack, styles }) => {
                         </div>
                         <div style={{ flex: '1 1 30%' }}>
                             <p style={{ color: '#888', fontSize: '0.65rem', marginBottom: '5px' }}>CIUDAD/BASE</p>
-                            <input disabled={!editando} style={{ ...styles.input, width: '100%', margin: 0, opacity: editando ? 1 : 0.8 }} value={datos.ciudad} onChange={e => setDatos({ ...datos, ciudad: e.target.value })} />
+                            <input disabled={!editando} style={{ ...styles.input, width: '90%', margin: 0, opacity: editando ? 1 : 0.8 }} value={datos.ciudad} onChange={e => setDatos({ ...datos, ciudad: e.target.value })} />
                         </div>
                     </div>
                 </div>
@@ -278,17 +288,17 @@ const MiCuenta = ({ usuario, onBack, styles }) => {
                             <p style={{ color: '#888', fontSize: '0.65rem', marginBottom: '5px' }}>INSTAGRAM</p>
                             <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#000', border: '1px solid #333', borderRadius: '6px', padding: '0 10px' }}>
                                 <span style={{ color: '#666' }}>@</span>
-                                <input disabled={!editando} style={{ backgroundColor: 'transparent', color: '#fff', border: 'none', outline: 'none', padding: '10px', width: '100%', opacity: editando ? 1 : 0.8 }} value={datos.instagram} onChange={e => setDatos({ ...datos, instagram: e.target.value.replace('@', '') })} />
+                                <input disabled={!editando} style={{ backgroundColor: 'transparent', color: '#fff', border: 'none', outline: 'none', padding: '10px', width: '90%', opacity: editando ? 1 : 0.8 }} value={datos.instagram} onChange={e => setDatos({ ...datos, instagram: e.target.value.replace('@', '') })} />
                             </div>
                         </div>
 
-                        <div style={{ flex: '1 1 60%' }}>
+                        <div style={{ flex: '1 1 40%' }}>
                             <p style={{ color: '#ff4444', fontSize: '0.65rem', marginBottom: '5px', fontWeight: 'bold' }}>CONTACTO DE EMERGENCIA</p>
-                            <input disabled={!editando} placeholder="Nombre y Teléfono" style={{ ...styles.input, width: '100%', margin: 0, opacity: editando ? 1 : 0.8, borderColor: editando ? '#ff4444' : '#333' }} value={datos.emergencia} onChange={e => setDatos({ ...datos, emergencia: e.target.value })} />
+                            <input disabled={!editando} placeholder="Nombre y Teléfono" style={{ ...styles.input, width: '90%', margin: 0, opacity: editando ? 1 : 0.8, borderColor: editando ? '#ff4444' : '#333' }} value={datos.emergencia} onChange={e => setDatos({ ...datos, emergencia: e.target.value })} />
                         </div>
                         <div style={{ flex: '1 1 30%' }}>
                             <p style={{ color: '#ff4444', fontSize: '0.65rem', marginBottom: '5px', fontWeight: 'bold' }}>TIPO DE SANGRE</p>
-                            <select disabled={!editando} value={datos.tipoSangre} onChange={e => setDatos({ ...datos, tipoSangre: e.target.value })} style={{ ...styles.input, width: '100%', margin: 0, opacity: editando ? 1 : 0.8 }}>
+                            <select disabled={!editando} value={datos.tipoSangre} onChange={e => setDatos({ ...datos, tipoSangre: e.target.value })} style={{ ...styles.input, width: '90%', margin: 0, opacity: editando ? 1 : 0.8 }}>
                                 <option value="">---</option>
                                 {sangres.map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
@@ -334,8 +344,8 @@ const MiCuenta = ({ usuario, onBack, styles }) => {
                 <div style={{ display: 'flex', gap: '15px', marginTop: '10px' }}>
                     {!editando ? (
                         <>
-                            <button onClick={onBack} style={{ ...styles.btnOutline, flex: 1 }}>VOLVER AL HUB</button>
-                            <button onClick={() => setEditando(true)} style={{ ...styles.btnGold, flex: 1, fontWeight: 'bold' }}>EDITAR PASAPORTE</button>
+                            <button onClick={onBack} style={{ ...styles.btnOutline, flex: 1 }}>VOLVER</button>
+                            <button onClick={() => setEditando(true)} style={{ ...styles.btnGold, flex: 1, fontWeight: 'bold' }}>EDITAR</button>
                         </>
                     ) : (
                         <>
