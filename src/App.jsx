@@ -321,17 +321,24 @@ export default function App() {
   };
 
   // --- FUNCIÓN PARA FINALIZAR EL ONBOARDING ---
-  const handleOnboardingComplete = (datosActualizados) => {
-    // 1. Actualizamos el estado local del usuario con su nuevo teamId y sedeId
-    setUsuario(prev => ({
-      ...prev,
-      ...datosActualizados
-    }));
-
-    // 2. Cerramos el modal
+  const handleOnboardingComplete = (resultado) => {
+    // 1. Ocultamos el modal inmediatamente
     setShowOnboarding(false);
 
-    notify("¡Bóveda configurada con éxito! Oss.");
+    // 2. Actualizamos la memoria (estado) de React con los nuevos datos
+    // Esto es crucial para que App.jsx sepa que el profesor YA TIENE team.
+    setUsuario((prevUsuario) => ({
+      ...prevUsuario,
+      teamId: resultado.teamId,
+      sedeId: resultado.sedeId,
+      academiaId: resultado.academiaId || resultado.teamId, // Aseguramos el academiaId
+      necesitaOnboarding: false // ¡Apagamos el loop!
+    }));
+
+    // (Opcional pero recomendado) 
+    // Si tu app requiere una recarga dura para que otros componentes 
+    // lean desde cero la base de datos ya actualizada, descomenta la siguiente línea:
+    // window.location.reload(); 
   };
 
   // --- 4. RENDERIZADO DE PÁGINAS ---

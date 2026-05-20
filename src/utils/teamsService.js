@@ -1,7 +1,3 @@
-// teamsService.js
-// Servicio central para la arquitectura Multi-Team de Team Hakagure Platform
-// Maneja: Teams, Sedes, Roles, Migración de datos legacy
-
 import { db } from '../firebase';
 import {
     doc, getDoc, setDoc, addDoc, updateDoc,
@@ -107,9 +103,11 @@ export const crearNuevoTeam = async ({ uid, nombreTeam, nombreSede, ciudad }) =>
     const usuarioRef = doc(db, "usuarios", uid);
     batch.set(usuarioRef, {
         uid,
-        rol: 'propietario',
+        rol: 'profesor',
         teamId: uid,
         sedeId: sedeRef.id,
+        academiaId: uid, // <--- FALTABA ESTO
+        necesitaOnboarding: false, // <--- ESTO APAGA EL BUCLE INFINITO
         fechaActualizacion: new Date().toISOString()
     }, { merge: true });
 
@@ -145,6 +143,8 @@ export const vincularInstructorASede = async (uid, codigoAcceso) => {
         rol: 'instructor',
         teamId: sedeData.teamId,
         sedeId: sedeDoc.id,
+        academiaId: sedeData.teamId, // <--- FALTABA ESTO
+        necesitaOnboarding: false, // <--- PREVIENE EL BUCLE PARA INSTRUCTORES
         fechaVinculacion: new Date().toISOString()
     }, { merge: true });
 
@@ -205,20 +205,20 @@ export const buildAlumnosQuery = ({ rol, teamId, sedeId, soloArchivados = false 
 
     if (veTodoElTeam) {
         return query(
-        collection(db, "alumnos"),
-        where("academiaId", "==", teamId), // <--- CAMBIA teamId por academiaId aquí
-        where("activo", "==", activo),
-        orderBy("nombre", "asc")
-    );
+            collection(db, "alumnos"),
+            where("academiaId", "==", teamId), // <--- CAMBIA teamId por academiaId aquí
+            where("activo", "==", activo),
+            orderBy("nombre", "asc")
+        );
     } else {
         // Instructores o vista de sede específica
         return query(
-    collection(db, "alumnos"),
-    where("academiaId", "==", teamId), // <--- Y AQUÍ
-    where("sedeId", "==", sedeId),
-    where("activo", "==", activo),
-    orderBy("nombre", "asc")
-);
+            collection(db, "alumnos"),
+            where("academiaId", "==", teamId), // <--- Y AQUÍ
+            where("sedeId", "==", sedeId),
+            where("activo", "==", activo),
+            orderBy("nombre", "asc")
+        );
     }
 };
 
@@ -316,7 +316,7 @@ export const migrarDatosLegacy = async ({ uid, academiaId, nombreTeam, nombreSed
 export const obtenerStatsDeTeam = async (teamId) => {
     const alumnosQ = query(
         collection(db, "alumnos"),
-        where("teamId", "==", teamId),
+        where("academiaId", "==", teamId),
         where("activo", "==", true)
     );
     const snap = await getDocs(alumnosQ);
