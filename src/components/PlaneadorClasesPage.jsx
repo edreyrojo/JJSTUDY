@@ -134,35 +134,47 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
 
     // --- LÓGICA DEL TIMER (Se mantiene igual, solo ajustamos los beeps) ---
     useEffect(() => {
-        let interval = null;
-        if (timerActive && timeLeft > 0) {
-            // Beeps de cuenta regresiva (añadimos vibración corta)
-            if (timeLeft <= 5) playBeep(600, 0.5, true);
+        if (!usuario || !usuario.uid) return;
 
-            interval = setInterval(() => {
-                setTimeLeft(prev => {
-                    if (prev <= 1 && isPrepTime) { // Ajustado a 1 para mejor sincronía
-                        setIsPrepTime(false);
-                        playBeep(800, 3, true); // Inicio de round: vibración fuerte
-                        return currentTargetTime;
-                    }
-                    return prev - 1;
-                });
-            }, 1000);
-        } else if (timeLeft === 0 && timerActive) {
-            setTimerActive(false);
-            playTripleCampana();
+        const teamIdEfectivo = usuario.teamId || usuario.academiaId;
+        if (!teamIdEfectivo) return; // Si no hay equipo, no buscamos
 
-            // Liberamos el bloqueo de pantalla al terminar
-            if (wakeLockRef.current) {
-                wakeLockRef.current.release();
-                wakeLockRef.current = null;
+        let unsubClases = null;
+        let unsubAlumnos = null;
+
+        const cargarDatos = () => {
+            try {
+                // 1. CARGAR CLASES (Cumpliendo reglas de seguridad)
+                const qClases = query(
+                    collection(db, "clases"),
+                    where("teamId", "==", teamIdEfectivo)
+                );
+                unsubClases = onSnapshot(qClases, (snap) => {
+                    setClases(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+                }, (err) => console.error("Error cargando clases:", err));
+
+                // 2. CARGAR ALUMNOS (Para el Scouting)
+                const qAlumnos = query(
+                    collection(db, "alumnos"),
+                    where("teamId", "==", teamIdEfectivo)
+                );
+                unsubAlumnos = onSnapshot(qAlumnos, (snap) => {
+                    // Solo traemos alumnos activos si tienes campo de estado, si no, traemos todos
+                    setAlumnos(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+                }, (err) => console.error("Error cargando alumnos:", err));
+
+            } catch (err) {
+                console.error("Error al iniciar suscripciones:", err);
             }
-        }
-        return () => {
-            if (interval) clearInterval(interval);
         };
-    }, [timerActive, timeLeft, isPrepTime, currentTargetTime]);
+
+        cargarDatos();
+
+        return () => {
+            if (unsubClases) unsubClases();
+            if (unsubAlumnos) unsubAlumnos();
+        };
+    }, [usuario]);
 
     const formatTime = (seconds) => {
         const mins = Math.floor(seconds / 60);
@@ -180,74 +192,6 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
         ]
     };
     const [nuevaClase, setNuevaClase] = useState(estadoInicial);
-
-    useEffect(() => {
-        // 1. Validar que tengamos datos mínimos para la query
-        if (!usuario || !usuario.uid) return;
-
-        let unsub = null;
-
-        const iniciarSuscripcion = async () => {
-            try {
-                // Asegúrate de que esta query coincide con las nuevas reglas
-                const q = query(
-                    collection(db, "clases"),
-                    where("teamId", "==", usuario.teamId || usuario.academiaId)
-                );
-
-                unsub = onSnapshot(q,
-                    (snap) => {
-                        setClases(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-                    },
-                    (error) => {
-                        // SI ES ERROR DE PERMISO, NO HACEMOS NADA O AVISAMOS CON CALMA
-                        if (error.code === 'permission-denied') {
-                            console.warn("Permiso denegado en PlaneadorClasesPage. Revisa las reglas de 'clases'.");
-                        } else {
-                            console.error("Error en snapshot:", error);
-                        }
-                    }
-                );
-            } catch (err) {
-                console.error("Error al iniciar suscripción:", err);
-            }
-        };
-
-        iniciarSuscripcion();
-
-        // LIMPIEZA ESENCIAL (El "regresar" no debería crashear si esto es correcto)
-        return () => {
-            if (unsub) {
-                unsub();
-            }
-        };
-    }, [usuario]); useEffect(() => {
-        if (!usuario) return;
-
-        // Quitamos el 'where' restrictivo por ahora para ver todos los datos
-        // o al menos asegurar que traemos la colección completa
-        const q = collection(db, "clases");
-
-        const unsub = onSnapshot(q, (snap) => {
-            const todasLasClases = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-            // FILTRO MANUAL EN EL CLIENTE (A prueba de balas)
-            const filtradas = todasLasClases.filter(c =>
-                c.teamId === usuario.teamId ||
-                c.teamId === usuario.academiaId ||
-                c.academiaId === usuario.academiaId ||
-                c.academiaId === usuario.teamId
-            );
-
-            setClases(filtradas);
-            console.log("Clases cargadas:", filtradas.length); // DEBUG: Mira esto en F12
-        }, (error) => {
-            console.error("Error en suscripción:", error);
-        });
-
-        return () => unsub();
-    }, [usuario]);
-
     const agregarBloqueCLA = () => {
         const nuevosBloques = [...nuevaClase.bloques];
         const bloqueCLA = { id: Date.now().toString(), tipo: 'CLA', atacante: '', defensor: '', rondas: ['', '', ''], intensidad: 1, minutos: 3 };
@@ -256,12 +200,25 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
     };
 
     const guardarClase = async () => {
-        if (!nuevaClase.titulo) return notify("Falta título");
+        if (!nuevaClase.titulo) return notify("Falta título", "error");
+
         try {
-            await addDoc(collection(db, "clases"), { ...nuevaClase, academiaId: usuario.academiaId || usuario.uid, fechaRegistro: new Date().toISOString() });
+            const teamIdEfectivo = usuario.teamId || usuario.academiaId;
+
+            await addDoc(collection(db, "clases"), {
+                ...nuevaClase,
+                teamId: teamIdEfectivo, // Vital para la regla de seguridad
+                creadoPor: usuario.uid,
+                fechaRegistro: new Date().toISOString()
+            });
+
+            notify("Clase forjada con éxito", "success");
             setModo('lista');
             setNuevaClase(estadoInicial);
-        } catch (e) { notify("Error al guardar"); }
+        } catch (e) {
+            console.error(e);
+            notify("Error al guardar la clase. Revisa permisos.", "error");
+        }
     };
 
     const registrarAsistenciaConNota = async (alumnoId, nota) => {
