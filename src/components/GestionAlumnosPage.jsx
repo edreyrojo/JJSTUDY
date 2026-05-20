@@ -16,7 +16,6 @@ const notify = (mensaje, tipo = 'success') => {
         color: '#fff',
         confirmButtonColor: '#d4af37',
         iconColor: tipo === 'success' ? '#4CAF50' : '#ff4444',
-        border: '1px solid #d4af37',
         customClass: { popup: 'gold-border-alert' }
     });
 };
@@ -83,7 +82,6 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
     const esPropietario = rol === 'propietario';
 
     // ── 1. CARGA DE CONFIGURACIÓN DE LA SEDE ──
-    // ── 1. CARGA DE CONFIGURACIÓN DE LA SEDE (AJUSTADO A MIGRACIÓN) ──
     useEffect(() => {
         if (!sedeIdEfectiva) return;
 
@@ -92,10 +90,10 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
             if (snap.exists()) {
                 const data = snap.data();
                 setConfig({
-                    // Ajustamos los nombres de los campos a lo que hay en Firestore
-                    nombre: data.nombreSede || 'Mi Dojo',
+                    nombre: data.nombreSede || data.nombre || 'Mi Dojo',
                     ciudad: data.ciudad || '',
-                    logoBase64: data.logobase64 || '', // Minúscula según el script
+                    // Tolerancia a fallos: leemos la key con mayúscula y con minúscula
+                    logoBase64: data.logoBase64 || data.logobase64 || '',
                     horarios: data.horarios || [],
                     programas: data.programas || [],
                     codigoAcceso: data.codigoAcceso || ''
@@ -109,25 +107,25 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
     }, [sedeIdEfectiva]);
     // ── 2. ESCUCHA DE ALUMNOS (SINCRONIZACIÓN MAESTRA) ──
     useEffect(() => {
-    // El único requisito real es tener el ID del equipo
-    const idSeguro = teamId || usuario.academiaId || usuario.uid;
-    if (!idSeguro) return;
+        // El único requisito real es tener el ID del equipo
+        const idSeguro = teamId || usuario.academiaId || usuario.uid;
+        if (!idSeguro) return;
 
-    const q = buildAlumnosQuery({
-        rol: rol, 
-        teamId: idSeguro,
-        sedeId: sedeIdEfectiva, // Si es null, la nueva función cargará todo el team
-        soloArchivados: verArchivados
-    });
+        const q = buildAlumnosQuery({
+            rol: rol,
+            teamId: idSeguro,
+            sedeId: sedeIdEfectiva, // Si es null, la nueva función cargará todo el team
+            soloArchivados: verArchivados
+        });
 
-    const unsub = onSnapshot(q, (snap) => {
-        setAlumnos(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, (error) => {
-        console.error("Error en la boveda de alumnos:", error);
-    });
+        const unsub = onSnapshot(q, (snap) => {
+            setAlumnos(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        }, (error) => {
+            console.error("Error en la boveda de alumnos:", error);
+        });
 
-    return () => unsub();
-}, [verArchivados, teamId, sedeIdEfectiva, rol, usuario]);
+        return () => unsub();
+    }, [verArchivados, teamId, sedeIdEfectiva, rol, usuario]);
 
     // --- HANDLERS DE ARCHIVOS (sin cambios) ---
     const handleFotoChange = (e) => {
@@ -179,17 +177,21 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
     const handleGuardarAlumno = async () => {
         if (!nuevo.nombre || !nuevo.fechaPago) return notify("Nombre y fecha de pago requeridos.", "error");
         const dia = nuevo.fechaPago.split('-')[2];
+        const idSeguro = usuario.teamId || usuario.academiaId || usuario.uid;
+        const idSede = sedeIdEfectiva || idSeguro; // Si no tiene sede definida, usa el ID global
         try {
             const payload = {
                 ...nuevo,
                 diaPago: dia,
-                // ── CAMPOS NUEVOS: identificadores de arquitectura ──
-                teamId: teamId,
-                sedeId: sedeIdEfectiva,
-                // Mantener academiaId por compatibilidad con datos legacy
-                academiaId: sedeIdEfectiva,
+                teamId: idSeguro,
+                sedeId: idSede,
+                // CORRECCIÓN CRÍTICA: Mantenemos retrocompatibilidad.
+                // academiaId DEBE ser igual al teamId, no a la sede.
+                academiaId: idSeguro,
                 ultimaActualizacion: new Date().toISOString()
             };
+            Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
+
 
             if (editandoId) {
                 await setDoc(doc(db, "alumnos", editandoId), payload, { merge: true });
@@ -733,14 +735,24 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
                         {/* GUARDAR CONFIG */}
                         <div style={{ display: 'flex', gap: '15px', marginTop: '10px' }}>
                             <button onClick={async () => {
-                                // Guardar en "sedes/{sedeId}" en lugar de "academias/{id}"
-                                await setDoc(doc(db, "sedes", sedeIdEfectiva), {
-                                    ...config,
-                                    ultimaActualizacion: new Date().toISOString()
-                                }, { merge: true });
-                                setEditandoConfig(false);
-                                notify("¡Configuración de Sede guardada! OSS.");
-                            }} style={{ ...styles.btnGold, flex: 1, fontWeight: 'bold' }}>GUARDAR CAMBIOS</button>
+                                // Protección: Si sedeIdEfectiva es undefined, usamos un ID seguro
+                                const idSedeParaGuardar = sedeIdEfectiva || usuario.teamId || usuario.academiaId || usuario.uid;
+
+                                try {
+                                    await setDoc(doc(db, "sedes", idSedeParaGuardar), {
+                                        ...config,
+                                        ultimaActualizacion: new Date().toISOString()
+                                    }, { merge: true });
+
+                                    setEditandoConfig(false);
+                                    notify("¡Configuración de Sede guardada! OSS.");
+                                } catch (error) {
+                                    console.error("Error guardando sede:", error);
+                                    notify("Hubo un error al guardar.", "error");
+                                }
+                            }} style={{ ...styles.btnGold, flex: 1, fontWeight: 'bold' }}>
+                                GUARDAR CAMBIOS
+                            </button>
                             <button onClick={() => setEditandoConfig(false)} style={{ ...styles.btnOutline, flex: 1 }}>CERRAR</button>
                         </div>
                     </div>

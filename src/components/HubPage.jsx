@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, doc, getDoc, query, orderBy, limit, getDocs, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, query, orderBy, limit, getDocs, updateDoc, where } from 'firebase/firestore';
 
 const HubPage = ({
     onNavigate,
@@ -30,48 +30,83 @@ const HubPage = ({
 
     // Efecto para cargar Fondo de Academia
     useEffect(() => {
+        // DEBUG: Ver qué tiene el usuario en la mano
+        console.log("--- INICIO DE AUDITORÍA ---");
+        console.log("Usuario actual (objeto completo):", usuario);
+        console.log("TeamID presente:", usuario?.teamId);
+        console.log("AcademiaID presente:", usuario?.academiaId);
+
         const fetchFondoApp = async () => {
+            // 🛡️ SALVAVIDAS: Si nada funciona, esta imagen salvará la interfaz de la demo
+            const IMAGEN_POR_DEFECTO = "https://images.unsplash.com/photo-1564415315949-26bf26eb4e3e?q=80&w=1000&auto=format&fit=crop";
+
             try {
-                // RUTA NUEVA: Profesores con TeamId
-                if (usuario?.teamId) {
-                    const sedeRef = doc(db, "sedes", usuario.teamId);
-                    const sedeSnap = await getDoc(sedeRef);
+                console.log("DEBUG: Iniciando fetch de datos...");
 
-                    if (sedeSnap.exists()) {
-                        const data = sedeSnap.data();
-                        // Búsqueda inteligente: intenta encontrar el primer campo válido disponible
-                        const imagenEncontrada = data.avatarSede || data.logoBase64 || data.logobase64;
+                // 1. Intentar con Sede usando QUERY (Busca dentro de los campos, no por ID de documento)
+                if (usuario?.teamId || usuario?.uid) {
+                    const idBusquedaSede = usuario.teamId || usuario.uid;
+                    console.log("DEBUG: Buscando en 'sedes' donde el campo teamId sea:", idBusquedaSede);
 
-                        if (imagenEncontrada) {
-                            setFondoAcademia(imagenEncontrada);
-                            return; // Éxito, terminamos aquí
+                    // Creamos la consulta
+                    const qSede = query(collection(db, "sedes"), where("teamId", "==", idBusquedaSede));
+                    const sedeSnap = await getDocs(qSede);
+
+                    if (!sedeSnap.empty) {
+                        // Tomamos el primer documento que coincida
+                        const data = sedeSnap.docs[0].data();
+                        const imagen = data.avatarSede || data.logoBase64 || data.logobase64;
+                        if (imagen) {
+                            setFondoAcademia(imagen);
+                            console.log("ÉXITO: Fondo cargado desde SEDE");
+                            return; // 🛑 Salimos inmediatamente si encontramos la imagen aquí
                         }
+                    } else {
+                        console.log("AVISO: Ninguna sede tiene el teamId:", idBusquedaSede);
                     }
                 }
 
-                // RUTA ANTIGUA: Respaldo para usuarios antiguos (Gustavo)
-                if (usuario?.academiaId) {
-                    const academiaRef = doc(db, "academias", usuario.academiaId);
-                    const academiaSnap = await getDoc(academiaRef);
+                // 2. Respaldo: Intentar con Academia usando QUERY
+                if (usuario?.academiaId || usuario?.uid) {
+                    const idBusquedaAcademia = usuario.academiaId || usuario.uid;
+                    console.log("DEBUG: Buscando en 'academias' donde el campo academiaId sea:", idBusquedaAcademia);
 
-                    if (academiaSnap.exists()) {
-                        const data = academiaSnap.data();
-                        // Igual que arriba, protegemos contra nombres de campos inconsistentes
-                        const imagenEncontrada = data.logoBase64 || data.logobase64;
+                    // Creamos la consulta
+                    const qAcademia = query(collection(db, "academias"), where("academiaId", "==", idBusquedaAcademia));
+                    const academiaSnap = await getDocs(qAcademia);
 
-                        if (imagenEncontrada) {
-                            setFondoAcademia(imagenEncontrada);
+                    if (!academiaSnap.empty) {
+                        // Tomamos el primer documento que coincida
+                        const data = academiaSnap.docs[0].data();
+                        const imagen = data.logoBase64 || data.logobase64;
+                        if (imagen) {
+                            setFondoAcademia(imagen);
+                            console.log("ÉXITO: Fondo cargado desde ACADEMIA");
+                            return; // 🛑 Salimos inmediatamente si encontramos la imagen aquí
                         }
+                    } else {
+                        console.log("AVISO: Ninguna academia tiene el academiaId:", idBusquedaAcademia);
                     }
                 }
+
+                // 3. Fallback final: Si el código llega a esta línea, significa que no encontró imagen
+                console.warn("AVISO: No se encontró imagen en BDD. Activando fondo por defecto para evitar pantalla rota.");
+                setFondoAcademia(IMAGEN_POR_DEFECTO);
+
             } catch (error) {
-                // Log silencioso para la demo, no queremos que un error de carga detenga la UI
-                console.warn("Fallo en la carga del fondo, usando estilo por defecto:", error);
+                // Si Firestore falla por reglas de seguridad o pérdida de internet:
+                console.error("ERROR CRÍTICO en la carga de datos:", error);
+                setFondoAcademia(IMAGEN_POR_DEFECTO); // Ponemos el fondo de respaldo
             }
         };
 
-        fetchFondoApp();
-    }, [usuario?.teamId, usuario?.academiaId]);
+        // 🚦 Prevenir que se ejecute antes de que el objeto "usuario" exista
+        if (usuario) {
+            fetchFondoApp();
+        }
+
+        // Agregamos usuario?.uid a las dependencias por si teamId viene nulo pero uid no
+    }, [usuario?.teamId, usuario?.academiaId, usuario?.uid]);
 
     // Efecto para buscar el último anuncio
     useEffect(() => {

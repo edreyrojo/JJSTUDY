@@ -40,10 +40,15 @@ const PanelMaestro = ({ usuario, teamData, sedeData, styles, onVerSede, onBack }
     // 1. Escuchar sedes en tiempo real
     useEffect(() => {
         if (!teamId) return;
-        const unsub = escucharSedesDeTeam(teamId, setSedes);
+        const unsub = escucharSedesDeTeam(teamId, (data) => {
+            setSedes(data);
+            // AUTO-SELECCIÓN: Si no hay sede seleccionada, elegimos la primera para que no esté vacío
+            if (data.length > 0 && !sedeSeleccionada) {
+                setSedeSeleccionada(data[0]);
+            }
+        });
         return () => unsub();
     }, [teamId]);
-
     // 2. Cargar stats globales
     useEffect(() => {
         if (!teamId) return;
@@ -55,24 +60,26 @@ const PanelMaestro = ({ usuario, teamData, sedeData, styles, onVerSede, onBack }
 
     // 3. Escuchar alumnos de la sede seleccionada (Optimizado para Demo sin necesidad de índices)
     useEffect(() => {
-        if (!sedeSeleccionada) { setAlumnosDeSede([]); return; }
+        if (!sedeSeleccionada || !sedeSeleccionada.id) {
+            setAlumnosDeSede([]);
+            return;
+        }
 
-        // Consulta simple (Firestore NO requiere índices complejos para esto)
+        console.log("🔍 Consultando alumnos para la sede ID:", sedeSeleccionada.id);
+
         const q = query(
             collection(db, "alumnos"),
             where("sedeId", "==", sedeSeleccionada.id),
             where("activo", "==", true)
         );
 
-        const unsub = onSnapshot(q, snap => {
+        const unsub = onSnapshot(q, (snap) => {
             const listaAlumnos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-            // Ordenamos por nombre nativamente en JavaScript para que la UX siga siendo perfecta
             listaAlumnos.sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
-
             setAlumnosDeSede(listaAlumnos);
-        }, error => {
-            console.error("Error en tiempo real de alumnos:", error);
+            console.log(`✅ Alumnos cargados: ${listaAlumnos.length}`);
+        }, (error) => {
+            console.error("❌ Error en la query de alumnos:", error);
         });
 
         return () => unsub();
