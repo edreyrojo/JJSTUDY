@@ -36,7 +36,6 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
     const [timerActive, setTimerActive] = useState(false);
     const [isPrepTime, setIsPrepTime] = useState(false);
     const [currentTargetTime, setCurrentTargetTime] = useState(0);
-
     const intentarVolver = async () => {
         if (modo === 'clase_activa') {
             const result = await Swal.fire({
@@ -124,7 +123,6 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
         // ESTO DESBLOQUEA EL CELULAR: Debe ser gatillado por el click del usuario
         await initAudio();
         await requestWakeLock();
-
         setCurrentTargetTime(minutos * 60);
         setTimeLeft(10);
         setIsPrepTime(true);
@@ -132,12 +130,12 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
         playBeep(500, 2, true);
     };
 
-    // --- LÓGICA DEL TIMER (Se mantiene igual, solo ajustamos los beeps) ---
+    // --- LÓGICA DE FIREBASE (Se queda exactamente como está en tu código) ---
     useEffect(() => {
         if (!usuario || !usuario.uid) return;
 
         const teamIdEfectivo = usuario.teamId || usuario.academiaId;
-        if (!teamIdEfectivo) return; // Si no hay equipo, no buscamos
+        if (!teamIdEfectivo) return;
 
         let unsubClases = null;
         let unsubAlumnos = null;
@@ -159,7 +157,6 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
                     where("teamId", "==", teamIdEfectivo)
                 );
                 unsubAlumnos = onSnapshot(qAlumnos, (snap) => {
-                    // Solo traemos alumnos activos si tienes campo de estado, si no, traemos todos
                     setAlumnos(snap.docs.map(d => ({ id: d.id, ...d.data() })));
                 }, (err) => console.error("Error cargando alumnos:", err));
 
@@ -175,6 +172,37 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
             if (unsubAlumnos) unsubAlumnos();
         };
     }, [usuario]);
+
+
+    // =================================================================
+    // 👇 NUEVO BLOQUE EXCLUSIVO PARA EL TIMER (Añádelo aquí abajo) 👇
+    // =================================================================
+    useEffect(() => {
+        let intervalo = null;
+
+        if (timerActive && timeLeft > 0) {
+            intervalo = setInterval(() => {
+                setTimeLeft((prevTiempo) => prevTiempo - 1);
+            }, 1000);
+        } else if (timerActive && timeLeft === 0) {
+            // El tiempo llegó a cero, evaluamos si era preparación o el round activo
+            if (isPrepTime) {
+                // Terminaron los 10 segundos de preparación, suena la triple campana e inicia el round real
+                playTripleCampana();
+                setIsPrepTime(false);
+                setTimeLeft(currentTargetTime);
+            } else {
+                // Terminó el round de la clase, suena pitido largo y paramos el timer
+                playBeep(800, 3, true);
+                setTimerActive(false);
+            }
+        }
+
+        // Limpieza fundamental para que el reloj no se vuelva loco si pausas o sales
+        return () => {
+            if (intervalo) clearInterval(intervalo);
+        };
+    }, [timerActive, timeLeft, isPrepTime, currentTargetTime]);
 
     const formatTime = (seconds) => {
         const mins = Math.floor(seconds / 60);
@@ -194,7 +222,17 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
     const [nuevaClase, setNuevaClase] = useState(estadoInicial);
     const agregarBloqueCLA = () => {
         const nuevosBloques = [...nuevaClase.bloques];
-        const bloqueCLA = { id: Date.now().toString(), tipo: 'CLA', atacante: '', defensor: '', rondas: ['', '', ''], intensidad: 1, minutos: 3 };
+        const bloqueCLA = {
+            id: Date.now().toString(),
+            tipo: 'CLA',
+            modalidad: '',   // NUEVO
+            limitantes: '',  // NUEVO
+            atacante: '',
+            defensor: '',
+            rondas: ['', '', ''],
+            intensidad: 1,
+            minutos: 3
+        };
         nuevosBloques.splice(nuevosBloques.length - 1, 0, bloqueCLA);
         setNuevaClase({ ...nuevaClase, bloques: nuevosBloques });
     };
@@ -311,8 +349,10 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
                                     </div>
                                 ) : bloque.tipo === 'CLA' ? (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
-                                        <input placeholder="Objetivo Atacante" style={{ ...styles.input, width: '100%', boxSizing: 'border-box', fontSize: '0.8rem' }} onChange={e => { const b = [...nuevaClase.bloques]; b[index].atacante = e.target.value; setNuevaClase({ ...nuevaClase, bloques: b }); }} />
-                                        <input placeholder="Objetivo Defensor" style={{ ...styles.input, width: '100%', boxSizing: 'border-box', fontSize: '0.8rem' }} onChange={e => { const b = [...nuevaClase.bloques]; b[index].defensor = e.target.value; setNuevaClase({ ...nuevaClase, bloques: b }); }} />
+                                        <input placeholder="Modalidad (Ej. Media Guardia)" style={{ ...styles.input, width: '100%', boxSizing: 'border-box', fontSize: '0.8rem', borderBottom: '1px solid #d4af37' }} onChange={e => { const b = [...nuevaClase.bloques]; b[index].modalidad = e.target.value; setNuevaClase({ ...nuevaClase, bloques: b }); }} value={bloque.modalidad || ''} />
+                                        <input placeholder="Limitantes (Ej. Solo pases por arriba)" style={{ ...styles.input, width: '100%', boxSizing: 'border-box', fontSize: '0.8rem', borderBottom: '1px solid #ff4444' }} onChange={e => { const b = [...nuevaClase.bloques]; b[index].limitantes = e.target.value; setNuevaClase({ ...nuevaClase, bloques: b }); }} value={bloque.limitantes || ''} />
+                                        <input placeholder="Objetivo Atacante" style={{ ...styles.input, width: '100%', boxSizing: 'border-box', fontSize: '0.8rem' }} onChange={e => { const b = [...nuevaClase.bloques]; b[index].atacante = e.target.value; setNuevaClase({ ...nuevaClase, bloques: b }); }} value={bloque.atacante || ''} />
+                                        <input placeholder="Objetivo Defensor" style={{ ...styles.input, width: '100%', boxSizing: 'border-box', fontSize: '0.8rem' }} onChange={e => { const b = [...nuevaClase.bloques]; b[index].defensor = e.target.value; setNuevaClase({ ...nuevaClase, bloques: b }); }} value={bloque.defensor || ''} />
                                     </div>
                                 ) : (
                                     <textarea placeholder="Detalles de Sparring" style={{ ...styles.input, width: '100%', boxSizing: 'border-box', height: '60px', fontSize: '0.8rem', resize: 'none' }} onChange={e => { const b = [...nuevaClase.bloques]; b[index].contenido = e.target.value; setNuevaClase({ ...nuevaClase, bloques: b }); }} />
@@ -346,6 +386,8 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
                                         </>
                                     ) : b.tipo === 'CLA' ? (
                                         <>
+                                            {b.modalidad && <div style={{ marginBottom: '5px', color: '#fff' }}><strong>MODALIDAD:</strong> {b.modalidad}</div>}
+                                            {b.limitantes && <div style={{ marginBottom: '8px', color: '#ff4444' }}><strong>LIMITANTES:</strong> {b.limitantes}</div>}
                                             <div style={{ marginBottom: '5px' }}><strong>ATK:</strong> {b.atacante}</div>
                                             <div><strong>DEF:</strong> {b.defensor}</div>
                                         </>
