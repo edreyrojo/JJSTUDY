@@ -320,8 +320,8 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
                             </div>
                         ))}
                         <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <button onClick={agregarBloqueCLA} style={{ ...styles.btnOutline, padding: '12px' }}>+ AÑADIR BLOQUE TÉCNICO</button>
-                            <button onClick={guardarClase} style={{ ...styles.btnGold, padding: '15px' }}>GUARDAR EN BÓVEDA</button>
+                            <button onClick={agregarBloqueCLA} style={{ ...styles.btnOutline, padding: '12px' }}>+ BLOQUE</button>
+                            <button onClick={guardarClase} style={{ ...styles.btnGold, padding: '15px' }}>GUARDAR CLASE</button>
                         </div>
                     </div>
                 )}
