@@ -71,12 +71,11 @@ export const inicializarUsuario = async (uid) => {
 // ─────────────────────────────────────────────
 // ONBOARDING: Crear un nuevo Team (Profesor/Fundador)
 // ─────────────────────────────────────────────
-// --- 2. Corrección en crearNuevoTeam ---
-// Aseguramos que la creación sea consistente con los campos requeridos por las reglas
 export const crearNuevoTeam = async ({ uid, nombreTeam, nombreSede, ciudad }) => {
     const batch = writeBatch(db);
 
-    const teamRef = doc(db, "teams", uid);
+    // 1. Crear el Team
+    const teamRef = doc(db, "teams", uid); // El uid del propietario ES el teamId
     batch.set(teamRef, {
         nombre: nombreTeam,
         propietarioUid: uid,
@@ -84,31 +83,41 @@ export const crearNuevoTeam = async ({ uid, nombreTeam, nombreSede, ciudad }) =>
         activo: true
     });
 
+    // 2. Crear la Sede Principal
     const sedeRef = doc(collection(db, "sedes"));
     const codigoAcceso = generarCodigoAcceso(nombreTeam, ciudad);
     batch.set(sedeRef, {
-        teamId: uid, // Campo clave para las nuevas reglas
+        teamId: uid,
         nombre: nombreSede,
         ciudad: ciudad,
         tipo: 'sede_principal',
         codigoAcceso: codigoAcceso,
+        logoBase64: '',
+        horarios: [],
+        programas: ["BJJ Adultos", "BJJ Kids", "BJJ Teens", "No-Gi"],
         fechaCreacion: new Date().toISOString(),
         activa: true
     });
 
+    // 3. Actualizar el usuario como propietario
     const usuarioRef = doc(db, "usuarios", uid);
     batch.set(usuarioRef, {
         uid,
         rol: 'profesor',
-        teamId: uid, // Necesario para getMiTeam()
+        teamId: uid,
         sedeId: sedeRef.id,
-        academiaId: uid, // Mantenemos para retrocompatibilidad
-        necesitaOnboarding: false,
+        academiaId: uid, // <--- FALTABA ESTO
+        necesitaOnboarding: false, // <--- ESTO APAGA EL BUCLE INFINITO
         fechaActualizacion: new Date().toISOString()
     }, { merge: true });
 
     await batch.commit();
-    return { teamId: uid, sedeId: sedeRef.id, codigoAcceso };
+
+    return {
+        teamId: uid,
+        sedeId: sedeRef.id,
+        codigoAcceso
+    };
 };
 
 // ─────────────────────────────────────────────
@@ -206,30 +215,6 @@ export const buildAlumnosQuery = ({ rol, teamId, sedeId, soloArchivados = false 
         return query(
             collection(db, "alumnos"),
             where("academiaId", "==", teamId), // <--- Y AQUÍ
-            where("sedeId", "==", sedeId),
-            where("activo", "==", activo),
-            orderBy("nombre", "asc")
-        );
-    }
-};export const buildAlumnosQuery = ({ rol, teamId, sedeId, soloArchivados = false }) => {
-    const activo = !soloArchivados;
-
-    // Usuarios con privilegios administrativos
-    const veTodoElTeam = ['propietario', 'profesor', 'admin'].includes(rol);
-
-    // Usamos el teamId como campo de filtro universal
-    if (veTodoElTeam) {
-        return query(
-            collection(db, "alumnos"),
-            where("teamId", "==", teamId), // Cambiado de academiaId a teamId
-            where("activo", "==", activo),
-            orderBy("nombre", "asc")
-        );
-    } else {
-        // Filtro para instructores limitado a sede
-        return query(
-            collection(db, "alumnos"),
-            where("teamId", "==", teamId), // Cambiado de academiaId a teamId
             where("sedeId", "==", sedeId),
             where("activo", "==", activo),
             orderBy("nombre", "asc")
