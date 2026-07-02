@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs, doc, updateDoc, deleteDoc, addDoc, getDoc,} from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, addDoc } from 'firebase/firestore';
 import Swal from 'sweetalert2';
 import { DB_INSTRUCCIONALES } from '../data/instruccionales';
 
-// Iconos rápidos (puedes reemplazarlos por Lucide o FontAwesome si lo prefieres)
+// Iconos rápidos
 const Icons = {
     User: "👤",
     Ticket: "🎫",
@@ -16,8 +16,8 @@ const Icons = {
     Shield: "🛡️",
     Megaphone: "📢",
     Send: "🚀",
-    Down: "🔻", // Nuevo icono
-    Up: "🔺"    // Nuevo icono
+    Down: "🔻",
+    Up: "🔺"
 };
 
 const AdminPage = ({ onBack }) => {
@@ -25,7 +25,7 @@ const AdminPage = ({ onBack }) => {
     const [usuarios, setUsuarios] = useState([]);
     const [tickets, setTickets] = useState([]);
     const [cargando, setCargando] = useState(true);
-    const [tabActiva, setTabActiva] = useState('usuarios'); 
+    const [tabActiva, setTabActiva] = useState('usuarios');
     const [filtroUser, setFiltroUser] = useState("");
 
     // Estados para crear anuncios
@@ -106,14 +106,14 @@ const AdminPage = ({ onBack }) => {
         if (!tituloAnuncio.trim() || !mensajeAnuncio.trim()) {
             return notify("Por favor completa el título y el mensaje.", "error");
         }
-        
+
         setEnviandoAnuncio(true);
         try {
             await addDoc(collection(db, "anuncios"), {
                 titulo: tituloAnuncio.trim(),
                 mensaje: mensajeAnuncio.trim(),
                 fecha: new Date().toLocaleString(),
-                timestamp: Date.now() 
+                timestamp: Date.now()
             });
             notify("¡Anuncio publicado globalmente! 📢");
             setTituloAnuncio("");
@@ -125,7 +125,7 @@ const AdminPage = ({ onBack }) => {
             setEnviandoAnuncio(false);
         }
     };
-    
+
     return (
         <div style={s.container}>
             {/* Sidebar / Topbar */}
@@ -162,7 +162,7 @@ const AdminPage = ({ onBack }) => {
                     onClick={() => setTabActiva('tickets')}
                     style={tabActiva === 'tickets' ? s.tabActiveInfo : s.tabInactive}
                 >
-                    {Icons.Ticket} TICKETS SOPORTE 
+                    {Icons.Ticket} TICKETS SOPORTE
                     {tickets.length > 0 && <span style={s.badge}>{tickets.length}</span>}
                 </button>
             </div>
@@ -171,7 +171,7 @@ const AdminPage = ({ onBack }) => {
                 <div style={s.loader}>Sincronizando la base de datos...</div>
             ) : (
                 <main style={s.main}>
-                    
+
                     {/* VISTA 1: USUARIOS */}
                     {tabActiva === 'usuarios' && (
                         <div style={s.viewSection}>
@@ -212,10 +212,10 @@ const AdminPage = ({ onBack }) => {
                                         Este mensaje activará la campanita roja en el Hub de todos los alumnos registrados.
                                     </p>
                                 </div>
-                                
+
                                 <label style={s.formLabel}>TÍTULO DEL ANUNCIO (Ej. Nueva Actualización v2.0)</label>
-                                <input 
-                                    style={s.formInput} 
+                                <input
+                                    style={s.formInput}
                                     value={tituloAnuncio}
                                     onChange={(e) => setTituloAnuncio(e.target.value)}
                                     placeholder="Escribe el título aquí..."
@@ -223,15 +223,15 @@ const AdminPage = ({ onBack }) => {
                                 />
 
                                 <label style={s.formLabel}>MENSAJE / DESCRIPCIÓN DETALLADA</label>
-                                <textarea 
-                                    style={s.formTextarea} 
+                                <textarea
+                                    style={s.formTextarea}
                                     value={mensajeAnuncio}
                                     onChange={(e) => setMensajeAnuncio(e.target.value)}
                                     placeholder="Explica qué hay de nuevo, qué se arregló, etc..."
                                 />
 
                                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
-                                    <button 
+                                    <button
                                         onClick={handlePublicarAnuncio}
                                         disabled={enviandoAnuncio || !tituloAnuncio.trim() || !mensajeAnuncio.trim()}
                                         style={(!tituloAnuncio.trim() || !mensajeAnuncio.trim()) ? s.btnPublishDisabled : s.btnPublish}
@@ -294,11 +294,20 @@ const StatCard = ({ label, value, icon, color }) => (
     </div>
 );
 
-// --- USER ROW CON ACORDEÓN ---
-const UserRow = ({ user, autores = {}, onUpdate }) => { 
-    // NUEVO: Estado para expandir/contraer
+// --- USER ROW CON ACORDEÓN REFORZADO ---
+const UserRow = ({ user, autores = {}, onUpdate }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [selectedCourse, setSelectedCourse] = useState("");
+
+    // Estados locales para los IDs (evita el lag de renderizado al teclear)
+    const [localAcademiaId, setLocalAcademiaId] = useState(user.academiaId || "");
+    const [localSedeId, setLocalSedeId] = useState(user.sedeId || "");
+
+    // Sincroniza los inputs si los datos de Firebase cambian externamente
+    useEffect(() => {
+        setLocalAcademiaId(user.academiaId || "");
+        setLocalSedeId(user.sedeId || "");
+    }, [user.academiaId, user.sedeId]);
 
     const handleLiberarTodo = async () => {
         if (!autores || Object.keys(autores).length === 0) {
@@ -325,11 +334,14 @@ const UserRow = ({ user, autores = {}, onUpdate }) => {
         }
     };
 
+    // Detecta si el administrador editó los campos
+    const tieneCambiosDeIds = localAcademiaId !== (user.academiaId || "") || localSedeId !== (user.sedeId || "");
+
     return (
         <div style={s.userCard}>
             {/* CABECERA (Siempre visible y clicable para expandir) */}
-            <div 
-                style={{ ...s.userInfo, cursor: 'pointer' }} 
+            <div
+                style={{ ...s.userInfo, cursor: 'pointer' }}
                 onClick={() => setIsExpanded(!isExpanded)}
                 title="Clic para expandir/contraer gestión"
             >
@@ -340,10 +352,9 @@ const UserRow = ({ user, autores = {}, onUpdate }) => {
                         <span style={s.userEmail}>{user.email}</span>
                     </div>
                 </div>
-                
+
                 {/* Controles de la Cabecera */}
                 <div style={s.userControls}>
-                    {/* Badge informativo de cursos si está cerrado */}
                     {!isExpanded && user.cursos_liberados?.length > 0 && (
                         <span style={{ fontSize: '0.7rem', color: '#d4af37', backgroundColor: 'rgba(212, 175, 55, 0.1)', padding: '4px 8px', borderRadius: '12px', border: '1px solid #d4af37' }}>
                             {user.cursos_liberados.length} extras
@@ -351,15 +362,14 @@ const UserRow = ({ user, autores = {}, onUpdate }) => {
                     )}
 
                     {!user.validado && (
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); onUpdate({ validado: true }); }} 
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onUpdate({ validado: true }); }}
                             style={s.btnAccess}
                         >
                             AUTORIZAR
                         </button>
                     )}
-                    
-                    {/* Icono de Expandir/Contraer */}
+
                     <span style={{ fontSize: '0.8rem', color: '#666', marginLeft: '10px' }}>
                         {isExpanded ? Icons.Up : Icons.Down}
                     </span>
@@ -369,13 +379,13 @@ const UserRow = ({ user, autores = {}, onUpdate }) => {
             {/* SECCIÓN EXPANDIBLE (Cursos y Roles) */}
             {isExpanded && (
                 <div style={{ ...s.courseSection, animation: 'fadeIn 0.3s ease' }}>
-                    
+
                     {/* Fila de Rol */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px', paddingBottom: '15px', borderBottom: '1px dashed #333' }}>
                         <label style={s.courseLabel}>ROL DEL SISTEMA:</label>
-                        <select 
-                            value={user.rol || 'alumno'} 
-                            onChange={(e) => onUpdate({ rol: e.target.value })} 
+                        <select
+                            value={user.rol || 'alumno'}
+                            onChange={(e) => onUpdate({ rol: e.target.value })}
                             style={s.select}
                         >
                             <option value="alumno">Alumno</option>
@@ -383,6 +393,43 @@ const UserRow = ({ user, autores = {}, onUpdate }) => {
                             <option value="profesor">Profesor</option>
                             <option value="admin">Admin</option>
                         </select>
+                    </div>
+
+                    {/* NUEVA FILA: GESTIÓN DE ACADEMIA Y SEDE */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', marginBottom: '20px', paddingBottom: '15px', borderBottom: '1px dashed #333' }}>
+                        <div style={{ flex: 1, minWidth: '200px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                            <label style={s.courseLabel}>ACADEMIA ID / TEAM ID:</label>
+                            <input
+                                type="text"
+                                value={localAcademiaId}
+                                onChange={(e) => setLocalAcademiaId(e.target.value)}
+                                placeholder="UID del Profesor / Academia"
+                                style={s.formInputInline}
+                            />
+                        </div>
+                        <div style={{ flex: 1, minWidth: '200px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                            <label style={s.courseLabel}>SEDE ID:</label>
+                            <input
+                                type="text"
+                                value={localSedeId}
+                                onChange={(e) => setLocalSedeId(e.target.value)}
+                                placeholder="Código de Acceso de Sede"
+                                style={s.formInputInline}
+                            />
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                            <button
+                                onClick={() => onUpdate({
+                                    academiaId: localAcademiaId.trim() || null,
+                                    teamId: localAcademiaId.trim() || null, // Se actualiza como espejo por seguridad
+                                    sedeId: localSedeId.trim() || null
+                                })}
+                                style={tieneCambiosDeIds ? s.btnSaveIds : s.btnSaveIdsDisabled}
+                                disabled={!tieneCambiosDeIds}
+                            >
+                                ACTUALIZAR NEXO
+                            </button>
+                        </div>
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
@@ -426,7 +473,7 @@ const UserRow = ({ user, autores = {}, onUpdate }) => {
                         >
                             OTORGAR ACCESO
                         </button>
-                        
+
                     </div>
                 </div>
             )}
@@ -460,7 +507,7 @@ const s = {
     },
     statValue: { fontSize: '2rem', fontWeight: '900', color: '#fff', lineHeight: '1' },
     statLabel: { fontSize: '0.75rem', color: '#888', textTransform: 'uppercase', marginTop: '8px', letterSpacing: '1px' },
-    
+
     tabContainer: {
         display: 'flex', gap: '10px', marginBottom: '25px', overflowX: 'auto', paddingBottom: '5px',
         borderBottom: '1px solid #222'
@@ -491,7 +538,7 @@ const s = {
     viewSection: {
         animation: 'fadeIn 0.3s ease-in-out'
     },
-    
+
     // ESTILOS DE USUARIOS
     searchBar: {
         backgroundColor: '#111', padding: '15px 20px', borderRadius: '10px',
@@ -504,11 +551,11 @@ const s = {
     userCard: {
         backgroundColor: '#0a0a0a', border: '1px solid #222', borderRadius: '12px',
         padding: '15px 20px', boxShadow: '0 4px 6px rgba(0,0,0,0.2)', transition: 'transform 0.2s',
-        overflow: 'hidden' // Evita desbordes al animar el acordeón
+        overflow: 'hidden'
     },
     userInfo: {
         display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px',
-        userSelect: 'none' // Evita que se seleccione el texto al hacer clic repetidamente
+        userSelect: 'none'
     },
     userMainInfo: { display: 'flex', alignItems: 'center', gap: '15px' },
     userControls: { display: 'flex', alignItems: 'center', gap: '10px' },
@@ -526,7 +573,7 @@ const s = {
     courseSection: { marginTop: '15px', paddingTop: '15px', borderTop: '1px solid #222' },
     courseLabel: { fontSize: '0.75rem', color: '#888', fontWeight: 'bold', letterSpacing: '1px', margin: 0 },
     btnUnlockAll: {
-        background: 'rgba(76, 175, 80, 0.1)', border: '1px solid #4CAF50', color: '#4CAF50', 
+        background: 'rgba(76, 175, 80, 0.1)', border: '1px solid #4CAF50', color: '#4CAF50',
         fontSize: '0.7rem', padding: '5px 10px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', transition: '0.2s'
     },
     courseChips: { display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '20px' },
@@ -544,6 +591,43 @@ const s = {
     btnAdd: {
         backgroundColor: '#d4af37', border: 'none', color: '#000',
         padding: '10px 20px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap'
+    },
+
+    // NUEVOS ESTILOS PARA LOS INPUTS DE IDS
+    formInputInline: {
+        backgroundColor: '#000',
+        border: '1px solid #444',
+        color: '#fff',
+        padding: '10px 12px',
+        borderRadius: '6px',
+        fontSize: '0.9rem',
+        outline: 'none',
+        boxSizing: 'border-box',
+        width: '100%'
+    },
+    btnSaveIds: {
+        backgroundColor: '#d4af37',
+        border: 'none',
+        color: '#000',
+        padding: '11px 18px',
+        borderRadius: '6px',
+        fontWeight: 'bold',
+        cursor: 'pointer',
+        fontSize: '0.85rem',
+        whiteSpace: 'nowrap',
+        boxShadow: '0 2px 8px rgba(212,175,55,0.2)',
+        transition: '0.2s'
+    },
+    btnSaveIdsDisabled: {
+        backgroundColor: '#222',
+        border: '1px solid #333',
+        color: '#555',
+        padding: '11px 18px',
+        borderRadius: '6px',
+        fontWeight: 'bold',
+        cursor: 'not-allowed',
+        fontSize: '0.85rem',
+        whiteSpace: 'nowrap'
     },
 
     // ESTILOS DE TICKETS
