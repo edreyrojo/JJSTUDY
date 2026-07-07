@@ -199,27 +199,46 @@ export const escucharSedesDeTeam = (teamId, callback) => {
 // ─────────────────────────────────────────────
 export const buildAlumnosQuery = ({ rol, teamId, sedeId, soloArchivados = false }) => {
     const activo = !soloArchivados;
+    
+    // Limpieza de datos (trim) para evitar errores por espacios ocultos
+    const cleanTeamId = teamId?.trim();
+    const cleanSedeId = sedeId?.trim();
 
-    // 1. Definimos quiénes pueden ver TODO el equipo (Admin, Propietario o Profesor)
+    // DEBUG: Nos ayudará en la consola si algo falla
+    console.log("🔍 Intentando cargar alumnos con:", { rol, cleanTeamId, cleanSedeId });
+
+    if (!cleanTeamId) {
+        console.error("⚠️ Error: No se recibió un teamId válido.");
+        return null;
+    }
+
     const veTodoElTeam = ['propietario', 'profesor', 'admin'].includes(rol);
+    const colRef = collection(db, "alumnos");
 
+    // Lógica para Propietarios/Admins (Ven todo el equipo, de todas las sedes)
     if (veTodoElTeam) {
         return query(
-            collection(db, "alumnos"),
-            where("academiaId", "==", teamId), // <--- CAMBIA teamId por academiaId aquí
+            colRef,
+            where("teamId", "==", cleanTeamId),
             where("activo", "==", activo),
             orderBy("nombre", "asc")
         );
-    } else {
-        // Instructores o vista de sede específica
-        return query(
-            collection(db, "alumnos"),
-            where("academiaId", "==", teamId), // <--- Y AQUÍ
-            where("sedeId", "==", sedeId),
-            where("activo", "==", activo),
-            orderBy("nombre", "asc")
-        );
+    } 
+
+    // Lógica para Instructores (Ven solo su sede)
+    if (!cleanSedeId) {
+        console.warn("⚠️ Advertencia: Eres instructor pero tu usuario no tiene un sedeId asignado.");
+        // Forzamos un retorno vacío si no tiene sede, por seguridad
+        return query(colRef, where("teamId", "==", "nada_a_mostrar")); 
     }
+
+    return query(
+        colRef,
+        where("teamId", "==", cleanTeamId),
+        where("sedeId", "==", cleanSedeId),
+        where("activo", "==", activo),
+        orderBy("nombre", "asc")
+    );
 };
 
 // ─────────────────────────────────────────────
@@ -314,11 +333,15 @@ export const migrarDatosLegacy = async ({ uid, academiaId, nombreTeam, nombreSed
 // PANEL MAESTRO: Stats globales por sede
 // ─────────────────────────────────────────────
 export const obtenerStatsDeTeam = async (teamId) => {
+    // APLICAMOS TRIM POR SEGURIDAD Y CAMBIAMOS academiaId POR teamId
+    const cleanTeamId = teamId?.trim();
+    
     const alumnosQ = query(
         collection(db, "alumnos"),
-        where("academiaId", "==", teamId),
+        where("teamId", "==", cleanTeamId), // <-- CORRECCIÓN AQUÍ
         where("activo", "==", true)
     );
+    
     const snap = await getDocs(alumnosQ);
     const alumnos = snap.docs.map(d => d.data());
 
