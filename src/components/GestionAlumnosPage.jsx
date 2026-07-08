@@ -202,40 +202,56 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
     };
 
     // ── GUARDAR ALUMNO — Incluye teamId + sedeId ──
-    const handleGuardarAlumno = async () => {
-        if (!nuevo.nombre || !nuevo.fechaPago) return notify("Nombre y fecha de pago requeridos.", "error");
-        const dia = nuevo.fechaPago.split('-')[2];
-        const idSede = sedeIdEfectiva || teamId; 
+const handleGuardarAlumno = async () => {
+    // 1. Validación básica
+    if (!nuevo.nombre || !nuevo.fechaPago) {
+        return notify("Nombre y fecha de pago requeridos.", "error");
+    }
 
-        try {
-            const payload = {
-                ...nuevo,
-                diaPago: dia,
-                teamId: teamId,
-                sedeId: idSede,
-                academiaId: teamId, // Retrocompatibilidad garantizada
-                ultimaActualizacion: new Date().toISOString()
-            };
-            Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
+    const dia = nuevo.fechaPago.split('-')[2];
+    const idSede = sedeIdEfectiva || teamId;
 
-            if (editandoId) {
-                await setDoc(doc(db, "alumnos", editandoId), payload, { merge: true });
-            } else {
-                await addDoc(collection(db, "alumnos"), {
-                    ...payload,
-                    fechaRegistro: new Date().toISOString(),
-                    registradoPor: usuario.uid
-                });
-            }
-            setMostrarForm(false);
-            setEditandoId(null);
-            setNuevo(estadoAlumnoInicial);
-            notify("Operación exitosa 🛡️");
-        } catch (e) {
-            console.error(e);
-            notify("Error al guardar.", "error");
-        }
+    // 2. Construcción del Payload
+    const payload = {
+        ...nuevo,
+        diaPago: dia,
+        teamId: teamId,
+        sedeId: idSede,
+        academiaId: teamId, // Retrocompatibilidad garantizada
+        ultimaActualizacion: new Date().toISOString()
     };
+
+    // Limpieza de campos undefined
+    Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
+
+    // 3. Bloque de ejecución con Debugging y Manejo de Errores
+    try {
+        // --- LOGS DE DIAGNÓSTICO ---
+        console.log("DEBUG: Payload enviado a Firebase:", JSON.stringify(payload, null, 2));
+        console.log("DEBUG: ID de Sede en uso:", idSede);
+
+        if (editandoId) {
+            await setDoc(doc(db, "alumnos", editandoId), payload, { merge: true });
+        } else {
+            await addDoc(collection(db, "alumnos"), {
+                ...payload,
+                fechaRegistro: new Date().toISOString(),
+                registradoPor: usuario.uid
+            });
+        }
+
+        // 4. Éxito: Reset de formulario
+        setMostrarForm(false);
+        setEditandoId(null);
+        setNuevo(estadoAlumnoInicial);
+        notify("Operación exitosa 🛡️");
+
+    } catch (e) {
+        // 5. Diagnóstico de fallo
+        console.error("DEBUG: Error completo de Firebase:", e);
+        notify(`Error al guardar: ${e.message}`, "error");
+    }
+};
 
     // --- REGISTRAR PAGO ---
     const handleRegistrarPago = async (alumno) => {

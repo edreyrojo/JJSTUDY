@@ -227,47 +227,44 @@ const AdminPage = ({ onBack }) => {
 
     // --- CONTROLADOR UNIFICADO PARA VINCULAR NUEVA SEDE ---
     const handleCrearSede = async (e) => {
-        e.preventDefault();
-        if (!nombreSede.trim() || !academiaSeleccionada || !teamIdProfesor.trim()) {
-            return notify("Por favor completa todos los campos de la sede", "error");
-        }
-        setCreandoSede(true);
-        try {
-            const academiaObj = academias.find(a => a.id === academiaSeleccionada);
-            const nombreAlianza = academiaObj
-                ? (academiaObj.nombreAcademia || academiaObj.nombre || "SIN ALIANZA")
-                : "SIN ALIANZA";
+    e.preventDefault();
+    
+    // 1. Validación de seguridad
+    if (!nombreSede.trim() || !academiaSeleccionada || !teamIdProfesor.trim()) {
+        return notify("Por favor completa todos los campos de la sede", "error");
+    }
 
-            // Generamos un código de acceso automático (Ej: HOL-SED-1234)
-            const prefijo = nombreAlianza.substring(0, 3).toUpperCase();
-            const codigoGenerado = `${prefijo}-SED-${Date.now().toString().slice(-4)}`;
-            const nombreSedeLimpia = nombreSede.trim().toUpperCase();
+    const academiaMadre = academias.find(a => a.id === academiaSeleccionada);
+    setCreandoSede(true);
 
-            await addDoc(collection(db, "sedes"), {
-                nombre: nombreSedeLimpia,
-                nombreSede: nombreSedeLimpia,
-                academiaId: academiaSeleccionada,
-                academiaNombre: nombreAlianza,
-                teamId: teamIdProfesor.trim(), // UID del profesor responsable
-                ciudad: "Xalapa",
-                codigoAcceso: codigoGenerado,
-                horarios: [],
-                programas: ["BJJ Adultos", "BJJ Kids", "No-Gi"],
-                fechaCreacion: new Date().toLocaleString(),
-                ultimaActualizacion: new Date().toISOString(),
-                timestamp: Date.now()
-            });
+    try {
+        // 2. Generamos la referencia de documento vacía PRIMERO para capturar su ID autogenerado
+        const sedeRef = doc(collection(db, "sedes"));
 
-            notify(`Sede "${nombreSedeLimpia}" vinculada y configurada 📍`);
-            setNombreSede('');
-            setTeamIdProfesor('');
-            setAcademiaSeleccionada('');
-        } catch (error) {
-            console.error("Error al crear sede:", error);
-            notify("Error al vincular la sede", "error");
-        } finally {
-            setCreandoSede(false);
-        }
+        // 3. Guardamos con setDoc inyectando el ID de forma interna y explícita
+        await setDoc(sedeRef, {
+            id: sedeRef.id, // 🛡️ ¡Blindaje total! El ID ahora vive dentro del documento
+            nombre: nombreSede.trim(), // Nombre estándar
+            nombreSede: nombreSede.trim(), // Duplicado por retrocompatibilidad con componentes antiguos
+            academiaId: academiaSeleccionada,
+            academiaNombre: academiaMadre?.nombre || "Desconocida",
+            teamId: teamIdProfesor.trim(), // UID del profesor responsable (Filtro multi-tenant)
+            fechaCreacion: new Date().toISOString(),
+            activa: true,
+            tipo: 'sede_afiliada'
+        });
+
+        // 4. Reset del formulario y notificación
+        notify("Sede vinculada y estructurada exitosamente 📍", "success");
+        setNombreSede("");
+        setTeamIdProfesor("");
+        
+    } catch (e) {
+        console.error("DEBUG: Error al crear sede en AdminPage:", e);
+        notify(`Error al vincular sede: ${e.message}`, "error");
+    } finally {
+        setCreandoSede(false);
+    }
     };
 
     // --- FUNCIONES DE MANTENIMIENTO ORIGINALES ---
