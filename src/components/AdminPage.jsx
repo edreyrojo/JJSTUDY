@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs, doc, updateDoc, deleteDoc, addDoc, writeBatch } from 'firebase/firestore';
+import { collection, onSnapshot, getDocs, doc, deleteDoc, addDoc, writeBatch, setDoc } from 'firebase/firestore';
 import Swal from 'sweetalert2';
 import { DB_INSTRUCCIONALES } from '../data/instruccionales';
 
@@ -100,49 +100,57 @@ const AdminPage = ({ onBack }) => {
         }
     };
 
-    // 2. GENERADOR DE CÓDIGO DE ACCESO PARA SEDE MADRE LEGACY
     const generarCodigoSedeMadre = async (idSede, nombreAca) => {
-        try {
-            const prefijo = (nombreAca || "DOJO").slice(0, 4).toUpperCase().replace(/[^A-Z]/g, "X");
-            const rand = Math.floor(100 + Math.random() * 900);
-            const nuevoCodigo = `${prefijo}-MADRE${rand}`;
+    try {
+        const prefijo = (nombreAca || "DOJO").slice(0, 4).toUpperCase().replace(/[^A-Z]/g, "X");
+        const rand = Math.floor(100 + Math.random() * 900);
+        const nuevoCodigo = `${prefijo}-MADRE${rand}`;
 
-            await setDoc(doc(db, "sedes", idSede), {
-                codigoAcceso: nuevoCodigo,
-                nombreSede: nombreAca || "Sede Madre Principal",
-                ciudad: "Sede Central"
-            }, { merge: true });
+        // 1. Crear la referencia al documento
+        const sedeRef = doc(db, "sedes", idSede);
 
-            Swal.fire('¡Listo!', `Código generado: ${nuevoCodigo}`, 'success');
-        } catch (err) {
-            Swal.fire('Error', err.message, 'error');
-        }
+        // 2. Ejecutar setDoc (ahora sí lo reconocerá)
+        await setDoc(sedeRef, {
+            codigoAcceso: nuevoCodigo,
+            nombreSede: nombreAca || "Sede Madre Principal",
+            ciudad: "Sede Central"
+        }, { merge: true });
+
+        Swal.fire('¡Listo!', `Código generado: ${nuevoCodigo}`, 'success');
+    } catch (err) {
+        console.error("Error al generar código:", err);
+        Swal.fire('Error', err.message, 'error');
+    }
+};
+
+    useEffect(() => {
+    // 1. Definimos las escuchas (listeners)
+    const unsubUsuarios = onSnapshot(collection(db, "usuarios"), (snap) => {
+        setUsuarios(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    const unsubTickets = onSnapshot(collection(db, "soporte"), (snap) => {
+        const listaT = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setTickets(listaT.sort((a, b) => new Date(b.fecha) - new Date(a.fecha)));
+    });
+
+    const unsubAcademias = onSnapshot(collection(db, "academias"), (snap) => {
+        setAcademias(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    const unsubSedes = onSnapshot(collection(db, "sedes"), (snap) => {
+        setSedes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setCargando(false); // Una vez cargan las sedes, quitamos el loader
+    });
+
+    // 2. Limpieza (Muy importante para no duplicar escuchas)
+    return () => {
+        unsubUsuarios();
+        unsubTickets();
+        unsubAcademias();
+        unsubSedes();
     };
-
-    // --- OBTENER DATOS AMPLIADO (Trae también Academias y Sedes en paralelo) ---
-    const obtenerDatos = async () => {
-        try {
-            setCargando(true);
-            const [uSnap, tSnap, acSnap, seSnap] = await Promise.all([
-                getDocs(collection(db, "usuarios")),
-                getDocs(collection(db, "soporte")),
-                getDocs(collection(db, "academias")),
-                getDocs(collection(db, "sedes"))
-            ]);
-
-            setUsuarios(uSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-            const listaT = tSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-            setTickets(listaT.sort((a, b) => new Date(b.fecha) - new Date(a.fecha)));
-
-            // Inyectar Estructuras organizacionales
-            setAcademias(acSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-            setSedes(seSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        } catch (error) {
-            notify("Fallo en sincronización", "error");
-        } finally { setCargando(false); }
-    };
-
-    useEffect(() => { obtenerDatos(); }, []);
+}, []);
 
     const usuariosFiltrados = useMemo(() => {
         return usuarios.filter(u =>
@@ -309,9 +317,6 @@ const AdminPage = ({ onBack }) => {
         }
     };
 
-    const ejecutarMigracionMasiva = () => {
-        corregirIdsAlumnos();
-    };
     const vincularUsuarioASede = async (usuarioId, nuevaSedeId, nuevoRol) => {
         try {
             // 1. Actualizamos el usuario (sedeId y rol)
@@ -747,50 +752,60 @@ const AdminPage = ({ onBack }) => {
                                                     </div>
 
                                                     {/* CONTENIDO ACORDEÓN DE SEDES */}
-                                                    {estaAbierto && (
-                                                        <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #222' }}>
-                                                            {sedesDeAcademia.map(se => {
-                                                                const esSedeMadreLegacy = se.id === ac.id || !se.nombreSede;
-                                                                const nombreAMostrar = se.nombreSede || se.nombre || ac.nombreAcademia || 'Sede Principal / Madre';
-                                                                const ciudadAMostrar = se.ciudad || se.direccion || (esSedeMadreLegacy ? 'Sede Central' : 'Sin ubicación');
+{estaAbierto && (
+    <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #222' }}>
+        {sedesDeAcademia.map((se) => {
+            // Lógica de visualización
+            const esSedeMadre = se.tipo === 'sede_principal' || se.id === ac.id;
+            const nombreAMostrar = se.nombre || se.nombreSede || 'Sede sin nombre';
+            const ciudadAMostrar = se.ciudad || (esSedeMadre ? 'Sede Central' : 'Sin ubicación');
 
-                                                                return (
-                                                                    <div key={se.id} style={{ ...s.listItemSede, background: '#1f1f1f', margin: 0, border: '1px solid #282828' }}>
-                                                                        <div style={{ flex: 1 }}>
-                                                                            <div style={{ color: '#4CAF50', fontSize: '0.9rem', marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                                <span>📍</span>
-                                                                                <span><strong>{nombreAMostrar}</strong></span>
-                                                                                <span style={{ color: '#aaa', fontWeight: 'normal', fontSize: '0.75rem' }}>({ciudadAMostrar})</span>
-                                                                            </div>
+            return (
+                <div key={se.id} style={{ ...s.listItemSede, background: '#1f1f1f', margin: 0, border: '1px solid #282828' }}>
+                    <div style={{ flex: 1 }}>
+                        
+                        {/* CABECERA: TIPO Y NOMBRE */}
+                        <div style={{ color: '#4CAF50', fontSize: '0.9rem', marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>{esSedeMadre ? '👑' : '📍'}</span>
+                            <strong>{nombreAMostrar}</strong>
+                            <span style={{ color: '#aaa', fontWeight: 'normal', fontSize: '0.75rem' }}>
+                                ({ciudadAMostrar})
+                            </span>
+                        </div>
 
-                                                                            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '6px', alignItems: 'center' }}>
-                                                                                {se.codigoAcceso ? (
-                                                                                    <span style={{ background: '#222', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', color: '#d4af37', border: '1px solid #333', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                                                                                        <span style={{ userSelect: 'none' }}>🔑</span>
-                                                                                        <strong style={{ userSelect: 'all', cursor: 'pointer', letterSpacing: '1px' }} title="Doble clic para copiar">
-                                                                                            {se.codigoAcceso}
-                                                                                        </strong>
-                                                                                    </span>
-                                                                                ) : (
-                                                                                    <button
-                                                                                        onClick={() => generarCodigoSedeMadre(se.id, nombreAMostrar)}
-                                                                                        style={{ background: '#d4af3722', border: '1px solid #d4af37', color: '#d4af37', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', cursor: 'pointer', fontWeight: 'bold' }}
-                                                                                    >
-                                                                                        ⚡ Generar Código Madre
-                                                                                    </button>
-                                                                                )}
+                        {/* ACCIONES Y DATOS */}
+                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '6px', alignItems: 'center' }}>
+                            {se.codigoAcceso ? (
+                                <span style={{ background: '#222', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', color: '#d4af37', border: '1px solid #333' }}>
+                                    🔑 <strong style={{ cursor: 'pointer', letterSpacing: '1px' }}>{se.codigoAcceso}</strong>
+                                </span>
+                            ) : (
+                                <button
+                                    onClick={() => generarCodigoSedeMadre(se.id, nombreAMostrar)}
+                                    style={{ background: '#d4af3722', border: '1px solid #d4af37', color: '#d4af37', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', cursor: 'pointer' }}
+                                >
+                                    ⚡ Generar Código
+                                </button>
+                            )}
 
-                                                                                <span style={s.subTextListCode}>
-                                                                                    🥋 UID: {se.teamId?.slice(0, 6)}...{se.teamId?.slice(-4)}
-                                                                                </span>
-                                                                            </div>
-                                                                        </div>
-                                                                        <button onClick={() => handleAction(se.id, 'sedes', 'delete')} style={s.btnTextDelete}>Eliminar</button>
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    )}
+                            <span style={s.subTextListCode}>
+                                🥋 UID: {se.teamId ? `${se.teamId.slice(0, 6)}...${se.teamId.slice(-4)}` : 'N/A'}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    {/* BOTÓN ELIMINAR */}
+                    <button 
+                        onClick={() => handleAction(se.id, 'sedes', 'delete')} 
+                        style={{ ...s.btnTextDelete, marginLeft: '10px' }}
+                    >
+                        Eliminar
+                    </button>
+                </div>
+            );
+        })}
+    </div>
+)}
                                                 </div>
                                             );
                                         })}
@@ -876,28 +891,6 @@ const AdminPage = ({ onBack }) => {
                                     ))}
                                 </div>
                             )}
-                        </div>
-                    )}
-
-                    {/* ───────────────────────────────────────────── */}
-                    {/* VISTA 5: MANTENIMIENTO                        */}
-                    {/* ───────────────────────────────────────────── */}
-                    {tabActiva === 'mantenimiento' && (
-                        <div style={s.viewSection}>
-                            <div style={s.anuncioCard}>
-                                <h2 style={{ color: '#d4af37' }}>⚙️ Herramientas de Mantenimiento</h2>
-                                <p style={{ color: '#888' }}>Acciones críticas sobre la base de datos.</p>
-
-                                <div style={{ marginTop: '20px', padding: '20px', border: '1px solid #333', borderRadius: '10px' }}>
-                                    <h3 style={{ color: '#fff' }}>Normalización de IDs (Legacy)</h3>
-                                    <p style={{ fontSize: '0.8rem', color: '#666' }}>
-                                        Este script corrige la estructura de los usuarios antiguos que aún no cuentan con el campo 'teamId'.
-                                    </p>
-                                    <button onClick={ejecutarMigracionMasiva} style={s.btnAccess}>
-                                        EJECUTAR MIGRACIÓN AHORA
-                                    </button>
-                                </div>
-                            </div>
                         </div>
                     )}
                 </main>
