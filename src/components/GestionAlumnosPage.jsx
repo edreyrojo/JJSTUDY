@@ -8,6 +8,7 @@ import {
 import Swal from 'sweetalert2';
 import { buildAlumnosQuery, vincularInstructorASede } from '../utils/teamsService';
 
+// ── BLINDAJE Z-INDEX: Forzamos zIndex 9999 para que salte sobre modales de capa 4000 ──
 const notify = (mensaje, tipo = 'success') => {
     Swal.fire({
         text: mensaje,
@@ -16,20 +17,25 @@ const notify = (mensaje, tipo = 'success') => {
         color: '#fff',
         confirmButtonColor: '#d4af37',
         iconColor: tipo === 'success' ? '#4CAF50' : '#ff4444',
-        customClass: { popup: 'gold-border-alert' }
+        customClass: { popup: 'gold-border-alert' },
+        didOpen: (toast) => {
+            if (toast.parentElement) {
+                toast.parentElement.style.zIndex = '9999';
+            }
+        }
     });
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PROPS NUEVAS vs v1:
-//   usuario.rol        → 'propietario' | 'instructor'
+//   usuario.rol        → 'propietario' | 'instructor' | 'admin'
 //   usuario.teamId     → ID del team al que pertenece
 //   usuario.sedeId     → ID de la sede específica del usuario
 //   sedeActual         → Objeto con datos de la sede (puede venir del PanelMaestro)
 // ─────────────────────────────────────────────────────────────────────────────
 const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
 
-    // --- ESTADOS PRINCIPALES (sin cambios) ---
+    // --- ESTADOS PRINCIPALES ---
     const [alumnos, setAlumnos] = useState([]);
     const [verArchivados, setVerArchivados] = useState(false);
     const [mostrarForm, setMostrarForm] = useState(false);
@@ -37,12 +43,11 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
     const [alumnoSeleccionado, setAlumnoSeleccionado] = useState(null);
     const [editandoId, setEditandoId] = useState(null);
 
-    // NUEVO: Para vincular instructores — ahora usan código, no uid directo
+    // NUEVO: Para vincular instructores — usan código, no uid directo
     const [codigoVinculacion, setCodigoVinculacion] = useState("");
     const [vinculandoInstructor, setVinculandoInstructor] = useState(false);
 
-    // --- CONFIGURACIÓN DE LA SEDE (antes "academia") ---
-    // Ahora viene de "sedes/{sedeId}" en lugar de "academias/{id}"
+    // --- CONFIGURACIÓN DE LA SEDE ---
     const [config, setConfig] = useState({
         nombre: sedeActual?.nombre || 'Mi Dojo',
         ciudad: sedeActual?.ciudad || '',
@@ -52,13 +57,12 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
         codigoAcceso: sedeActual?.codigoAcceso || ''
     });
 
-    // Estados temporales para constructores de config (sin cambios)
+    // Estados temporales para constructores de config
     const [tempHora, setTempHora] = useState("19:00");
     const [tempNombreClase, setTempNombreClase] = useState("");
-    const [tempDias, setTempDias] = useState([]);
     const [tempNuevoPrograma, setTempNuevoPrograma] = useState("");
 
-    // --- ESTADO INICIAL DEL ALUMNO (sin cambios en campos) ---
+    // --- ESTADO INICIAL DEL ALUMNO ---
     const estadoAlumnoInicial = {
         nombre: '', fotoBase64: '', edad: '', telefono: '', instagram: '',
         contactoEmergenciaNombre: '', contactoEmergenciaTel: '', parentescoEmergencia: '',
@@ -73,31 +77,47 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
 
     const [nuevo, setNuevo] = useState(estadoAlumnoInicial);
 
-    // Determinar la sedeId efectiva:
-    // Si el propietario viene desde PanelMaestro con una sede seleccionada, usa esa.
-    // Si es instructor, siempre usa la suya.
-    const sedeIdEfectiva = sedeActual?.id || usuario.sedeId;
-    const teamId = usuario.teamId;
-    const rol = usuario.rol;
-    const esPropietario = rol === 'propietario';
+    // ── BLINDAJE DE IDs: Cadena de respaldo para evitar variables undefined ──
+    const teamId = usuario?.teamId || usuario?.academiaId || usuario?.uid;
+    const rol = usuario?.rol || 'instructor';
+    const esPropietario = rol === 'propietario' || rol === 'admin';
+    const sedeIdEfectiva = sedeActual?.id || usuario?.sedeId || teamId;
 
-    // ── 1. CARGA DE CONFIGURACIÓN DE LA SEDE ──
+    // ── 1. CARGA DE CONFIGURACIÓN DE LA SEDE (Con retrocompatibilidad) ──
     useEffect(() => {
         if (!sedeIdEfectiva) return;
 
         const docRef = doc(db, "sedes", sedeIdEfectiva);
-        const unsub = onSnapshot(docRef, (snap) => {
+        const unsub = onSnapshot(docRef, async (snap) => {
             if (snap.exists()) {
                 const data = snap.data();
                 setConfig({
                     nombre: data.nombreSede || data.nombre || 'Mi Dojo',
                     ciudad: data.ciudad || '',
-                    // Tolerancia a fallos: leemos la key con mayúscula y con minúscula
                     logoBase64: data.logoBase64 || data.logobase64 || '',
                     horarios: data.horarios || [],
-                    programas: data.programas || [],
+                    programas: data.programas || ["BJJ Adultos", "BJJ Kids", "BJJ Teens", "No-Gi"],
                     codigoAcceso: data.codigoAcceso || ''
                 });
+            } else {
+                // Respaldo de retrocompatibilidad: Si aún no existe en "sedes", buscar en "academias"
+                try {
+                    const acadRef = doc(db, "academias", sedeIdEfectiva);
+                    const acadSnap = await getDoc(acadRef);
+                    if (acadSnap.exists()) {
+                        const data = acadSnap.data();
+                        setConfig({
+                            nombre: data.nombreAcademia || data.nombre || 'Mi Dojo',
+                            ciudad: data.ciudad || '',
+                            logoBase64: data.logoBase64 || data.logobase64 || '',
+                            horarios: data.horarios || [],
+                            programas: data.programas || ["BJJ Adultos", "BJJ Kids", "BJJ Teens", "No-Gi"],
+                            codigoAcceso: data.codigoAcceso || ''
+                        });
+                    }
+                } catch (err) {
+                    console.log("No se encontró config previa en academias.");
+                }
             }
         }, (error) => {
             console.error("Error cargando configuración de sede:", error);
@@ -105,32 +125,27 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
 
         return () => unsub();
     }, [sedeIdEfectiva]);
+
     // ── 2. ESCUCHA DE ALUMNOS (Blindado y Estable) ──
     useEffect(() => {
-        // 1. Aseguramos que tenemos los IDs necesarios
-        const idSeguro = teamId || usuario?.academiaId || usuario?.uid;
-
-        // 2. Si el usuario no está cargado o no tiene IDs de pertenencia, no hacemos nada
-        if (!usuario || !idSeguro) {
+        if (!usuario || !teamId) {
             console.log("Esperando datos de usuario o IDs...");
             return;
         }
 
-        // 3. Construimos la query
         const q = buildAlumnosQuery({
-            rol: usuario.rol, // Usamos el rol del usuario, no una variable externa
-            teamId: idSeguro,
+            rol: rol,
+            teamId: teamId,
             sedeId: sedeIdEfectiva,
             soloArchivados: verArchivados
         });
 
-        // 4. Suscripción con manejo de errores real
         const unsub = onSnapshot(q,
             (snap) => {
                 setAlumnos(snap.docs.map(d => ({ id: d.id, ...d.data() })));
             },
             (error) => {
-                console.error("Error en la boveda de alumnos:", error);
+                console.error("Error en la bóveda de alumnos:", error);
                 if (error.code === 'permission-denied') {
                     notify("No tienes permiso para ver estos alumnos. Verifica si estás validado.", 'error');
                 }
@@ -138,11 +153,9 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
         );
 
         return () => unsub();
+    }, [verArchivados, teamId, sedeIdEfectiva, usuario?.uid, rol]);
 
-        // 5. Array de dependencias ESTABLE: Usamos solo el ID (string) y no el objeto 'usuario' completo
-    }, [verArchivados, teamId, sedeIdEfectiva, usuario?.uid, usuario?.rol]);
-
-    // --- HANDLERS DE ARCHIVOS (sin cambios) ---
+    // --- HANDLERS DE ARCHIVOS ---
     const handleFotoChange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -160,7 +173,7 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
         reader.readAsDataURL(file);
     };
 
-    // ── NUEVO: Vincular instructor con código de sede ──
+    // ── Vincular instructor con código de sede ──
     const handleVincularInstructor = async () => {
         if (!codigoVinculacion.trim()) return notify("Pega un código válido.", "error");
         setVinculandoInstructor(true);
@@ -175,7 +188,7 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
         }
     };
 
-    // --- LÓGICA DE NEGOCIO (PAGOS) — sin cambios ---
+    // --- LÓGICA DE NEGOCIO (PAGOS) ---
     const calcularEstadoPago = (fechaVencimiento) => {
         if (verArchivados) return { label: 'INACTIVO', color: '#666' };
         if (!fechaVencimiento) return { label: 'SIN FECHA', color: '#666' };
@@ -188,25 +201,22 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
         return { label: `ATRASADO (${Math.abs(diffDays)}d)`, color: '#ff4444' };
     };
 
-    // ── GUARDAR ALUMNO — Ahora incluye teamId + sedeId ──
+    // ── GUARDAR ALUMNO — Incluye teamId + sedeId ──
     const handleGuardarAlumno = async () => {
         if (!nuevo.nombre || !nuevo.fechaPago) return notify("Nombre y fecha de pago requeridos.", "error");
         const dia = nuevo.fechaPago.split('-')[2];
-        const idSeguro = usuario.teamId || usuario.academiaId || usuario.uid;
-        const idSede = sedeIdEfectiva || idSeguro; // Si no tiene sede definida, usa el ID global
+        const idSede = sedeIdEfectiva || teamId; 
+
         try {
             const payload = {
                 ...nuevo,
                 diaPago: dia,
-                teamId: idSeguro,
+                teamId: teamId,
                 sedeId: idSede,
-                // CORRECCIÓN CRÍTICA: Mantenemos retrocompatibilidad.
-                // academiaId DEBE ser igual al teamId, no a la sede.
-                academiaId: idSeguro,
+                academiaId: teamId, // Retrocompatibilidad garantizada
                 ultimaActualizacion: new Date().toISOString()
             };
             Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
-
 
             if (editandoId) {
                 await setDoc(doc(db, "alumnos", editandoId), payload, { merge: true });
@@ -227,7 +237,7 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
         }
     };
 
-    // --- REGISTRAR PAGO (sin cambios) ---
+    // --- REGISTRAR PAGO ---
     const handleRegistrarPago = async (alumno) => {
         if (!window.confirm(`¿Registrar pago para ${alumno.nombre}? La fecha saltará al próximo mes.`)) return;
         try {
@@ -244,7 +254,7 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
         }
     };
 
-    // --- UI HELPERS (sin cambios) ---
+    // --- UI HELPERS ---
     const toggleSelection = (lista, item, campo) => {
         const actual = nuevo[campo] || [];
         const existe = actual.includes(item);
@@ -253,14 +263,13 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
 
     if (!styles) return null;
 
-    // Nombre para mostrar en el header
     const nombreDisplay = sedeActual?.nombre || config.nombre || 'Mi Dojo';
     const ciudadDisplay = sedeActual?.ciudad || config.ciudad || '';
 
     return (
         <div style={{ padding: '20px', backgroundColor: '#000', minHeight: '100vh', color: '#fff', boxSizing: 'border-box' }}>
 
-            {/* ── HEADER ── (sin cambios visuales, datos dinámicos) */}
+            {/* ── HEADER ── */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '30px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <button onClick={onBack} style={{ ...styles.btnOutline, width: 'auto', padding: '10px 20px' }}>←</button>
@@ -274,7 +283,6 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
                             </h2>
                             <p style={{ margin: 0, fontSize: '0.75rem', color: '#666', letterSpacing: '1px' }}>
                                 {ciudadDisplay}
-                                {/* Badge de rol para el propietario */}
                                 {esPropietario && (
                                     <span style={{ marginLeft: '8px', color: '#d4af3788', fontSize: '0.6rem' }}>
                                         👑 PROPIETARIO
@@ -307,7 +315,7 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
                 </div>
             </div>
 
-            {/* ── GRID DE ALUMNOS ── (sin cambios, + chip de sede para propietario) */}
+            {/* ── GRID DE ALUMNOS ── */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '20px' }}>
                 {alumnos.length === 0 ? (
                     <div style={{ textAlign: 'center', gridColumn: '1/-1', marginTop: '60px', opacity: 0.5 }}>
@@ -323,11 +331,6 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
                 ) : (
                     alumnos.map(alumno => {
                         const pago = calcularEstadoPago(alumno.fechaPago);
-
-                        // Nombre de la sede del alumno (solo útil para propietario en vista global)
-                        // En vista de sede específica esto no se muestra
-                        const mostrarChipSede = esPropietario && !sedeActual && alumno.sedeId !== sedeIdEfectiva;
-
                         return (
                             <div key={alumno.id} style={{
                                 ...styles.card,
@@ -354,7 +357,7 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
                                             {alumno.nombre.toUpperCase()}
                                         </h3>
 
-                                        {/* CHIPS DE PROGRAMAS (sin cambios) */}
+                                        {/* CHIPS DE PROGRAMAS */}
                                         <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
                                             {(alumno.programas || []).map((p, i) => (
                                                 <span key={i} style={{
@@ -370,7 +373,7 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
                                         </p>
                                     </div>
 
-                                    {/* ACCIONES LATERALES (sin cambios) */}
+                                    {/* ACCIONES LATERALES */}
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
                                         <button
                                             onClick={() => { setNuevo(alumno); setEditandoId(alumno.id); setMostrarForm(true); }}
@@ -419,7 +422,7 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
                                     </div>
                                 </div>
 
-                                {/* PIE DE TARJETA (sin cambios, + chip de sede) */}
+                                {/* PIE DE TARJETA */}
                                 <div style={{
                                     marginTop: '15px', paddingTop: '12px',
                                     borderTop: '1px solid #222',
@@ -446,7 +449,7 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
                 )}
             </div>
 
-            {/* ── MODAL REGISTRO / EDICIÓN ── (sin cambios en UI) */}
+            {/* ── MODAL REGISTRO / EDICIÓN ── */}
             {mostrarForm && (
                 <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.96)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000, padding: '15px', boxSizing: 'border-box' }}>
                     <div style={{ ...styles.card, width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto', padding: '30px' }}>
@@ -514,12 +517,12 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
                                 )}
                             </div>
 
-                            {/* BLOQUE IV: CLASES */}
+                            {/* BLOQUE IV: CLASES (Blindado contra arrays vacíos) */}
                             <div style={{ borderBottom: '1px solid #222', paddingBottom: '15px' }}>
                                 <p style={{ color: '#d4af37', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '10px' }}>IV. ASIGNACIÓN DE CLASES</p>
                                 <label style={{ fontSize: '0.7rem', color: '#666' }}>PROGRAMAS:</label>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', margin: '10px 0 20px 0' }}>
-                                    {config.programas.map(p => (
+                                    {(config.programas || []).map(p => (
                                         <div key={p}
                                             onClick={() => toggleSelection(config.programas, p, 'programas')}
                                             style={{
@@ -534,7 +537,7 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
                                 </div>
                                 <label style={{ fontSize: '0.7rem', color: '#666' }}>HORARIOS:</label>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px' }}>
-                                    {config.horarios.map((h, i) => {
+                                    {(config.horarios || []).map((h, i) => {
                                         const label = `${h.hora} - ${h.nombre}`;
                                         const isSelected = nuevo.horarios?.includes(label);
                                         return (
@@ -581,7 +584,7 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
                 </div>
             )}
 
-            {/* ── EXPEDIENTE COMPLETO ── (sin cambios) */}
+            {/* ── EXPEDIENTE COMPLETO ── */}
             {alumnoSeleccionado && (
                 <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.98)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 3000, padding: '15px' }}>
                     <div style={{ ...styles.card, width: '100%', maxWidth: '700px', maxHeight: '95vh', overflowY: 'auto', border: '1px solid #d4af37', padding: '40px' }}>
@@ -661,7 +664,7 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
                             <input placeholder="Ciudad" style={{ ...styles.input, width: '100%', margin: 0 }} value={config.ciudad} onChange={e => setConfig({ ...config, ciudad: e.target.value })} />
                         </div>
 
-                        {/* CÓDIGO DE ACCESO (solo lectura, para compartir) */}
+                        {/* CÓDIGO DE ACCESO */}
                         {config.codigoAcceso && (
                             <div style={{ marginBottom: '25px', backgroundColor: '#0a0a0a', padding: '15px', borderRadius: '10px', border: '1px solid #d4af3733' }}>
                                 <p style={{ fontSize: '0.65rem', color: '#d4af37', fontWeight: 'bold', margin: '0 0 8px 0' }}>
@@ -681,7 +684,7 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
                             </div>
                         )}
 
-                        {/* VINCULACIÓN (solo instructores ven esto completo) */}
+                        {/* VINCULACIÓN */}
                         {!esPropietario && (
                             <div style={{ marginBottom: '25px', borderTop: '1px solid #222', paddingTop: '20px' }}>
                                 <p style={{ color: '#d4af37', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '15px' }}>CAMBIAR DE SEDE:</p>
@@ -750,9 +753,7 @@ const GestionAlumnosPage = ({ onBack, styles, usuario, sedeActual }) => {
                         {/* GUARDAR CONFIG */}
                         <div style={{ display: 'flex', gap: '15px', marginTop: '10px' }}>
                             <button onClick={async () => {
-                                // Protección: Si sedeIdEfectiva es undefined, usamos un ID seguro
-                                const idSedeParaGuardar = sedeIdEfectiva || usuario.teamId || usuario.academiaId || usuario.uid;
-
+                                const idSedeParaGuardar = sedeIdEfectiva || teamId;
                                 try {
                                     await setDoc(doc(db, "sedes", idSedeParaGuardar), {
                                         ...config,

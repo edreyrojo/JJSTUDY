@@ -442,136 +442,136 @@ const AdminPage = ({ onBack }) => {
                     {tabActiva === 'estructuras' && (
                         <div style={s.viewSection}>
 
-                                {/* 🌳 1. ÁRBOL ORGANIZACIONAL MAESTRO */}
-                                <div style={{ ...s.panelBox, marginBottom: '30px', border: '1px solid #d4af3744', padding: '20px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333', paddingBottom: '10px', marginBottom: '15px' }}>
-                                        <h2 style={{ color: '#fff', margin: 0 }}>🌳 Árbol Organizacional Maestro</h2>
-                                        <span style={{ fontSize: '0.8rem', color: '#aaa' }}>Haz clic en una academia para gestionar</span>
-                                    </div>
+                            {/* 🌳 1. ÁRBOL ORGANIZACIONAL MAESTRO */}
+                            <div style={{ ...s.panelBox, marginBottom: '30px', border: '1px solid #d4af3744', padding: '20px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333', paddingBottom: '10px', marginBottom: '15px' }}>
+                                    <h2 style={{ color: '#fff', margin: 0 }}>🌳 Árbol Organizacional Maestro</h2>
+                                    <span style={{ fontSize: '0.8rem', color: '#aaa' }}>Haz clic en una academia para gestionar</span>
+                                </div>
 
-                                    {academias.map(aca => {
-                                        const logoAca = aca.logoBase64 || aca.logobase64;
-                                        const nombreAca = aca.nombreAcademia || aca.nombre || 'Academia Principal';
-                                        const estaAbierto = !!academiasAbiertas[aca.id];
+                                {academias.map(aca => {
+                                    const logoAca = aca.logoBase64 || aca.logobase64;
+                                    const nombreAca = aca.nombreAcademia || aca.nombre || 'Academia Principal';
+                                    const estaAbierto = !!academiasAbiertas[aca.id];
 
-                                        // Filtros optimizados
-                                        const profesMadre = usuarios.filter(u => u.academiaId === aca.id && u.rol === 'profesor' && u.sedeId === aca.id);
-                                        const instsMadre = usuarios.filter(u => u.academiaId === aca.id && u.rol === 'instructor' && u.sedeId === aca.id);
-                                        const sedesAfiliadas = sedes.filter(se => se.academiaId === aca.id && se.id !== aca.id);
+                                    // Filtros optimizados
+                                    const profesMadre = usuarios.filter(u => u.academiaId === aca.id && u.rol === 'profesor' && u.sedeId === aca.id);
+                                    const instsMadre = usuarios.filter(u => u.academiaId === aca.id && u.rol === 'instructor' && u.sedeId === aca.id);
+                                    const sedesAfiliadas = sedes.filter(se => se.academiaId === aca.id && se.id !== aca.id);
 
-                                        return (
-                                            <div key={aca.id} style={{ marginBottom: '15px', borderLeft: '4px solid #d4af37', background: '#0a0a0a', borderRadius: '0 8px 8px 0', overflow: 'hidden' }}>
-                                                {/* CABECERA ACORDEÓN */}
-                                                <div onClick={() => toggleAcademia(aca.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', cursor: 'pointer', background: estaAbierto ? '#141414' : '#0e0e0e' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                        {logoAca ? <img src={logoAca} alt="logo" style={{ width: '40px', height: '40px', objectFit: 'contain', borderRadius: '6px' }} /> : <span style={{ fontSize: '1.8rem' }}>🏢</span>}
-                                                        <h3 style={{ color: '#fff', margin: 0 }}>{nombreAca}</h3>
-                                                    </div>
-                                                    <div style={{ color: '#d4af37' }}>{estaAbierto ? '▼' : '►'}</div>
+                                    return (
+                                        <div key={aca.id} style={{ marginBottom: '15px', borderLeft: '4px solid #d4af37', background: '#0a0a0a', borderRadius: '0 8px 8px 0', overflow: 'hidden' }}>
+                                            {/* CABECERA ACORDEÓN */}
+                                            <div onClick={() => toggleAcademia(aca.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', cursor: 'pointer', background: estaAbierto ? '#141414' : '#0e0e0e' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                    {logoAca ? <img src={logoAca} alt="logo" style={{ width: '40px', height: '40px', objectFit: 'contain', borderRadius: '6px' }} /> : <span style={{ fontSize: '1.8rem' }}>🏢</span>}
+                                                    <h3 style={{ color: '#fff', margin: 0 }}>{nombreAca}</h3>
                                                 </div>
+                                                <div style={{ color: '#d4af37' }}>{estaAbierto ? '▼' : '►'}</div>
+                                            </div>
 
-                                                {/* CONTENIDO */}
-                                                {estaAbierto && (
-                                                    <div style={{ padding: '20px' }}>
-                                                        {/* --- SECCIÓN MADRE --- */}
-                                                        <div style={{ background: '#141414', padding: '15px', borderRadius: '8px', borderLeft: '3px solid #fff', marginBottom: '20px' }}>
-                                                            <h4 style={{ color: '#d4af37', margin: '0 0 10px 0' }}>🏠 SEDE MADRE</h4>
+                                            {/* CONTENIDO */}
+                                            {estaAbierto && (
+                                                <div style={{ padding: '20px' }}>
+                                                    {/* --- SECCIÓN MADRE --- */}
+                                                    <div style={{ background: '#141414', padding: '15px', borderRadius: '8px', borderLeft: '3px solid #fff', marginBottom: '20px' }}>
+                                                        <h4 style={{ color: '#d4af37', margin: '0 0 10px 0' }}>🏠 SEDE MADRE</h4>
 
-                                                            {/* Profesores Madre */}
-                                                            <p style={{ color: '#aaa', fontSize: '0.75rem', margin: '5px 0' }}>PROFESORES:</p>
-                                                            {profesMadre.map(p => (
-                                                                <div key={p.uid} style={{ display: 'flex', justifyContent: 'space-between', background: '#1f1f1f', padding: '5px 10px', borderRadius: '4px', marginBottom: '5px' }}>
-                                                                    <span style={{ fontSize: '0.8rem' }}>{p.nombre}</span>
-                                                                    <button onClick={() => handleAsignarPersonal(p.uid, 'alumno', '', aca.id)} style={s.btnTextDelete}>Remover</button>
-                                                                </div>
-                                                            ))}
-                                                            <select style={{ ...s.formInput, marginBottom: '10px' }} onChange={(e) => { if (e.target.value) handleAsignarPersonal(e.target.value, 'profesor', aca.id, aca.id); e.target.value = ''; }}>
-                                                                <option value="">+ Asignar Profesor...</option>
-                                                                {usuarios.map(u => <option key={u.uid} value={u.uid}>{u.nombre || u.email}</option>)}
-                                                            </select>
+                                                        {/* Profesores Madre */}
+                                                        <p style={{ color: '#aaa', fontSize: '0.75rem', margin: '5px 0' }}>PROFESORES:</p>
+                                                        {profesMadre.map(p => (
+                                                            <div key={p.uid} style={{ display: 'flex', justifyContent: 'space-between', background: '#1f1f1f', padding: '5px 10px', borderRadius: '4px', marginBottom: '5px' }}>
+                                                                <span style={{ fontSize: '0.8rem' }}>{p.nombre}</span>
+                                                                <button onClick={() => handleAsignarPersonal(p.uid, 'alumno', '', aca.id)} style={s.btnTextDelete}>Remover</button>
+                                                            </div>
+                                                        ))}
+                                                        <select style={{ ...s.formInput, marginBottom: '10px' }} onChange={(e) => { if (e.target.value) handleAsignarPersonal(e.target.value, 'profesor', aca.id, aca.id); e.target.value = ''; }}>
+                                                            <option value="">+ Asignar Profesor...</option>
+                                                            {usuarios.map(u => <option key={u.uid} value={u.uid}>{u.nombre || u.email}</option>)}
+                                                        </select>
 
-                                                            {/* Instructores Madre */}
-                                                            <p style={{ color: '#aaa', fontSize: '0.75rem', margin: '5px 0' }}>INSTRUCTORES:</p>
-                                                            {instsMadre.map(i => (
-                                                                <div key={i.uid} style={{ display: 'flex', justifyContent: 'space-between', background: '#1f1f1f', padding: '5px 10px', borderRadius: '4px', marginBottom: '5px' }}>
-                                                                    <span style={{ fontSize: '0.8rem' }}>{i.nombre}</span>
-                                                                    <button onClick={() => handleAsignarPersonal(i.uid, 'alumno', '', aca.id)} style={s.btnTextDelete}>Remover</button>
-                                                                </div>
-                                                            ))}
-                                                            <select style={s.formInput} onChange={(e) => { if (e.target.value) handleAsignarPersonal(e.target.value, 'instructor', aca.id, aca.id); e.target.value = ''; }}>
-                                                                <option value="">+ Asignar Instructor...</option>
-                                                                {usuarios.map(u => <option key={u.uid} value={u.uid}>{u.nombre || u.email}</option>)}
-                                                            </select>
+                                                        {/* Instructores Madre */}
+                                                        <p style={{ color: '#aaa', fontSize: '0.75rem', margin: '5px 0' }}>INSTRUCTORES:</p>
+                                                        {instsMadre.map(i => (
+                                                            <div key={i.uid} style={{ display: 'flex', justifyContent: 'space-between', background: '#1f1f1f', padding: '5px 10px', borderRadius: '4px', marginBottom: '5px' }}>
+                                                                <span style={{ fontSize: '0.8rem' }}>{i.nombre}</span>
+                                                                <button onClick={() => handleAsignarPersonal(i.uid, 'alumno', '', aca.id)} style={s.btnTextDelete}>Remover</button>
+                                                            </div>
+                                                        ))}
+                                                        <select style={s.formInput} onChange={(e) => { if (e.target.value) handleAsignarPersonal(e.target.value, 'instructor', aca.id, aca.id); e.target.value = ''; }}>
+                                                            <option value="">+ Asignar Instructor...</option>
+                                                            {usuarios.map(u => <option key={u.uid} value={u.uid}>{u.nombre || u.email}</option>)}
+                                                        </select>
+                                                    </div>
+
+                                                    {/* --- 2. SECCIÓN: SEDES AFILIADAS (CORREGIDA) --- */}
+                                                    <div style={{ marginTop: '20px' }}>
+                                                        <div style={{ color: '#d4af37', fontSize: '0.85rem', marginBottom: '10px', borderBottom: '1px solid #d4af3744', paddingBottom: '5px' }}>
+                                                            📍 SEDES AFILIADAS ({sedesAfiliadas.length}):
                                                         </div>
 
-                                                        {/* --- 2. SECCIÓN: SEDES AFILIADAS (CORREGIDA) --- */}
-<div style={{ marginTop: '20px' }}>
-    <div style={{ color: '#d4af37', fontSize: '0.85rem', marginBottom: '10px', borderBottom: '1px solid #d4af3744', paddingBottom: '5px' }}>
-        📍 SEDES AFILIADAS ({sedesAfiliadas.length}):
-    </div>
-    
-    {sedesAfiliadas.length > 0 ? (
-        sedesAfiliadas.map(se => {
-            // CORRECCIÓN: Filtramos ambos roles
-            const personalSede = usuarios.filter(u => u.sedeId === se.id && (u.rol === 'instructor' || u.rol === 'profesor'));
-            
-            return (
-                <div key={se.id} style={{ background: '#111', padding: '10px', borderRadius: '6px', marginBottom: '10px', border: '1px solid #222' }}>
-                    <div style={{ color: '#fff', fontWeight: 'bold', marginBottom: '8px', borderBottom: '1px solid #333', paddingBottom: '5px' }}>
-                        {se.nombreSede || se.nombre}
-                    </div>
-                    
-                    {/* Lista de Personal actual */}
-                    {personalSede.length > 0 ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '10px' }}>
-                            {personalSede.map(u => (
-                                <div key={u.uid} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#222', padding: '4px 8px', borderRadius: '4px' }}>
-                                    <span style={{ fontSize: '0.8rem', color: '#fff' }}>
-                                        {u.nombre || u.email} <small style={{ color: '#888' }}>({u.rol})</small>
-                                    </span>
-                                    <button 
-                                        onClick={() => handleAsignarPersonal(u.uid, 'alumno', '', aca.id)} 
-                                        style={{ ...s.btnTextDelete, fontSize: '0.7rem', color: '#ff4444' }}
-                                    >
-                                        Remover
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div style={{ fontSize: '0.75rem', color: '#555', fontStyle: 'italic', marginBottom: '10px' }}>Sin personal asignado</div>
-                    )}
+                                                        {sedesAfiliadas.length > 0 ? (
+                                                            sedesAfiliadas.map(se => {
+                                                                // CORRECCIÓN: Filtramos ambos roles
+                                                                const personalSede = usuarios.filter(u => u.sedeId === se.id && (u.rol === 'instructor' || u.rol === 'profesor'));
 
-                    {/* SELECTOR: Mantenemos el rol original del usuario al asignar */}
-                    <select 
-                        style={{ ...s.formInput, width: '100%', padding: '6px', fontSize: '0.75rem', borderColor: '#333' }} 
-                        onChange={(e) => { 
-                            if (e.target.value) {
-                                const usuarioSeleccionado = usuarios.find(u => u.uid === e.target.value);
-                                // Pasamos el rol que ya tiene (instructor o profesor)
-                                handleAsignarPersonal(e.target.value, usuarioSeleccionado.rol, se.id, aca.id); 
-                                e.target.value = ''; 
-                            }
-                        }}
-                    >
-                        <option value="">+ Asignar Profesor/Instructor...</option>
-                        {usuarios.filter(u => u.rol === 'instructor' || u.rol === 'profesor').map(u => (
-                            <option key={u.uid} value={u.uid}>{u.nombre || u.email} ({u.rol})</option>
-                        ))}
-                    </select>
-                </div>
-            );
-        })
-    ) : (
-        <div style={{ color: '#666', fontStyle: 'italic', fontSize: '0.85rem' }}>No hay sedes afiliadas registradas.</div>
-    )}
-</div>
+                                                                return (
+                                                                    <div key={se.id} style={{ background: '#111', padding: '10px', borderRadius: '6px', marginBottom: '10px', border: '1px solid #222' }}>
+                                                                        <div style={{ color: '#fff', fontWeight: 'bold', marginBottom: '8px', borderBottom: '1px solid #333', paddingBottom: '5px' }}>
+                                                                            {se.nombreSede || se.nombre}
+                                                                        </div>
+
+                                                                        {/* Lista de Personal actual */}
+                                                                        {personalSede.length > 0 ? (
+                                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '10px' }}>
+                                                                                {personalSede.map(u => (
+                                                                                    <div key={u.uid} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#222', padding: '4px 8px', borderRadius: '4px' }}>
+                                                                                        <span style={{ fontSize: '0.8rem', color: '#fff' }}>
+                                                                                            {u.nombre || u.email} <small style={{ color: '#888' }}>({u.rol})</small>
+                                                                                        </span>
+                                                                                        <button
+                                                                                            onClick={() => handleAsignarPersonal(u.uid, 'alumno', '', aca.id)}
+                                                                                            style={{ ...s.btnTextDelete, fontSize: '0.7rem', color: '#ff4444' }}
+                                                                                        >
+                                                                                            Remover
+                                                                                        </button>
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div style={{ fontSize: '0.75rem', color: '#555', fontStyle: 'italic', marginBottom: '10px' }}>Sin personal asignado</div>
+                                                                        )}
+
+                                                                        {/* SELECTOR: Mantenemos el rol original del usuario al asignar */}
+                                                                        <select
+                                                                            style={{ ...s.formInput, width: '100%', padding: '6px', fontSize: '0.75rem', borderColor: '#333' }}
+                                                                            onChange={(e) => {
+                                                                                if (e.target.value) {
+                                                                                    const usuarioSeleccionado = usuarios.find(u => u.uid === e.target.value);
+                                                                                    // Pasamos el rol que ya tiene (instructor o profesor)
+                                                                                    handleAsignarPersonal(e.target.value, usuarioSeleccionado.rol, se.id, aca.id);
+                                                                                    e.target.value = '';
+                                                                                }
+                                                                            }}
+                                                                        >
+                                                                            <option value="">+ Asignar Profesor/Instructor...</option>
+                                                                            {usuarios.filter(u => u.rol === 'instructor' || u.rol === 'profesor').map(u => (
+                                                                                <option key={u.uid} value={u.uid}>{u.nombre || u.email} ({u.rol})</option>
+                                                                            ))}
+                                                                        </select>
+                                                                    </div>
+                                                                );
+                                                            })
+                                                        ) : (
+                                                            <div style={{ color: '#666', fontStyle: 'italic', fontSize: '0.85rem' }}>No hay sedes afiliadas registradas.</div>
+                                                        )}
                                                     </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
 
                             {/* 🏛️ 2. FORMULARIOS DE REGISTRO */}
                             <div style={s.structureGrid}>
@@ -610,22 +610,22 @@ const AdminPage = ({ onBack }) => {
                                             {academias.map(ac => (<option key={ac.id} value={ac.id}>{ac.nombreAcademia || ac.nombre || ac.id}</option>))}
                                         </select>
                                         <label style={s.formLabel}>SELECCIONAR PROFESOR (TEAM ID)</label>
-<select 
-    style={s.selectFullStyle} 
-    value={teamIdProfesor} 
-    onChange={(e) => setTeamIdProfesor(e.target.value)}
->
-    <option value="">-- SELECCIONAR PROFESOR --</option>
-    {usuarios
-        // Filtramos para que solo aparezcan profesores o admins
-        .filter(u => u.rol === 'profesor' || u.rol === 'admin') 
-        .map(u => (
-            <option key={u.id} value={u.uid || u.id}>
-                {u.nombre || u.email || "Usuario sin nombre"} ({u.rol})
-            </option>
-        ))
-    }
-</select>
+                                        <select
+                                            style={s.selectFullStyle}
+                                            value={teamIdProfesor}
+                                            onChange={(e) => setTeamIdProfesor(e.target.value)}
+                                        >
+                                            <option value="">-- SELECCIONAR PROFESOR --</option>
+                                            {usuarios
+                                                // Filtramos para que solo aparezcan profesores o admins
+                                                .filter(u => u.rol === 'profesor' || u.rol === 'admin')
+                                                .map(u => (
+                                                    <option key={u.id} value={u.uid || u.id}>
+                                                        {u.nombre || u.email || "Usuario sin nombre"} ({u.rol})
+                                                    </option>
+                                                ))
+                                            }
+                                        </select>
                                         <input style={s.formInput} value={teamIdProfesor} onChange={(e) => setTeamIdProfesor(e.target.value)} placeholder="UID del Profesor" />
                                         <button type="submit" disabled={creandoSede} style={s.btnGreenAction}>{creandoSede ? "ENLAZANDO..." : "VINCULAR SEDE"}</button>
                                     </form>

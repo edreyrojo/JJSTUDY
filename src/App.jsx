@@ -50,18 +50,26 @@ import OnboardingModal from './components/OnboardingModal';
 
 import Swal from 'sweetalert2';
 
+// Actualiza tu función notify
 const notify = (mensaje, tipo = 'success') => {
-  Swal.fire({
-    text: mensaje,
-    icon: tipo,
-    background: '#0a0a0a',
-    color: '#fff',
-    confirmButtonColor: '#d4af37',
-    iconColor: tipo === 'success' ? '#4CAF50' : '#ff4444',
-    customClass: {
-      popup: 'gold-border-alert'
-    }
-  });
+    Swal.fire({
+        text: mensaje,
+        icon: tipo,
+        background: '#0a0a0a',
+        color: '#fff',
+        confirmButtonColor: '#d4af37',
+        iconColor: tipo === 'success' ? '#4CAF50' : '#ff4444',
+        border: '1px solid #d4af37',
+        // --- ESTA ES LA CLAVE ---
+        customClass: { 
+            popup: 'gold-border-alert',
+            container: 'my-swal-container' // Añadimos una clase de contenedor
+        },
+        didOpen: (toast) => {
+            // Esto asegura que el contenedor tenga un z-index altísimo
+            toast.parentElement.style.zIndex = '9999';
+        }
+    });
 };
 
 // --- 1. CONFIGURACIÓN DE ESTILOS ---
