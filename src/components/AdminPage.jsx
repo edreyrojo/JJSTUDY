@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, getDocs, doc, deleteDoc, addDoc, writeBatch, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, getDocs, doc, deleteDoc, addDoc, writeBatch, setDoc, updateDoc } from 'firebase/firestore';
 import Swal from 'sweetalert2';
 import { DB_INSTRUCCIONALES } from '../data/instruccionales';
 
@@ -101,56 +101,56 @@ const AdminPage = ({ onBack }) => {
     };
 
     const generarCodigoSedeMadre = async (idSede, nombreAca) => {
-    try {
-        const prefijo = (nombreAca || "DOJO").slice(0, 4).toUpperCase().replace(/[^A-Z]/g, "X");
-        const rand = Math.floor(100 + Math.random() * 900);
-        const nuevoCodigo = `${prefijo}-MADRE${rand}`;
+        try {
+            const prefijo = (nombreAca || "DOJO").slice(0, 4).toUpperCase().replace(/[^A-Z]/g, "X");
+            const rand = Math.floor(100 + Math.random() * 900);
+            const nuevoCodigo = `${prefijo}-MADRE${rand}`;
 
-        // 1. Crear la referencia al documento
-        const sedeRef = doc(db, "sedes", idSede);
+            // 1. Crear la referencia al documento
+            const sedeRef = doc(db, "sedes", idSede);
 
-        // 2. Ejecutar setDoc (ahora sí lo reconocerá)
-        await setDoc(sedeRef, {
-            codigoAcceso: nuevoCodigo,
-            nombreSede: nombreAca || "Sede Madre Principal",
-            ciudad: "Sede Central"
-        }, { merge: true });
+            // 2. Ejecutar setDoc (ahora sí lo reconocerá)
+            await setDoc(sedeRef, {
+                codigoAcceso: nuevoCodigo,
+                nombreSede: nombreAca || "Sede Madre Principal",
+                ciudad: "Sede Central"
+            }, { merge: true });
 
-        Swal.fire('¡Listo!', `Código generado: ${nuevoCodigo}`, 'success');
-    } catch (err) {
-        console.error("Error al generar código:", err);
-        Swal.fire('Error', err.message, 'error');
-    }
-};
+            Swal.fire('¡Listo!', `Código generado: ${nuevoCodigo}`, 'success');
+        } catch (err) {
+            console.error("Error al generar código:", err);
+            Swal.fire('Error', err.message, 'error');
+        }
+    };
 
     useEffect(() => {
-    // 1. Definimos las escuchas (listeners)
-    const unsubUsuarios = onSnapshot(collection(db, "usuarios"), (snap) => {
-        setUsuarios(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+        // 1. Definimos las escuchas (listeners)
+        const unsubUsuarios = onSnapshot(collection(db, "usuarios"), (snap) => {
+            setUsuarios(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
 
-    const unsubTickets = onSnapshot(collection(db, "soporte"), (snap) => {
-        const listaT = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setTickets(listaT.sort((a, b) => new Date(b.fecha) - new Date(a.fecha)));
-    });
+        const unsubTickets = onSnapshot(collection(db, "soporte"), (snap) => {
+            const listaT = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            setTickets(listaT.sort((a, b) => new Date(b.fecha) - new Date(a.fecha)));
+        });
 
-    const unsubAcademias = onSnapshot(collection(db, "academias"), (snap) => {
-        setAcademias(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+        const unsubAcademias = onSnapshot(collection(db, "academias"), (snap) => {
+            setAcademias(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
 
-    const unsubSedes = onSnapshot(collection(db, "sedes"), (snap) => {
-        setSedes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        setCargando(false); // Una vez cargan las sedes, quitamos el loader
-    });
+        const unsubSedes = onSnapshot(collection(db, "sedes"), (snap) => {
+            setSedes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setCargando(false); // Una vez cargan las sedes, quitamos el loader
+        });
 
-    // 2. Limpieza (Muy importante para no duplicar escuchas)
-    return () => {
-        unsubUsuarios();
-        unsubTickets();
-        unsubAcademias();
-        unsubSedes();
-    };
-}, []);
+        // 2. Limpieza (Muy importante para no duplicar escuchas)
+        return () => {
+            unsubUsuarios();
+            unsubTickets();
+            unsubAcademias();
+            unsubSedes();
+        };
+    }, []);
 
     const usuariosFiltrados = useMemo(() => {
         return usuarios.filter(u =>
@@ -192,7 +192,6 @@ const AdminPage = ({ onBack }) => {
                 await updateDoc(doc(db, collectionName, id), data);
                 notify("Vault actualizado");
             }
-            obtenerDatos();
         } catch (error) { notify(error.message, "error"); }
     };
 
@@ -218,7 +217,6 @@ const AdminPage = ({ onBack }) => {
             });
             notify(`Academia "${nombreLimpio}" registrada con éxito 🏢`);
             setNombreAcademia('');
-            obtenerDatos();
         } catch (error) {
             console.error("Error al crear academia:", error);
             notify("Error al crear la academia en la base de datos", "error");
@@ -264,7 +262,6 @@ const AdminPage = ({ onBack }) => {
             setNombreSede('');
             setTeamIdProfesor('');
             setAcademiaSeleccionada('');
-            obtenerDatos();
         } catch (error) {
             console.error("Error al crear sede:", error);
             notify("Error al vincular la sede", "error");
@@ -307,7 +304,6 @@ const AdminPage = ({ onBack }) => {
             if (count > 0) {
                 await batch.commit();
                 notify(`¡Éxito! Se corrigieron ${count} alumnos.`, 'success');
-                obtenerDatos();
             } else {
                 notify("No se encontraron alumnos con el ID erróneo.", "info");
             }
@@ -326,7 +322,6 @@ const AdminPage = ({ onBack }) => {
             });
 
             notify("Personal vinculado correctamente", "success");
-            obtenerDatos(); // Recargamos para refrescar el árbol
         } catch (error) {
             notify("Error al vincular: " + error.message, "error");
         }
@@ -444,368 +439,220 @@ const AdminPage = ({ onBack }) => {
                         </div>
                     )}
 
-                    {/* ───────────────────────────────────────────── */}
-                    {/* VISTA: ESTADO DEL DOJO (ESTRUCTURAS Y ÁRBOL)  */}
-                    {/* ───────────────────────────────────────────── */}
                     {tabActiva === 'estructuras' && (
                         <div style={s.viewSection}>
 
-                            {/* 🌳 1. ÁRBOL ORGANIZACIONAL MAESTRO (JERARQUÍA Y ACORDEÓN) */}
-                            <div style={{ ...s.panelBox, marginBottom: '30px', border: '1px solid #d4af3744', padding: '20px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333', paddingBottom: '10px', marginBottom: '15px' }}>
-                                    <h2 style={{ color: '#fff', margin: 0 }}>
-                                        🌳 Árbol Organizacional Maestro
-                                    </h2>
-                                    <span style={{ fontSize: '0.8rem', color: '#aaa' }}>Haz clic en una academia para expandir/contraer</span>
-                                </div>
+                                {/* 🌳 1. ÁRBOL ORGANIZACIONAL MAESTRO */}
+                                <div style={{ ...s.panelBox, marginBottom: '30px', border: '1px solid #d4af3744', padding: '20px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333', paddingBottom: '10px', marginBottom: '15px' }}>
+                                        <h2 style={{ color: '#fff', margin: 0 }}>🌳 Árbol Organizacional Maestro</h2>
+                                        <span style={{ fontSize: '0.8rem', color: '#aaa' }}>Haz clic en una academia para gestionar</span>
+                                    </div>
 
-                                {academias.map(aca => {
-                                    const logoAca = aca.logoBase64 || aca.logobase64;
-                                    const nombreAca = aca.nombreAcademia || aca.nombre || 'Academia Principal';
-                                    const estaAbierto = !!academiasAbiertas[aca.id]; // Verifica si el acordeón está abierto
+                                    {academias.map(aca => {
+                                        const logoAca = aca.logoBase64 || aca.logobase64;
+                                        const nombreAca = aca.nombreAcademia || aca.nombre || 'Academia Principal';
+                                        const estaAbierto = !!academiasAbiertas[aca.id];
 
-                                    {/* --- PERSONAL ACADEMIA MADRE --- */ }
-                                    const profesMadre = usuarios.filter(u =>
-                                        (u.uid === aca.id || u.academiaId === aca.id || u.teamId === aca.id) &&
-                                        (u.rol === 'profesor' || u.rol === 'admin' || u.rol === 'propietario') &&
-                                        (!u.sedeId || u.sedeId === aca.id || u.sedeId === 'legacy' || u.sedeId === '')
-                                    );
+                                        // Filtros optimizados
+                                        const profesMadre = usuarios.filter(u => u.academiaId === aca.id && u.rol === 'profesor' && u.sedeId === aca.id);
+                                        const instsMadre = usuarios.filter(u => u.academiaId === aca.id && u.rol === 'instructor' && u.sedeId === aca.id);
+                                        const sedesAfiliadas = sedes.filter(se => se.academiaId === aca.id && se.id !== aca.id);
 
-                                    const instructoresMadre = usuarios.filter(u =>
-                                        u.rol === 'instructor' &&
-                                        (u.academiaId === aca.id || u.teamId === aca.id || (u.academiaNombre && u.academiaNombre.toLowerCase() === nombreAca.toLowerCase())) &&
-                                        (!u.sedeId || u.sedeId === aca.id || u.sedeId === 'legacy' || u.sedeId === '')
-                                    );
-
-                                    {/* --- SEDES AFILIADAS --- */ }
-                                    const sedesAfiliadas = sedes.filter(se =>
-                                        (se.academiaId === aca.id || (se.nombre && se.nombre.toLowerCase() === nombreAca.toLowerCase())) &&
-                                        se.id !== aca.id &&
-                                        se.nombreSede !== nombreAca
-                                    );
-
-                                    return (
-                                        <div key={aca.id} style={{ marginBottom: '15px', borderLeft: '4px solid #d4af37', background: '#0a0a0a', borderRadius: '0 8px 8px 0', overflow: 'hidden', transition: 'all 0.3s ease' }}>
-
-                                            {/* NIVEL 1: CABECERA ACORDEÓN (CLIC PARA ABRIR/CERRAR) */}
-                                            <div
-                                                onClick={() => toggleAcademia(aca.id)}
-                                                style={{
-                                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                                    padding: '12px 18px', cursor: 'pointer', background: estaAbierto ? '#141414' : '#0e0e0e',
-                                                    borderBottom: estaAbierto ? '1px solid #222' : 'none'
-                                                }}
-                                            >
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                    {logoAca ? (
-                                                        <img src={logoAca} alt="logo" style={{ width: '40px', height: '40px', objectFit: 'contain', borderRadius: '6px', background: '#111', border: '1px solid #d4af37' }} />
-                                                    ) : (
-                                                        <span style={{ fontSize: '1.8rem' }}>🏢</span>
-                                                    )}
-                                                    <div>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                            <span style={{ fontSize: '0.65rem', background: '#d4af3722', color: '#d4af37', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase', fontWeight: 'bold' }}>Academia Madre</span>
-                                                            <span style={{ fontSize: '0.75rem', color: '#888' }}>({sedesAfiliadas.length} sedes afiliadas)</span>
-                                                        </div>
-                                                        <h3 style={{ color: '#fff', margin: '4px 0 0 0', fontSize: '1.3rem' }}>{nombreAca}</h3>
+                                        return (
+                                            <div key={aca.id} style={{ marginBottom: '15px', borderLeft: '4px solid #d4af37', background: '#0a0a0a', borderRadius: '0 8px 8px 0', overflow: 'hidden' }}>
+                                                {/* CABECERA ACORDEÓN */}
+                                                <div onClick={() => toggleAcademia(aca.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', cursor: 'pointer', background: estaAbierto ? '#141414' : '#0e0e0e' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                        {logoAca ? <img src={logoAca} alt="logo" style={{ width: '40px', height: '40px', objectFit: 'contain', borderRadius: '6px' }} /> : <span style={{ fontSize: '1.8rem' }}>🏢</span>}
+                                                        <h3 style={{ color: '#fff', margin: 0 }}>{nombreAca}</h3>
                                                     </div>
+                                                    <div style={{ color: '#d4af37' }}>{estaAbierto ? '▼' : '►'}</div>
                                                 </div>
 
-                                                {/* Icono indicador de flecha */}
-                                                <div style={{ color: '#d4af37', fontSize: '1.2rem', fontWeight: 'bold', padding: '0 10px' }}>
-                                                    {estaAbierto ? '▼' : '►'}
-                                                </div>
-                                            </div>
+                                                {/* CONTENIDO */}
+                                                {estaAbierto && (
+                                                    <div style={{ padding: '20px' }}>
+                                                        {/* --- SECCIÓN MADRE --- */}
+                                                        <div style={{ background: '#141414', padding: '15px', borderRadius: '8px', borderLeft: '3px solid #fff', marginBottom: '20px' }}>
+                                                            <h4 style={{ color: '#d4af37', margin: '0 0 10px 0' }}>🏠 SEDE MADRE</h4>
 
-                                            {/* CONTENIDO DEL ACORDEÓN (SOLO SE MUESTRA SI ESTÁ ABIERTO) */}
-                                            {estaAbierto && (
-                                                <div style={{ padding: '15px 18px' }}>
-
-                                                    {/* NIVEL 2: PROFESOR ENCARGADO DE LA ACADEMIA MADRE */}
-                                                    <div style={{ background: '#141414', padding: '10px 15px', borderRadius: '6px', borderLeft: '3px solid #fff' }}>
-                                                        <div style={{ color: '#aaa', fontSize: '0.8rem', marginBottom: '6px' }}>👤 <strong>PROFESOR ENCARGADO (SEDE MADRE):</strong></div>
-                                                        {profesMadre.length > 0 ? profesMadre.map(profe => (
-                                                            <div key={profe.uid} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1f1f1f', padding: '6px 10px', borderRadius: '4px', margin: '4px 0' }}>
-                                                                <span style={{ color: '#d4af37', fontWeight: 'bold' }}>{profe.nombre || profe.email}</span>
-                                                                <button onClick={() => handleAsignarPersonal(profe.uid, 'alumno', '', aca.id)} style={s.btnTextDelete}>Remover</button>
-                                                            </div>
-                                                        )) : <div style={{ color: '#666', fontStyle: 'italic', fontSize: '0.85rem' }}>Sin profesor asignado</div>}
-
-                                                        <select
-                                                            style={{ ...s.formInput, marginTop: '8px', padding: '6px', fontSize: '0.8rem', borderColor: '#333' }}
-                                                            onChange={(e) => { if (e.target.value) handleAsignarPersonal(e.target.value, 'profesor', aca.id, aca.id); e.target.value = ''; }}
-                                                        >
-                                                            <option value="">+ Añadir Profesor Madre desde Usuarios...</option>
-                                                            {usuarios.map(u => (
-                                                                <option key={u.uid} value={u.uid}>{u.nombre || u.email} ({u.rol})</option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-
-                                                    {/* NIVEL 3: INSTRUCTORES DE ACADEMIA MADRE */}
-                                                    <div style={{ marginTop: '12px', background: '#141414', padding: '10px 15px', borderRadius: '6px', borderLeft: '3px solid #aaa' }}>
-                                                        <div style={{ color: '#aaa', fontSize: '0.8rem', marginBottom: '6px' }}>👥 <strong>INSTRUCTORES DE ACADEMIA MADRE ({instructoresMadre.length}):</strong></div>
-                                                        {instructoresMadre.length > 0 ? instructoresMadre.map(inst => (
-                                                            <div key={inst.uid} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1f1f1f', padding: '6px 10px', borderRadius: '4px', margin: '4px 0' }}>
-                                                                <span style={{ color: '#fff' }}>{inst.nombre || inst.email}</span>
-                                                                <button onClick={() => handleAsignarPersonal(inst.uid, 'alumno', '', aca.id)} style={s.btnTextDelete}>Remover</button>
-                                                            </div>
-                                                        )) : <div style={{ color: '#666', fontStyle: 'italic', fontSize: '0.85rem' }}>Sin instructores en sede madre</div>}
-
-                                                        <select
-                                                            style={{ ...s.formInput, marginTop: '8px', padding: '6px', fontSize: '0.8rem', borderColor: '#333' }}
-                                                            onChange={(e) => { if (e.target.value) handleAsignarPersonal(e.target.value, 'instructor', aca.id, aca.id); e.target.value = ''; }}
-                                                        >
-                                                            <option value="">+ Añadir Instructor Madre desde Usuarios...</option>
-                                                            {usuarios.map(u => (
-                                                                <option key={u.uid} value={u.uid}>{u.nombre || u.email} ({u.rol})</option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-
-                                                    {/* NIVEL 4: SEDES AFILIADAS / SUCURSALES */}
-                                                    <div style={{ marginLeft: '15px', marginTop: '20px', borderLeft: '2px dashed #4CAF50', paddingLeft: '15px' }}>
-                                                        <div style={{ color: '#4CAF50', fontSize: '0.85rem', letterSpacing: '1px', marginBottom: '10px', fontWeight: 'bold' }}>
-                                                            📍 SEDES Y SUCURSALES AFILIADAS ({sedesAfiliadas.length})
-                                                        </div>
-
-                                                        {sedesAfiliadas.length > 0 ? sedesAfiliadas.map(sede => {
-                                                            const logoSede = sede.logoBase64 || sede.logobase64 || sede.avatarSede;
-                                                            const nombreSe = sede.nombreSede || sede.nombre || 'Sucursal Afiliada';
-
-                                                            const profeSede = usuarios.find(u => (u.uid === sede.teamId || u.uid === sede.propietarioUid) && (u.rol === 'profesor' || u.rol === 'propietario'));
-                                                            const instructoresSede = usuarios.filter(u => u.rol === 'instructor' && (u.sedeId === sede.id || u.teamId === sede.teamId));
-
-                                                            return (
-                                                                <div key={sede.id} style={{ background: '#111', padding: '12px', borderRadius: '8px', borderLeft: '3px solid #4CAF50', marginBottom: '15px' }}>
-
-                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', borderBottom: '1px solid #222', paddingBottom: '6px' }}>
-                                                                        {logoSede ? (
-                                                                            <img src={logoSede} alt="logo-sede" style={{ width: '24px', height: '24px', objectFit: 'contain', borderRadius: '2px' }} />
-                                                                        ) : <span>🥋</span>}
-                                                                        <h4 style={{ color: '#4CAF50', margin: 0, fontSize: '1.1rem' }}>{nombreSe} {sede.ciudad && <span style={{ fontSize: '0.8rem', color: '#888', fontWeight: 'normal' }}>({sede.ciudad})</span>}</h4>
-                                                                    </div>
-
-                                                                    <div style={{ marginLeft: '10px', marginBottom: '10px', background: '#1a1a1a', padding: '8px', borderRadius: '4px' }}>
-                                                                        <div style={{ fontSize: '0.8rem', color: '#aaa' }}>👤 <strong>Profesor Responsable:</strong></div>
-                                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-                                                                            <span style={{ color: '#d4af37', fontWeight: 'bold' }}>{profeSede?.nombre || 'Sin asignar'}</span>
-                                                                            {profeSede && <button onClick={() => handleAsignarPersonal(profeSede.uid, 'alumno', '', aca.id)} style={s.btnTextDelete}>Remover</button>}
-                                                                        </div>
-
-                                                                        <select
-                                                                            style={{ ...s.formInput, marginTop: '6px', padding: '4px', fontSize: '0.75rem', borderColor: '#222' }}
-                                                                            onChange={(e) => { if (e.target.value) handleAsignarPersonal(e.target.value, 'profesor', sede.id, aca.id); e.target.value = ''; }}
-                                                                        >
-                                                                            <option value="">+ Cambiar/Asignar Profe a Sucursal...</option>
-                                                                            {usuarios.map(u => (
-                                                                                <option key={u.uid} value={u.uid}>{u.nombre || u.email} ({u.rol})</option>
-                                                                            ))}
-                                                                        </select>
-                                                                    </div>
-
-                                                                    <div style={{ marginLeft: '10px', background: '#1a1a1a', padding: '8px', borderRadius: '4px' }}>
-                                                                        <div style={{ fontSize: '0.8rem', color: '#aaa', marginBottom: '4px' }}>👥 <strong>Instructores de Sucursal ({instructoresSede.length}):</strong></div>
-                                                                        {instructoresSede.map(inst => (
-                                                                            <div key={inst.uid} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#222', padding: '4px 8px', borderRadius: '4px', margin: '4px 0' }}>
-                                                                                <span style={{ color: '#fff', fontSize: '0.85rem' }}>{inst.nombre || inst.email}</span>
-                                                                                <button onClick={() => handleAsignarPersonal(inst.uid, 'alumno', '', aca.id)} style={s.btnTextDelete}>Remover</button>
-                                                                            </div>
-                                                                        ))}
-
-                                                                        <select
-                                                                            style={{ ...s.formInput, marginTop: '6px', padding: '4px', fontSize: '0.75rem', borderColor: '#222' }}
-                                                                            onChange={(e) => { if (e.target.value) handleAsignarPersonal(e.target.value, 'instructor', sede.id, aca.id); e.target.value = ''; }}
-                                                                        >
-                                                                            <option value="">+ Añadir Instructor a Sucursal...</option>
-                                                                            {usuarios.map(u => (
-                                                                                <option key={u.uid} value={u.uid}>{u.nombre || u.email} ({u.rol})</option>
-                                                                            ))}
-                                                                        </select>
-                                                                    </div>
-
+                                                            {/* Profesores Madre */}
+                                                            <p style={{ color: '#aaa', fontSize: '0.75rem', margin: '5px 0' }}>PROFESORES:</p>
+                                                            {profesMadre.map(p => (
+                                                                <div key={p.uid} style={{ display: 'flex', justifyContent: 'space-between', background: '#1f1f1f', padding: '5px 10px', borderRadius: '4px', marginBottom: '5px' }}>
+                                                                    <span style={{ fontSize: '0.8rem' }}>{p.nombre}</span>
+                                                                    <button onClick={() => handleAsignarPersonal(p.uid, 'alumno', '', aca.id)} style={s.btnTextDelete}>Remover</button>
                                                                 </div>
-                                                            );
-                                                        }) : <div style={{ color: '#666', fontStyle: 'italic', fontSize: '0.85rem' }}>No hay sucursales afiliadas registradas aún.</div>}
-                                                    </div>
+                                                            ))}
+                                                            <select style={{ ...s.formInput, marginBottom: '10px' }} onChange={(e) => { if (e.target.value) handleAsignarPersonal(e.target.value, 'profesor', aca.id, aca.id); e.target.value = ''; }}>
+                                                                <option value="">+ Asignar Profesor...</option>
+                                                                {usuarios.map(u => <option key={u.uid} value={u.uid}>{u.nombre || u.email}</option>)}
+                                                            </select>
 
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
+                                                            {/* Instructores Madre */}
+                                                            <p style={{ color: '#aaa', fontSize: '0.75rem', margin: '5px 0' }}>INSTRUCTORES:</p>
+                                                            {instsMadre.map(i => (
+                                                                <div key={i.uid} style={{ display: 'flex', justifyContent: 'space-between', background: '#1f1f1f', padding: '5px 10px', borderRadius: '4px', marginBottom: '5px' }}>
+                                                                    <span style={{ fontSize: '0.8rem' }}>{i.nombre}</span>
+                                                                    <button onClick={() => handleAsignarPersonal(i.uid, 'alumno', '', aca.id)} style={s.btnTextDelete}>Remover</button>
+                                                                </div>
+                                                            ))}
+                                                            <select style={s.formInput} onChange={(e) => { if (e.target.value) handleAsignarPersonal(e.target.value, 'instructor', aca.id, aca.id); e.target.value = ''; }}>
+                                                                <option value="">+ Asignar Instructor...</option>
+                                                                {usuarios.map(u => <option key={u.uid} value={u.uid}>{u.nombre || u.email}</option>)}
+                                                            </select>
+                                                        </div>
+
+                                                        {/* --- 2. SECCIÓN: SEDES AFILIADAS (CORREGIDA) --- */}
+<div style={{ marginTop: '20px' }}>
+    <div style={{ color: '#d4af37', fontSize: '0.85rem', marginBottom: '10px', borderBottom: '1px solid #d4af3744', paddingBottom: '5px' }}>
+        📍 SEDES AFILIADAS ({sedesAfiliadas.length}):
+    </div>
+    
+    {sedesAfiliadas.length > 0 ? (
+        sedesAfiliadas.map(se => {
+            // CORRECCIÓN: Filtramos ambos roles
+            const personalSede = usuarios.filter(u => u.sedeId === se.id && (u.rol === 'instructor' || u.rol === 'profesor'));
+            
+            return (
+                <div key={se.id} style={{ background: '#111', padding: '10px', borderRadius: '6px', marginBottom: '10px', border: '1px solid #222' }}>
+                    <div style={{ color: '#fff', fontWeight: 'bold', marginBottom: '8px', borderBottom: '1px solid #333', paddingBottom: '5px' }}>
+                        {se.nombreSede || se.nombre}
+                    </div>
+                    
+                    {/* Lista de Personal actual */}
+                    {personalSede.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '10px' }}>
+                            {personalSede.map(u => (
+                                <div key={u.uid} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#222', padding: '4px 8px', borderRadius: '4px' }}>
+                                    <span style={{ fontSize: '0.8rem', color: '#fff' }}>
+                                        {u.nombre || u.email} <small style={{ color: '#888' }}>({u.rol})</small>
+                                    </span>
+                                    <button 
+                                        onClick={() => handleAsignarPersonal(u.uid, 'alumno', '', aca.id)} 
+                                        style={{ ...s.btnTextDelete, fontSize: '0.7rem', color: '#ff4444' }}
+                                    >
+                                        Remover
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div style={{ fontSize: '0.75rem', color: '#555', fontStyle: 'italic', marginBottom: '10px' }}>Sin personal asignado</div>
+                    )}
+
+                    {/* SELECTOR: Mantenemos el rol original del usuario al asignar */}
+                    <select 
+                        style={{ ...s.formInput, width: '100%', padding: '6px', fontSize: '0.75rem', borderColor: '#333' }} 
+                        onChange={(e) => { 
+                            if (e.target.value) {
+                                const usuarioSeleccionado = usuarios.find(u => u.uid === e.target.value);
+                                // Pasamos el rol que ya tiene (instructor o profesor)
+                                handleAsignarPersonal(e.target.value, usuarioSeleccionado.rol, se.id, aca.id); 
+                                e.target.value = ''; 
+                            }
+                        }}
+                    >
+                        <option value="">+ Asignar Profesor/Instructor...</option>
+                        {usuarios.filter(u => u.rol === 'instructor' || u.rol === 'profesor').map(u => (
+                            <option key={u.uid} value={u.uid}>{u.nombre || u.email} ({u.rol})</option>
+                        ))}
+                    </select>
+                </div>
+            );
+        })
+    ) : (
+        <div style={{ color: '#666', fontStyle: 'italic', fontSize: '0.85rem' }}>No hay sedes afiliadas registradas.</div>
+    )}
+</div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
 
                             {/* 🏛️ 2. FORMULARIOS DE REGISTRO */}
                             <div style={s.structureGrid}>
-
-                                {/* BLOQUE REGISTRAR ACADEMIA */}
                                 <div style={s.panelBox}>
-                                    <h2 style={{ color: '#d4af37', margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        {Icons.Building} Registrar Academia / Franquicia
-                                    </h2>
+                                    <h2 style={{ color: '#d4af37', margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>{Icons.Building} Registrar Academia</h2>
                                     <form onSubmit={handleCrearAcademia} style={{ marginBottom: '30px' }}>
                                         <label style={s.formLabel}>NOMBRE DE LA ACADEMIA</label>
-                                        <input
-                                            style={s.formInput}
-                                            value={nombreAcademia}
-                                            onChange={(e) => setNombreAcademia(e.target.value)}
-                                            placeholder="Ej. HOLKAN HAKAGURE"
-                                        />
-
-                                        <label style={s.formLabel}>LOGOTIPO DE LA ACADEMIA</label>
-
-                                        <label style={{
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                                            background: '#1f1f1f', color: '#d4af37', border: '1px dashed #d4af37',
-                                            padding: '12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold',
-                                            textAlign: 'center', marginBottom: '15px', transition: '0.2s'
-                                        }}>
-                                            <span>📁 SELECCIONAR LOGO DESDE ARCHIVO / CELULAR</span>
-                                            <input
-                                                type="file"
-                                                accept="image/*"
-                                                style={{ display: 'none' }}
-                                                onChange={handleLogoAcademiaChange}
-                                            />
+                                        <input style={s.formInput} value={nombreAcademia} onChange={(e) => setNombreAcademia(e.target.value)} placeholder="Ej. HOLKAN HAKAGURE" />
+                                        <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: '#1f1f1f', color: '#d4af37', border: '1px dashed #d4af37', padding: '12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', textAlign: 'center', marginBottom: '15px' }}>
+                                            <span>📁 LOGOTIPO</span>
+                                            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoAcademiaChange} />
                                         </label>
-
-                                        {logoAcademiaBase64 && (
-                                            <div style={{ marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px', background: '#111', padding: '8px', borderRadius: '6px', border: '1px solid #333' }}>
-                                                <img src={logoAcademiaBase64} alt="Preview" style={{ height: '40px', width: '40px', objectFit: 'contain', borderRadius: '4px' }} />
-                                                <span style={{ color: '#4CAF50', fontSize: '0.8rem' }}>✔ Logo listo para guardar</span>
-                                            </div>
-                                        )}
-
-                                        <button type="submit" disabled={creandoAcademia} style={s.btnGoldAction}>
-                                            {creandoAcademia ? "REGISTRANDO..." : "REGISTRAR ACADEMIA"}
-                                        </button>
+                                        <button type="submit" disabled={creandoAcademia} style={s.btnGoldAction}>{creandoAcademia ? "REGISTRANDO..." : "REGISTRAR"}</button>
                                     </form>
 
-                                    <h3 style={{ color: '#fff', borderBottom: '1px solid #222', paddingBottom: '8px' }}>
-                                        Academias Registradas ({academias.length})
-                                    </h3>
+                                    <h3 style={{ color: '#fff', borderBottom: '1px solid #222', paddingBottom: '8px' }}>Academias Registradas ({academias.length})</h3>
                                     <div style={s.listContainer}>
                                         {academias.map(ac => (
                                             <div key={ac.id} style={s.listItem}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    {(ac.logoBase64 || ac.logobase64) && <img src={ac.logoBase64 || ac.logobase64} alt="logo" style={{ width: '20px', height: '20px', objectFit: 'contain' }} />}
-                                                    <span>🏢 <strong>{ac.nombreAcademia || ac.nombre || `ID: ${ac.id}`}</strong></span>
-                                                </div>
+                                                <span>🏢 {ac.nombreAcademia || ac.nombre || ac.id}</span>
                                                 <button onClick={() => handleAction(ac.id, 'academias', 'delete')} style={s.btnTextDelete}>Eliminar</button>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
 
-                                {/* BLOQUE VINCULAR SEDE Y LISTA ACORDEÓN */}
+                                {/* BLOQUE VINCULAR SEDE Y LISTA */}
                                 <div style={s.panelBox}>
-                                    <h2 style={{ color: '#4CAF50', margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        {Icons.MapPin} Vincular Nueva Sede
-                                    </h2>
+                                    <h2 style={{ color: '#4CAF50', margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>{Icons.MapPin} Vincular Nueva Sede</h2>
                                     <form onSubmit={handleCrearSede} style={{ marginBottom: '30px' }}>
-                                        <label style={s.formLabel}>NOMBRE DE LA SEDE / SUCURSAL</label>
+                                        <label style={s.formLabel}>NOMBRE DE LA SEDE</label>
                                         <input style={s.formInput} value={nombreSede} onChange={(e) => setNombreSede(e.target.value)} placeholder="Ej. BUJUTSU VERACRUZ" />
-
-                                        <label style={s.formLabel}>ACADEMIA MADRE (ALIANZA)</label>
+                                        <label style={s.formLabel}>ACADEMIA MADRE</label>
                                         <select style={s.selectFullStyle} value={academiaSeleccionada} onChange={(e) => setAcademiaSeleccionada(e.target.value)}>
                                             <option value="">-- SELECCIONAR ACADEMIA --</option>
-                                            {academias.map(ac => (
-                                                <option key={ac.id} value={ac.id}>{ac.nombreAcademia || ac.nombre || ac.id}</option>
-                                            ))}
+                                            {academias.map(ac => (<option key={ac.id} value={ac.id}>{ac.nombreAcademia || ac.nombre || ac.id}</option>))}
                                         </select>
-
-                                        <label style={s.formLabel}>UID DEL PROFESOR (TEAM ID PROTECTOR)</label>
-                                        <input style={s.formInput} value={teamIdProfesor} onChange={(e) => setTeamIdProfesor(e.target.value)} placeholder="Pega el UID de Firebase Auth del Profesor" />
-
-                                        <button type="submit" disabled={creandoSede} style={s.btnGreenAction}>
-                                            {creandoSede ? "ENLAZANDO..." : "VINCULAR SEDE"}
-                                        </button>
+                                        <label style={s.formLabel}>SELECCIONAR PROFESOR (TEAM ID)</label>
+<select 
+    style={s.selectFullStyle} 
+    value={teamIdProfesor} 
+    onChange={(e) => setTeamIdProfesor(e.target.value)}
+>
+    <option value="">-- SELECCIONAR PROFESOR --</option>
+    {usuarios
+        // Filtramos para que solo aparezcan profesores o admins
+        .filter(u => u.rol === 'profesor' || u.rol === 'admin') 
+        .map(u => (
+            <option key={u.id} value={u.uid || u.id}>
+                {u.nombre || u.email || "Usuario sin nombre"} ({u.rol})
+            </option>
+        ))
+    }
+</select>
+                                        <input style={s.formInput} value={teamIdProfesor} onChange={(e) => setTeamIdProfesor(e.target.value)} placeholder="UID del Profesor" />
+                                        <button type="submit" disabled={creandoSede} style={s.btnGreenAction}>{creandoSede ? "ENLAZANDO..." : "VINCULAR SEDE"}</button>
                                     </form>
 
-                                    <h3 style={{ color: '#fff', borderBottom: '1px solid #222', paddingBottom: '8px' }}>
-                                        Sedes Vinculadas por Alianza ({sedes.length})
-                                    </h3>
-
-                                    {/* LISTA ACORDEÓN EN SEDES VINCULADAS */}
+                                    <h3 style={{ color: '#fff', borderBottom: '1px solid #222', paddingBottom: '8px' }}>Sedes Vinculadas</h3>
                                     <div style={s.listContainer}>
                                         {academias.map(ac => {
-                                            const sedesDeAcademia = sedes.filter(se => se.academiaId === ac.id || se.id === ac.id || (se.nombre && se.nombre.toLowerCase() === (ac.nombreAcademia || '').toLowerCase()));
+                                            const sedesDeAcademia = sedes.filter(se => se.academiaId === ac.id || se.id === ac.id);
                                             if (sedesDeAcademia.length === 0) return null;
-
                                             const estaAbierto = !!academiasAbiertas[`sedes_${ac.id}`];
 
                                             return (
                                                 <div key={ac.id} style={{ marginBottom: '10px', background: '#141414', border: '1px solid #222', borderRadius: '8px', overflow: 'hidden' }}>
-
-                                                    {/* CABECERA ACORDEÓN DE LA LISTA DE SEDES */}
-                                                    <div
-                                                        onClick={() => toggleAcademia(`sedes_${ac.id}`)}
-                                                        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', cursor: 'pointer', background: '#1a1a1a', color: '#d4af37', fontSize: '0.9rem' }}
-                                                    >
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                            {(ac.logoBase64 || ac.logobase64) ? <img src={ac.logoBase64 || ac.logobase64} alt="logo" style={{ width: '18px', height: '18px', objectFit: 'contain' }} /> : '🏢'}
-                                                            <strong>{ac.nombreAcademia || ac.nombre || ac.id}</strong>
-                                                            <span style={{ color: '#888', fontSize: '0.75rem' }}>({sedesDeAcademia.length})</span>
-                                                        </div>
+                                                    <div onClick={() => toggleAcademia(`sedes_${ac.id}`)} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 12px', cursor: 'pointer', background: '#1a1a1a', color: '#d4af37', fontSize: '0.9rem' }}>
+                                                        <strong>{ac.nombreAcademia || ac.nombre || ac.id} ({sedesDeAcademia.length})</strong>
                                                         <span>{estaAbierto ? '▼' : '►'}</span>
                                                     </div>
-
-                                                    {/* CONTENIDO ACORDEÓN DE SEDES */}
-{estaAbierto && (
-    <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #222' }}>
-        {sedesDeAcademia.map((se) => {
-            // Lógica de visualización
-            const esSedeMadre = se.tipo === 'sede_principal' || se.id === ac.id;
-            const nombreAMostrar = se.nombre || se.nombreSede || 'Sede sin nombre';
-            const ciudadAMostrar = se.ciudad || (esSedeMadre ? 'Sede Central' : 'Sin ubicación');
-
-            return (
-                <div key={se.id} style={{ ...s.listItemSede, background: '#1f1f1f', margin: 0, border: '1px solid #282828' }}>
-                    <div style={{ flex: 1 }}>
-                        
-                        {/* CABECERA: TIPO Y NOMBRE */}
-                        <div style={{ color: '#4CAF50', fontSize: '0.9rem', marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span>{esSedeMadre ? '👑' : '📍'}</span>
-                            <strong>{nombreAMostrar}</strong>
-                            <span style={{ color: '#aaa', fontWeight: 'normal', fontSize: '0.75rem' }}>
-                                ({ciudadAMostrar})
-                            </span>
-                        </div>
-
-                        {/* ACCIONES Y DATOS */}
-                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '6px', alignItems: 'center' }}>
-                            {se.codigoAcceso ? (
-                                <span style={{ background: '#222', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', color: '#d4af37', border: '1px solid #333' }}>
-                                    🔑 <strong style={{ cursor: 'pointer', letterSpacing: '1px' }}>{se.codigoAcceso}</strong>
-                                </span>
-                            ) : (
-                                <button
-                                    onClick={() => generarCodigoSedeMadre(se.id, nombreAMostrar)}
-                                    style={{ background: '#d4af3722', border: '1px solid #d4af37', color: '#d4af37', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', cursor: 'pointer' }}
-                                >
-                                    ⚡ Generar Código
-                                </button>
-                            )}
-
-                            <span style={s.subTextListCode}>
-                                🥋 UID: {se.teamId ? `${se.teamId.slice(0, 6)}...${se.teamId.slice(-4)}` : 'N/A'}
-                            </span>
-                        </div>
-                    </div>
-                    
-                    {/* BOTÓN ELIMINAR */}
-                    <button 
-                        onClick={() => handleAction(se.id, 'sedes', 'delete')} 
-                        style={{ ...s.btnTextDelete, marginLeft: '10px' }}
-                    >
-                        Eliminar
-                    </button>
-                </div>
-            );
-        })}
-    </div>
-)}
+                                                    {estaAbierto && (
+                                                        <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                            {sedesDeAcademia.map((se) => (
+                                                                <div key={se.id} style={{ ...s.listItemSede, background: '#1f1f1f', padding: '8px', borderRadius: '4px' }}>
+                                                                    <span>📍 {se.nombreSede || 'Sede'}</span>
+                                                                    <button onClick={() => handleAction(se.id, 'sedes', 'delete')} style={s.btnTextDelete}>Eliminar</button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             );
                                         })}
