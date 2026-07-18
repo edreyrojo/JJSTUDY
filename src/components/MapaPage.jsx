@@ -437,7 +437,7 @@ const MapaPage = ({
                                             animationDuration: `${5 + (i % 3)}s`,
                                             borderColor: visto ? '#4CAF50' : '#d4af37',
                                             color: visto ? '#4CAF50' : '#fff',
-                                            fontSize: esMovil ? '0.80rem' : '0.80rem',
+                                            fontSize: esMovil ? '0.78rem' : '0.80rem',
                                             width: esMovil ? (total > 20 ? '70px' : '80px') : '100px',
                                             height: esMovil ? (total > 20 ? '70px' : '80px') : '100px',
                                             zIndex: 10
