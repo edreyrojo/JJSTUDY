@@ -1,6 +1,7 @@
 import React from 'react';
 import { DB_INSTRUCCIONALES } from '../data/instruccionales'; // Asegúrate de que la ruta sea correcta
 import Swal from 'sweetalert2';
+
 const notify = (mensaje, tipo = 'success') => {
     Swal.fire({
         text: mensaje,
@@ -15,6 +16,7 @@ const notify = (mensaje, tipo = 'success') => {
         }
     });
 };
+
 const SUB_POSICIONES = [
     'GUARDIA', 'MONTURA', 'TOMA DE ESPALDA', 'CRUZADA',
     '100 KILOS', 'NORTE SUR', 'RODILLA EN EL ESTOMAGO', 'NORTE-SUR'
@@ -24,12 +26,15 @@ const SUB_DEFENSAS = [
     'ESCAPES MONTADA', 'ESCAPES LATERAL', 'DEFENSA ESPALDA', 'RE-GUARDIA',
     'DEFENSA LEG LOCKS', 'DEFENSA TRIANGULO', 'DEFENSA ARM BAR', 'DEFENSA STRANGLES'
 ];
+
 const EJES_MAESTROS = ['AUTORES', 'POSICIÓN', 'NO GI', 'GI', 'CLA',
     'SOMETIMIENTOS', 'ESCAPES', 'SWEEPS', 'DERRIBOS',
     'PASES', 'GUARDIAS', 'SISTEMAS', 'FUNDAMENTOS',
     'DEFENSA PERSONAL', 'CINTA', 'ORTODOXO', 'NEW SCHOOL'];
+
 const mapStyles = {
-    layout: { display: 'flex', height: '100vh', backgroundColor: '#050505', overflow: 'hidden' },
+    // AÑADIDO: width 100% y boxSizing border-box para prevenir desbordes
+    layout: { display: 'flex', height: '100vh', width: '100%', backgroundColor: '#050505', overflow: 'hidden', boxSizing: 'border-box' },
     sidebar: { width: '250px', borderRight: '1px solid #222', padding: '20px', backgroundColor: '#0a0a0a' },
     sideItem: { padding: '12px', cursor: 'pointer', borderRadius: '4px', fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px' },
     mapArea: { flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' },
@@ -38,6 +43,7 @@ const mapStyles = {
     mainNode: { width: '140px', height: '140px', borderRadius: '50%', border: '4px solid #d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#000', zIndex: 5, fontSize: '0.9rem', textAlign: 'center', fontWeight: 'bold' },
     subNodeFloating: { position: 'absolute', width: '110px', height: '110px', borderRadius: '50%', border: '1px solid #d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', textAlign: 'center', backgroundColor: '#111', cursor: 'pointer', zIndex: 6, padding: '10px', transition: '0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)' },
 };
+
 const MapaPage = ({
     onBack, onSelectVideo, onNavigateToNotes, onContinue, hasSession, usuario,
     categoriaSel, setCategoriaSel,
@@ -50,13 +56,13 @@ const MapaPage = ({
     // 1. ESTADOS
     const [terminoBusqueda, setTerminoBusqueda] = React.useState("");
     const [esMovil, setEsMovil] = React.useState(window.innerWidth < 768);
+
     // 3. EL CAZADOR DE TÉCNICAS (Optimizado para Ejes y Tags)
     const todasLasTecnicas = React.useMemo(() => {
         return Object.keys(DB_INSTRUCCIONALES).flatMap(cursoKey => {
             const curso = DB_INSTRUCCIONALES[cursoKey];
             return curso.volumenes.flatMap(vol =>
                 vol.partes.map(parte => {
-                    // Mantenemos soporte para subcategoría manual si existe
                     const sub = (parte.subcategoria || "").trim();
 
                     return {
@@ -65,7 +71,6 @@ const MapaPage = ({
                         curso: cursoKey,
                         tituloCurso: curso.titulo,
                         volNombre: vol.nombre,
-                        // --- LOS NUEVOS PILARES ---
                         eje: curso.eje || "OTROS",
                         tags: curso.tags || []
                     };
@@ -77,7 +82,6 @@ const MapaPage = ({
     // 4. CHEQUEO DE DEPURACIÓN
     React.useEffect(() => {
         console.log("Total Técnicas Indexadas:", todasLasTecnicas.length);
-        // Ejemplo: ver cuántos videos hay de un Eje específico
         const checkGuards = todasLasTecnicas.filter(t => t.eje === "GUARDS");
         console.log("Videos en Eje GUARDS:", checkGuards.length);
     }, [todasLasTecnicas]);
@@ -96,7 +100,7 @@ const MapaPage = ({
 
     if (volSel) {
         nodosAMostrar = volSel?.partes?.map((p, index) => ({
-            nombre: p.nombre, type: 'parte', id: p.id, cursoId: instrSel, // <--- PASAMOS EL ID DEL CURSO
+            nombre: p.nombre, type: 'parte', id: p.id, cursoId: instrSel,
             indice: index
         })) || [];
         tituloCentral = volSel?.nombre || "";
@@ -114,19 +118,14 @@ const MapaPage = ({
 
         // NIVEL A: EJE (ej. GUARDS)
         if (EJES_MAESTROS.includes(categoriaSel)) {
-
             if (categoriaSel === 'AUTORES') {
-                // Obtenemos autores únicos de la BD
                 const autores = [...new Set(Object.values(DB_INSTRUCCIONALES).map(c => c.autor))];
                 nodosAMostrar = autores.map(a => ({ nombre: a, type: 'autor' }));
             }
             else if (categoriaSel === 'POSICIÓN') {
-                // En lugar de ir a los tags, mostramos las 8 subcategorías fijas
                 nodosAMostrar = SUB_POSICIONES.map(p => ({ nombre: p, type: 'sub_posicion' }));
             }
             else {
-                // Obtenemos los Tags específicos de este eje (PASES, SWEEPS, etc.)
-                // Soporta que t.eje sea un String o un Array
                 const tagsDelEje = [...new Set(todasLasTecnicas
                     .filter(t => Array.isArray(t.eje) ? t.eje.includes(categoriaSel) : t.eje === categoriaSel)
                     .flatMap(t => t.tags))];
@@ -134,9 +133,8 @@ const MapaPage = ({
                 nodosAMostrar = tagsDelEje.map(tag => ({ nombre: tag, type: 'tag' }));
             }
         }
-        // 2. CASO: NO ES UN EJE (Es un autor específico o un tag específico)
+        // 2. CASO: NO ES UN EJE
         else {
-            // Filtramos la BD una sola vez buscando coincidencia en autor o en tags
             const cursosFiltrados = Object.keys(DB_INSTRUCCIONALES).filter(key => {
                 const curso = DB_INSTRUCCIONALES[key];
                 return (
@@ -156,28 +154,19 @@ const MapaPage = ({
 
     // 7. FUNCIONES DE INTERACCIÓN
     const handleNodeClick = (nodo) => {
-        // 1. Nodos que profundizan en el Mapa (Cambian la categoría central)
         if (nodo.type === 'sub_posicion' || nodo.type === 'tag' || nodo.type === 'autor') {
             setCategoriaSel(nodo.nombre);
         }
-
-        // 2. Nodos que entran al contenido del Instruccional
         else if (nodo.type === 'curso') {
             setInstrSel(nodo.id || nodo.nombre);
         }
         else if (nodo.type === 'volumen') {
             setVolSel(nodo.raw);
         }
-
-        // 3. Selección de video con lógica de bloqueo 🔒
         else if (nodo.type === 'parte') {
-            const cursoId = nodo.cursoId; // ID del curso al que pertenece el video
-            const esPrimerVideo = nodo.indice === 0; // Solo el primer video del volumen es gratis
-
-            // Reglas de acceso:
-            // - Si eres Admin: Acceso total.
-            // - Si es el primer video: Acceso libre.
-            // - Si el curso está en tu lista de 'cursos_liberados': Acceso concedido.
+            const cursoId = nodo.cursoId;
+            const esPrimerVideo = nodo.indice === 0;
+            
             const tieneAcceso = usuario.rol === 'admin' ||
                 esPrimerVideo ||
                 usuario.cursos_liberados?.includes(cursoId);
@@ -185,7 +174,6 @@ const MapaPage = ({
             if (tieneAcceso) {
                 onSelectVideo({ titulo: nodo.nombre, id: nodo.id });
             } else {
-                // Mensaje de acción para el alumno
                 if (window.confirm(
                     `CONTENIDO BLOQUEADO 🔒\n\nEste video requiere autorización. Solo el primer video de cada volumen es gratuito.\n\n¿Deseas enviar un WhatsApp al administrador para solicitar acceso a "${cursoId}"?`
                 )) {
@@ -197,39 +185,26 @@ const MapaPage = ({
     };
 
     const irAtras = () => {
-        // 1. Si estamos viendo un Volumen, regresamos al Curso
         if (volSel) {
             setVolSel(null);
         }
-        // 2. Si estamos viendo un Curso, regresamos al nivel anterior (Autor, Sub-posición o Tag)
         else if (instrSel) {
             setInstrSel(null);
         }
-        // 3. Si estamos viendo un Autor, regresamos a la lista de Autores
         else if (autorSel) {
             setAutorSel(null);
         }
-        // 4. Lógica de Navegación Profunda (Tags y Sub-posiciones)
         else if (categoriaSel) {
-
-            // A. Si es una Sub-posición (ej: Guardia), regresamos al eje maestro 'POSICIÓN'
             if (SUB_POSICIONES.includes(categoriaSel)) {
                 setCategoriaSel('POSICIÓN');
             }
-
-            // B. Si es un Eje Maestro (ej: POSICIÓN, PASES, AUTORES), volvemos al Home
             else if (EJES_MAESTROS.includes(categoriaSel)) {
                 onBack();
             }
-
-            // C. Si es un Tag o un Autor (ej: "Half Guard" o "Craig Jones")
             else {
-                // Buscamos a qué eje o sub-posición pertenece para saber a dónde volver
                 const tecnica = todasLasTecnicas.find(t => t.tags.includes(categoriaSel));
 
                 if (tecnica) {
-                    // Si el tag es de una sub-posición, volvemos a esa sub-posición
-                    // Si no, volvemos al eje principal
                     const posibleSub = SUB_POSICIONES.find(p => tecnica.tags.includes(p));
                     setCategoriaSel(posibleSub || (Array.isArray(tecnica.eje) ? tecnica.eje[0] : tecnica.eje));
                 } else {
@@ -238,11 +213,19 @@ const MapaPage = ({
                 }
             }
         }
-        // 5. Seguridad: Si no hay nada seleccionado, al Home
         else {
             onBack();
         }
     };
+
+    React.useEffect(() => {
+        const handleResize = () => setEsMovil(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    // ALMACENAMOS EL TOTAL DE NODOS PARA LA LÓGICA DE ESCALADO DINÁMICO
+    const totalNodos = nodosAMostrar.length;
 
     // 8. RENDERIZADO
     return (
@@ -256,25 +239,40 @@ const MapaPage = ({
                 flexDirection: 'column',
                 gap: '10px',
                 zIndex: 100,
-                padding: '15px',
-                boxSizing: 'border-box'
+                // CAMBIO 1: Agregamos safe-area-inset-top para proteger los botones de la cámara frontal
+                paddingTop: esMovil ? 'calc(env(safe-area-inset-top, 24px) + 12px)' : '20px',
+                paddingLeft: '15px',
+                paddingRight: '15px',
+                paddingBottom: '15px',
+                boxSizing: 'border-box',
+                borderBottom: esMovil ? '1px solid #222' : 'none',
+                borderRight: esMovil ? 'none' : '1px solid #222'
             }}>
                 {/* FILA 1: NAVEGACIÓN */}
-                <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
                     <button
                         onClick={irAtras}
-                        style={{ ...styles.btnOutline, flex: '0 0 40px', padding: '10px 0' }}
+                        // CAMBIO 2: Target ampliado en móvil a 52px de ancho para facilitar el clic
+                        style={{ 
+                            ...styles.btnOutline, 
+                            flex: esMovil ? '0 0 52px' : '0 0 40px', 
+                            padding: '10px 0',
+                            fontSize: esMovil ? '1.1rem' : 'inherit',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}
                     >
                         ←
                     </button>
-                    {/* LÓGICA CONDICIONAL: Solo si hay sesión activa */}
                     {hasSession && (
                         <button
                             onClick={onContinue}
                             style={{
                                 ...styles.btnGold,
-                                flex: 2, // Toma más espacio si aparece
-                                fontSize: '0.65rem'
+                                flex: 2,
+                                fontSize: esMovil ? '0.75rem' : '0.65rem',
+                                padding: esMovil ? '12px 5px' : '10px 0'
                             }}
                         >
                             {esMovil ? 'CONTINUAR' : '▶ CONTINUAR'}
@@ -284,9 +282,10 @@ const MapaPage = ({
                         onClick={onNavigateToNotes}
                         style={{
                             ...styles.btnOutline,
-                            flex: 1, // Se expande automáticamente si 'Continuar' no está
-                            fontSize: '0.65rem',
-                            borderColor: '#d4af37'
+                            flex: 1,
+                            fontSize: esMovil ? '0.75rem' : '0.65rem',
+                            borderColor: '#d4af37',
+                            padding: esMovil ? '12px 5px' : '10px 0'
                         }}
                     >
                         BITÁCORA
@@ -314,81 +313,78 @@ const MapaPage = ({
                     />
                 </div>
 
-                {/* FILA 3: CATEGORÍAS (Híbrido PC/Móvil) */}
-                <div style={{ marginTop: esMovil ? '0' : '20px' }}>
+                {/* FILA 3: CATEGORÍAS */}
+                <div style={{ marginTop: esMovil ? '2px' : '20px' }}>
                     {!esMovil && <h3 style={{ color: '#d4af37', marginBottom: '15px', fontSize: '0.9rem' }}>FILTRAR POR</h3>}
 
                     <div style={{
                         display: 'flex',
                         flexDirection: esMovil ? 'row' : 'column',
                         gap: '8px',
-                        maxHeight: esMovil ? 'auto' : '70vh', // Para que no se desborde el menú
+                        maxHeight: esMovil ? 'auto' : '70vh',
                         overflowX: esMovil ? 'auto' : 'hidden',
                         overflowY: esMovil ? 'hidden' : 'auto',
-                        paddingBottom: esMovil ? '10px' : '0',
+                        paddingBottom: esMovil ? '8px' : '0',
                         paddingRight: '5px',
-                        scrollbarWidth: 'none', // Ocultamos scrollbar feo en móviles
+                        scrollbarWidth: 'none',
                         msOverflowStyle: 'none',
-                        WebkitOverflowScrolling: 'touch',
-                        scrollbarColor: '#d4af37 #000'
+                        WebkitOverflowScrolling: 'touch'
                     }}>
-                        {['AUTORES', 'POSICIÓN', 'NO GI', 'GI', 'CLA',
-                            'SOMETIMIENTOS', 'ESCAPES', 'SWEEPS', 'DERRIBOS',
-                            'PASES', 'GUARDIAS', 'SISTEMAS', 'FUNDAMENTOS',
-                            'DEFENSA PERSONAL', 'CINTA', 'ORTODOXO', 'NEW SCHOOL'].map(cat => {
-                                // Lógica para mantener encendido el botón si estamos en una subcategoría
-                                const estaActivo = categoriaSel === cat ||
-                                    (cat === 'POSICIÓN' && SUB_POSICIONES.includes(categoriaSel)) ||
-                                    (cat === 'D EFENSAS' && SUB_DEFENSAS.includes(categoriaSel));
+                        {EJES_MAESTROS.map(cat => {
+                            const estaActivo = categoriaSel === cat ||
+                                (cat === 'POSICIÓN' && SUB_POSICIONES.includes(categoriaSel)) ||
+                                (cat === 'ESCAPES' && SUB_DEFENSAS.includes(categoriaSel));
 
-                                return (
-                                    <div
-                                        key={cat}
-                                        onClick={() => {
-                                            setCategoriaSel(cat);
-                                            setAutorSel(null);
-                                            setInstrSel(null);
-                                            setVolSel(null);
-                                            setTerminoBusqueda("");
-                                        }}
-                                        style={{
-                                            ...mapStyles.sideItem,
-                                            backgroundColor: estaActivo ? '#d4af37' : '#111',
-                                            color: estaActivo ? '#000' : '#fff',
-                                            border: '1px solid #d4af37',
-                                            whiteSpace: 'nowrap',
-                                            padding: esMovil ? '8px 15px' : '12px',
-                                            borderRadius: esMovil ? '20px' : '5px',
-                                            fontSize: esMovil ? '0.65rem' : '0.85rem',
-                                            cursor: 'pointer',
-                                            flexShrink: 0
-                                        }}
-                                    >
-                                        {cat}
-                                    </div>
-                                );
-                            })}
+                            return (
+                                <div
+                                    key={cat}
+                                    onClick={() => {
+                                        setCategoriaSel(cat);
+                                        setAutorSel(null);
+                                        setInstrSel(null);
+                                        setVolSel(null);
+                                        setTerminoBusqueda("");
+                                    }}
+                                    style={{
+                                        ...mapStyles.sideItem,
+                                        backgroundColor: estaActivo ? '#d4af37' : '#111',
+                                        color: estaActivo ? '#000' : '#fff',
+                                        border: '1px solid #d4af37',
+                                        whiteSpace: 'nowrap',
+                                        padding: esMovil ? '8px 16px' : '12px',
+                                        borderRadius: esMovil ? '20px' : '5px',
+                                        fontSize: esMovil ? '0.7rem' : '0.85rem',
+                                        cursor: 'pointer',
+                                        flexShrink: 0
+                                    }}
+                                >
+                                    {cat}
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             </aside>
 
+            {/* ÁREA PRINCIPAL DEL MAPA */}
             <main style={{
                 ...mapStyles.mapArea,
                 flex: 1,
                 display: 'flex',
                 flexDirection: 'column',
-                justifyContent: esMovil ? 'flex-start' : 'center', // Alinea arriba en móvil
+                justifyContent: 'center', 
                 alignItems: 'center',
-                paddingTop: esMovil ? '0px' : '20px',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                // Compensamos el margen izquierdo en PC para centrar el área disponible, sin afectar móvil
+                marginLeft: esMovil ? '0px' : '250px',
+                width: '100%'
             }}>
                 <div style={{
                     ...mapStyles.canvas,
-                    // Ajustamos el scale y añadimos marginTop negativo para subirlo
-                    transform: esMovil ? 'scale(0.7)' : 'scale(1)',
-                    marginTop: esMovil ? '0px' : '0px',
-                    transformOrigin: 'top center', // Cambiamos el origen para que escale hacia arriba
-                    transition: 'all 0.3s ease'
+                    // CAMBIO 3: Escala inteligente para proteger la doble órbita (evita que los nodos superen los lados en celular)
+                    transform: esMovil ? (totalNodos > 12 ? 'scale(0.52)' : 'scale(0.65)') : 'scale(1)',
+                    transformOrigin: 'center center',
+                    transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)'
                 }}>
                     {terminoBusqueda ? (
                         <div style={{ zIndex: 10, width: '100%', maxWidth: '500px', maxHeight: '80vh', overflowY: 'auto', padding: '20px' }}>
@@ -404,7 +400,7 @@ const MapaPage = ({
                         <>
                             <svg style={mapStyles.svgLayer}>
                                 {nodosAMostrar.map((n, i) => {
-                                    const total = nodosAMostrar.length;
+                                    const total = totalNodos;
                                     const angle = (i * (360 / total)) * (Math.PI / 180);
                                     return (
                                         <line key={i} x1="50%" y1="50%" x2={`${50 + (Math.cos(angle) * 35)}%`} y2={`${50 + (Math.sin(angle) * 35)}%`} stroke={vistos?.includes(n.id) ? '#4CAF50' : '#d4af37'} strokeWidth="1" opacity="0.2" className="floating-node" style={{ animationDelay: `${i * -0.8}s`, animationDuration: `${5 + (i % 3)}s` }} />
@@ -415,19 +411,13 @@ const MapaPage = ({
                             <div style={mapStyles.mainNode}>{tituloCentral}</div>
 
                             {nodosAMostrar.map((n, i) => {
-                                const total = nodosAMostrar.length;
-
-                                // --- MEJORA: RADIO DINÁMICO ---
-                                // Si hay más de 12 nodos, escalonamos el radio para crear dos "órbitas"
-                                // Los nodos pares se quedan en el radio base, los impares se alejan.
+                                const total = totalNodos;
                                 let radioBase = esMovil ? 210 : 260;
                                 let radio = radioBase;
 
                                 if (total > 12) {
-                                    // Si es impar, sumamos distancia para crear la segunda órbita
                                     radio = (i % 2 === 0) ? radioBase : radioBase + (esMovil ? 75 : 110);
                                 }
-                                // ------------------------------
 
                                 const angle = (i * (360 / total)) * (Math.PI / 180);
                                 const x = Math.cos(angle) * radio;
@@ -441,20 +431,18 @@ const MapaPage = ({
                                         className="floating-node"
                                         style={{
                                             ...mapStyles.subNodeFloating,
-                                            // Usamos x e y calculados con el radio dinámico
                                             left: `calc(50% + ${x}px - ${esMovil ? '40px' : '50px'})`,
                                             top: `calc(50% + ${y}px - ${esMovil ? '40px' : '50px'})`,
                                             animationDelay: `${i * -0.8}s`,
                                             animationDuration: `${5 + (i % 3)}s`,
                                             borderColor: visto ? '#4CAF50' : '#d4af37',
                                             color: visto ? '#4CAF50' : '#fff',
-                                            cursor: 'pointer',
                                             fontSize: esMovil ? '0.55rem' : '0.75rem',
-                                            // Reducimos un poco más el tamaño en móvil si hay saturación
                                             width: esMovil ? (total > 20 ? '70px' : '80px') : '100px',
                                             height: esMovil ? (total > 20 ? '70px' : '80px') : '100px',
                                             zIndex: 10
-                                        }}>
+                                        }}
+                                    >
                                         {visto ? '✅ ' : ''}{n.nombre}
                                     </div>
                                 );
@@ -466,4 +454,5 @@ const MapaPage = ({
         </div>
     );
 };
+
 export default MapaPage;
