@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { doc, setDoc, addDoc, collection } from 'firebase/firestore';
 import Swal from 'sweetalert2';
+
 const notify = (mensaje, tipo = 'success') => {
     Swal.fire({
         text: mensaje,
@@ -29,11 +30,11 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
     const [esMovil, setEsMovil] = React.useState(window.innerWidth < 768);
     const [mostrarAlerta, setMostrarAlerta] = useState(false);
     const [mensajeAlerta, setMensajeAlerta] = useState("");
+    
     const navegarVideo = (direccion) => {
         if (!getAdjacentVideo || !video) return;
         const siguiente = getAdjacentVideo(video, direccion);
         if (siguiente) {
-            // Usamos onSelectVideo que ya viene de App.jsx para cambiar el video actual
             onSelectVideo(siguiente);
         } else {
             setMensajeAlerta(direccion === 'next' ? "Fin del curso 🥋" : "Inicio del curso 🥋");
@@ -151,63 +152,51 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
     const isCompletado = vistos.includes(video?.id);
 
     return (
-        <div style={{ display: 'flex', flexDirection: esMovil ? 'column' : 'row', height: '100vh', width: '100vw', backgroundColor: '#000', color: '#fff', overflow: 'hidden' }}>
+        // CAMBIO 1: width 100% y boxSizing border-box para que no se coma la pantalla
+        <div style={{ display: 'flex', flexDirection: esMovil ? 'column' : 'row', height: '100vh', width: '100%', boxSizing: 'border-box', backgroundColor: '#000', color: '#fff', overflow: 'hidden' }}>
 
             {/* SECCIÓN IZQUIERDA: VIDEO */}
-            <div style={{ flex: esMovil ? 'none' : 3, display: 'flex', flexDirection: 'column', borderRight: '1px solid #222' }}>
+            {/* CAMBIO 2: flexShrink: 0 y ajuste de bordes para que no se aplaste en móvil */}
+            <div style={{ flex: esMovil ? 'none' : 3, flexShrink: 0, width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', borderRight: esMovil ? 'none' : '1px solid #222', borderBottom: esMovil ? '1px solid #222' : 'none' }}>
 
                 {/* HEADER CON NAVEGACIÓN MEJORADA */}
-                <div style={{ padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#0a0a0a', minHeight: '70px' }}>
-                    {/* CONTENEDOR DE NAVEGACIÓN DINÁMICA */}
+                <div style={{ padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#0a0a0a', minHeight: '70px', boxSizing: 'border-box' }}>
                     <div style={{ display: 'flex', gap: '5px' }}>
                         <button onClick={onBack} style={{ ...(styles.btnOutline || {}), width: 'auto', padding: '8px 12px' }}>←</button>
 
-                        {/* Solo aparece si existe un video previo */}
                         {getAdjacentVideo(video, 'prev') && (
                             <button
                                 onClick={() => navegarVideo('prev')}
-                                style={{
-                                    ...(styles.btnOutline || {}),
-                                    width: 'auto',
-                                    padding: '8px 12px',
-                                    border: '1px solid #d4af37',
-                                    color: '#d4af37'
-                                }}
+                                style={{ ...(styles.btnOutline || {}), width: 'auto', padding: '8px 12px', border: '1px solid #d4af37', color: '#d4af37' }}
                             >
                                 ◁
                             </button>
                         )}
 
-                        {/* Solo aparece si existe un video siguiente */}
                         {getAdjacentVideo(video, 'next') && (
                             <button
                                 onClick={() => navegarVideo('next')}
-                                style={{
-                                    ...(styles.btnOutline || {}),
-                                    width: 'auto',
-                                    padding: '8px 12px',
-                                    border: '1px solid #d4af37',
-                                    color: '#d4af37'
-                                }}
+                                style={{ ...(styles.btnOutline || {}), width: 'auto', padding: '8px 12px', border: '1px solid #d4af37', color: '#d4af37' }}
                             >
                                 ▷
                             </button>
                         )}
                     </div>
 
-                    <div style={{ textAlign: 'center', flex: 1, padding: '0 10px' }}>
+                    <div style={{ textAlign: 'center', flex: 1, padding: '0 10px', minWidth: 0 }}>
                         <span style={{ fontSize: '0.6rem', color: '#666', letterSpacing: '2px', display: 'block' }}>MODO ESTUDIO</span>
                         <h2 style={{ fontSize: '0.9rem', color: '#d4af37', margin: 0, fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{video?.titulo}</h2>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 }}>
                         <button onClick={onNavigateToNotes} style={{ background: 'none', border: '1px solid #d4af37', color: '#d4af37', borderRadius: '4px', fontSize: '0.6rem', padding: '5px 10px', cursor: 'pointer', fontWeight: 'bold' }}>BITÁCORA</button>
                         <div style={{ cursor: 'pointer', fontSize: '1.2rem' }} onClick={() => toggleVisto(video?.id)}>{isCompletado ? '✅' : '⚪'}</div>
                     </div>
                 </div>
 
                 {/* CONTENEDOR DE VIDEO */}
-                <div style={{ width: '100%', aspectRatio: '16/9', backgroundColor: '#000', position: 'relative' }}>
+                {/* CAMBIO 3: flexShrink: 0 al video para obligarlo a mantener el 16/9 */}
+                <div style={{ width: '100%', aspectRatio: '16/9', backgroundColor: '#000', position: 'relative', flexShrink: 0 }}>
                     <iframe
                         key={`${video?.id}-${tiempoActivo}`}
                         src={`https://drive.google.com/file/d/${video?.id}/preview${tiempoActivo ? `?t=${tiempoActivo}` : ''}`}
@@ -217,7 +206,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                 </div>
 
                 {/* ACCIONES RÁPIDAS DE VIDEO */}
-                <div style={{ padding: '8px 15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ padding: '8px 15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box' }}>
                     <button
                         onClick={() => navegarVideo('next')}
                         style={{ background: '#d4af3722', border: '1px solid #d4af37', color: '#d4af37', fontSize: '0.6rem', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer' }}
@@ -235,7 +224,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
             </div>
 
             {/* SECCIÓN DERECHA: NOTAS */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '20px', backgroundColor: '#0f0f0f', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px', backgroundColor: '#0f0f0f', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
 
                 <div style={{ marginBottom: '15px' }}>
                     <h3 style={{ color: '#d4af37', fontSize: '0.8rem', margin: '0 0 5px 0', letterSpacing: '1px' }}>OBSERVACIONES TÉCNICAS:</h3>
@@ -250,7 +239,8 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                             {isCronometroActivo ? 'PAUSAR SYNC' : 'INICIAR SYNC'}
                         </button>
                     </div>
-                    <input placeholder="Nombre de la posición o detalle..." value={nombreMarcador} onChange={(e) => setNombreMarcador(e.target.value)} style={{ ...(styles.input || {}), marginBottom: '10px', fontSize: '0.8rem' }} />
+                    {/* CAMBIO 4: inputs limitados al 100% con border-box */}
+                    <input placeholder="Nombre de la posición o detalle..." value={nombreMarcador} onChange={(e) => setNombreMarcador(e.target.value)} style={{ ...(styles.input || {}), marginBottom: '10px', fontSize: '0.8rem', boxSizing: 'border-box', width: '100%' }} />
                     <div style={{ display: 'flex', gap: '8px' }}>
                         <input placeholder="00:00" value={timestamp} onChange={(e) => setTimestamp(e.target.value)} style={{ width: '75px', backgroundColor: '#000', border: '1px solid #333', color: '#d4af37', textAlign: 'center', borderRadius: '5px', fontWeight: 'bold' }} />
                         <button onClick={insertarMarcaDeTiempo} style={{ flex: 1, ...(styles.btnGold || {}), fontSize: '0.7rem', fontWeight: 'bold' }}>+ AÑADIR A BITÁCORA</button>
@@ -266,7 +256,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                         const tiempo = tiempoMatch[0];
                         const nombre = marcaCompleta.replace(tiempo, "").replace(/^\s*-\s*/, "").trim() || "Marca";
                         return (
-                            <button key={i} onClick={() => saltarATiempo(tiempo)} style={{ fontSize: '0.65rem', padding: '8px 14px', backgroundColor: '#d4af3711', color: '#d4af37', border: '1px solid #d4af37', borderRadius: '20px', whiteSpace: 'nowrap' }}>
+                            <button key={i} onClick={() => saltarATiempo(tiempo)} style={{ fontSize: '0.65rem', padding: '8px 14px', backgroundColor: '#d4af3711', color: '#d4af37', border: '1px solid #d4af37', borderRadius: '20px', whiteSpace: 'nowrap', cursor: 'pointer' }}>
                                 📍 {tiempo} {nombre}
                             </button>
                         );
@@ -276,17 +266,17 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                 <textarea
                     value={nota}
                     onChange={(e) => setNota(e.target.value)}
-                    style={{ flex: 1, minHeight: '200px', backgroundColor: '#0a0a0a', color: '#ddd', padding: '15px', borderRadius: '8px', border: '1px solid #222', fontSize: '0.85rem', resize: 'none', lineHeight: '1.6' }}
+                    style={{ flex: 1, minHeight: '200px', backgroundColor: '#0a0a0a', color: '#ddd', padding: '15px', borderRadius: '8px', border: '1px solid #222', fontSize: '0.85rem', resize: 'none', lineHeight: '1.6', boxSizing: 'border-box', width: '100%' }}
                     placeholder="Escribe aquí los detalles del sistema..."
                 />
 
-                <button style={{ ...(styles.btnGold || {}), marginTop: '15px', padding: '15px', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(212, 175, 55, 0.1)' }} onClick={guardar}>GUARDAR CAMBIOS</button>
+                <button style={{ ...(styles.btnGold || {}), marginTop: '15px', padding: '15px', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(212, 175, 55, 0.1)', cursor: 'pointer', width: '100%', boxSizing: 'border-box' }} onClick={guardar}>GUARDAR CAMBIOS</button>
             </div>
 
             {/* MODAL DE REPORTE TÉCNICO */}
             {mostrarReporte && (
-                <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10005, padding: '20px' }}>
-                    <div style={{ backgroundColor: '#111', border: '1px solid #ff4444', padding: '25px', borderRadius: '12px', width: '100%', maxWidth: '350px', textAlign: 'center' }}>
+                <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10005, padding: '20px', boxSizing: 'border-box' }}>
+                    <div style={{ backgroundColor: '#111', border: '1px solid #ff4444', padding: '25px', borderRadius: '12px', width: '100%', maxWidth: '350px', textAlign: 'center', boxSizing: 'border-box' }}>
                         <h3 style={{ color: '#ff4444', marginTop: 0 }}>REPORTAR VIDEO</h3>
                         <p style={{ color: '#ccc', fontSize: '0.85rem', lineHeight: '1.5' }}>
                             ¿El video <b>"{video?.titulo}"</b> no carga o tiene errores? Ngasi revisará el enlace en el Vault.
