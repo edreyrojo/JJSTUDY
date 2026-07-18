@@ -152,22 +152,50 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
     const isCompletado = vistos.includes(video?.id);
 
     return (
-        // CAMBIO 1: width 100% y boxSizing border-box para que no se coma la pantalla
         <div style={{ display: 'flex', flexDirection: esMovil ? 'column' : 'row', height: '100vh', width: '100%', boxSizing: 'border-box', backgroundColor: '#000', color: '#fff', overflow: 'hidden' }}>
 
             {/* SECCIÓN IZQUIERDA: VIDEO */}
-            {/* CAMBIO 2: flexShrink: 0 y ajuste de bordes para que no se aplaste en móvil */}
             <div style={{ flex: esMovil ? 'none' : 3, flexShrink: 0, width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', borderRight: esMovil ? 'none' : '1px solid #222', borderBottom: esMovil ? '1px solid #222' : 'none' }}>
 
-                {/* HEADER CON NAVEGACIÓN MEJORADA */}
-                <div style={{ padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#0a0a0a', minHeight: '70px', boxSizing: 'border-box' }}>
-                    <div style={{ display: 'flex', gap: '5px' }}>
-                        <button onClick={onBack} style={{ ...(styles.btnOutline || {}), width: 'auto', padding: '8px 12px' }}>←</button>
+                {/* HEADER CON AJUSTE PARA NOTCH / CÁMARA FRONTAL */}
+                <div style={{ 
+                    // CAMBIO AQUÍ: Sumamos dinámicamente el safe-area-inset-top para empujar el menú abajo del notch
+                    paddingTop: esMovil ? 'calc(env(safe-area-inset-top, 24px) + 10px)' : '10px',
+                    paddingBottom: '10px',
+                    paddingLeft: '15px',
+                    paddingRight: '15px',
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between', 
+                    backgroundColor: '#0a0a0a', 
+                    minHeight: esMovil ? '95px' : '70px', 
+                    boxSizing: 'border-box' 
+                }}>
+                    {/* BOTONES DE NAVEGACIÓN */}
+                    <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                        <button 
+                            onClick={onBack} 
+                            style={{ 
+                                ...(styles.btnOutline || {}), 
+                                width: 'auto', 
+                                padding: esMovil ? '10px 14px' : '8px 12px', // Más área de contacto en móvil
+                                fontSize: esMovil ? '0.9rem' : 'inherit'
+                            }}
+                        >
+                            ←
+                        </button>
 
                         {getAdjacentVideo(video, 'prev') && (
                             <button
                                 onClick={() => navegarVideo('prev')}
-                                style={{ ...(styles.btnOutline || {}), width: 'auto', padding: '8px 12px', border: '1px solid #d4af37', color: '#d4af37' }}
+                                style={{ 
+                                    ...(styles.btnOutline || {}), 
+                                    width: 'auto', 
+                                    padding: esMovil ? '10px 14px' : '8px 12px', 
+                                    border: '1px solid #d4af37', 
+                                    color: '#d4af37',
+                                    fontSize: esMovil ? '0.9rem' : 'inherit'
+                                }}
                             >
                                 ◁
                             </button>
@@ -176,27 +204,61 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                         {getAdjacentVideo(video, 'next') && (
                             <button
                                 onClick={() => navegarVideo('next')}
-                                style={{ ...(styles.btnOutline || {}), width: 'auto', padding: '8px 12px', border: '1px solid #d4af37', color: '#d4af37' }}
+                                style={{ 
+                                    ...(styles.btnOutline || {}), 
+                                    width: 'auto', 
+                                    padding: esMovil ? '10px 14px' : '8px 12px', 
+                                    border: '1px solid #d4af37', 
+                                    color: '#d4af37',
+                                    fontSize: esMovil ? '0.9rem' : 'inherit'
+                                }}
                             >
                                 ▷
                             </button>
                         )}
                     </div>
 
+                    {/* TÍTULO DE LA LECCIÓN */}
                     <div style={{ textAlign: 'center', flex: 1, padding: '0 10px', minWidth: 0 }}>
-                        <span style={{ fontSize: '0.6rem', color: '#666', letterSpacing: '2px', display: 'block' }}>MODO ESTUDIO</span>
-                        <h2 style={{ fontSize: '0.9rem', color: '#d4af37', margin: 0, fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{video?.titulo}</h2>
+                        <span style={{ fontSize: '0.55rem', color: '#666', letterSpacing: '2px', display: 'block', marginBottom: '2px' }}>MODO ESTUDIO</span>
+                        <h2 style={{ fontSize: esMovil ? '0.85rem' : '0.9rem', color: '#d4af37', margin: 0, fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{video?.titulo}</h2>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 }}>
-                        <button onClick={onNavigateToNotes} style={{ background: 'none', border: '1px solid #d4af37', color: '#d4af37', borderRadius: '4px', fontSize: '0.6rem', padding: '5px 10px', cursor: 'pointer', fontWeight: 'bold' }}>BITÁCORA</button>
-                        <div style={{ cursor: 'pointer', fontSize: '1.2rem' }} onClick={() => toggleVisto(video?.id)}>{isCompletado ? '✅' : '⚪'}</div>
+                    {/* HERRAMIENTAS DERECHAS */}
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
+                        <button 
+                            onClick={onNavigateToNotes} 
+                            style={{ 
+                                background: 'none', 
+                                border: '1px solid #d4af37', 
+                                color: '#d4af37', 
+                                borderRadius: '4px', 
+                                fontSize: esMovil ? '0.65rem' : '0.6rem', 
+                                padding: esMovil ? '8px 12px' : '5px 10px', 
+                                cursor: 'pointer', 
+                                fontWeight: 'bold' 
+                            }}
+                        >
+                            BITÁCORA
+                        </button>
+                        <div 
+                            style={{ cursor: 'pointer', fontSize: esMovil ? '1.4rem' : '1.2rem', padding: esMovil ? '4px' : '0' }} 
+                            onClick={() => toggleVisto(video?.id)}
+                        >
+                            {isCompletado ? '✅' : '⚪'}
+                        </div>
                     </div>
                 </div>
 
                 {/* CONTENEDOR DE VIDEO */}
-                {/* CAMBIO 3: flexShrink: 0 al video para obligarlo a mantener el 16/9 */}
-                <div style={{ width: '100%', aspectRatio: '16/9', backgroundColor: '#000', position: 'relative', flexShrink: 0 }}>
+                <div style={{ 
+                    width: '100%', 
+                    aspectRatio: esMovil ? '16/11' : '16/9', 
+                    minHeight: esMovil ? '260px' : 'auto',
+                    backgroundColor: '#000', 
+                    position: 'relative', 
+                    flexShrink: 0 
+                }}>
                     <iframe
                         key={`${video?.id}-${tiempoActivo}`}
                         src={`https://drive.google.com/file/d/${video?.id}/preview${tiempoActivo ? `?t=${tiempoActivo}` : ''}`}
@@ -239,7 +301,6 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                             {isCronometroActivo ? 'PAUSAR SYNC' : 'INICIAR SYNC'}
                         </button>
                     </div>
-                    {/* CAMBIO 4: inputs limitados al 100% con border-box */}
                     <input placeholder="Nombre de la posición o detalle..." value={nombreMarcador} onChange={(e) => setNombreMarcador(e.target.value)} style={{ ...(styles.input || {}), marginBottom: '10px', fontSize: '0.8rem', boxSizing: 'border-box', width: '100%' }} />
                     <div style={{ display: 'flex', gap: '8px' }}>
                         <input placeholder="00:00" value={timestamp} onChange={(e) => setTimestamp(e.target.value)} style={{ width: '75px', backgroundColor: '#000', border: '1px solid #333', color: '#d4af37', textAlign: 'center', borderRadius: '5px', fontWeight: 'bold' }} />
