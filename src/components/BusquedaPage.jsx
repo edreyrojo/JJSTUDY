@@ -1,30 +1,30 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 // Importamos la base de datos desde su nueva ubicación
 import { DB_INSTRUCCIONALES } from '../data/instruccionales';
-const notify = (mensaje, tipo = 'success') => {
-    Swal.fire({
-        text: mensaje,
-        icon: tipo, // 'success', 'error', 'warning', 'info'
-        background: '#0a0a0a',
-        color: '#fff',
-        confirmButtonColor: '#d4af37',
-        iconColor: tipo === 'success' ? '#4CAF50' : '#ff4444',
-        border: '1px solid #d4af37',
-        customClass: {
-            popup: 'gold-border-alert'
-        }
-    });
-};
+
 const BusquedaPage = ({ onBack, onSelectVideo, styles }) => {
-    const [termino, setTermino] = React.useState("");
+    const [termino, setTermino] = useState("");
+    
+    // 📱 Detección móvil
+    const [esMovil, setEsMovil] = useState(window.innerWidth < 768);
+
+    useEffect(() => {
+        const handleResize = () => setEsMovil(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     // Aplanamos la DB para buscar en todos los videos de todos los cursos
-    const todasLasTecnicas = React.useMemo(() => {
+    const todasLasTecnicas = useMemo(() => {
+        if (!DB_INSTRUCCIONALES) return []; // Seguro contra DB no cargada
+
         return Object.keys(DB_INSTRUCCIONALES).flatMap(cursoKey =>
-            DB_INSTRUCCIONALES[cursoKey].volumenes.flatMap(vol =>
-                vol.partes.map(parte => {
+            (DB_INSTRUCCIONALES[cursoKey]?.volumenes || []).flatMap(vol =>
+                (vol.partes || []).map(parte => {
                     let sub = parte.subcategoria || "";
-                    const n = parte.nombre.toLowerCase();
+                    // 🛡️ Seguro contra variables nulas que rompen el .toLowerCase()
+                    const nombreOriginal = parte.nombre || "Técnica sin nombre";
+                    const n = nombreOriginal.toLowerCase();
                     const cursoNom = cursoKey.toLowerCase();
 
                     if (!sub) {
@@ -59,40 +59,106 @@ const BusquedaPage = ({ onBack, onSelectVideo, styles }) => {
                         else if (n.includes('octopus')) sub = "OCTOPUS GUARD";
                     }
 
-                    return { ...parte, subcategoria: sub, curso: cursoKey, volNombre: vol.nombre };
+                    return { ...parte, nombre: nombreOriginal, subcategoria: sub, curso: cursoKey, volNombre: vol.nombre };
                 })
             )
         );
-    }, [DB_INSTRUCCIONALES]);
+    }, []);
 
     const resultados = todasLasTecnicas.filter(t =>
         t.nombre.toLowerCase().includes(termino.toLowerCase())
     );
 
     return (
-        <div style={{ padding: '40px', backgroundColor: '#000', minHeight: '100vh', color: '#fff' }}>
-            <button onClick={onBack} style={styles.btnOutline}>← VOLVER AL HUB</button>
+        <div style={{
+            // 🛡️ Soporte Notch Integral (Safe Area)
+            paddingTop: esMovil ? 'calc(env(safe-area-inset-top, 0px) + 15px)' : '40px',
+            paddingBottom: esMovil ? 'calc(env(safe-area-inset-bottom, 0px) + 15px)' : '40px',
+            paddingLeft: esMovil ? 'calc(env(safe-area-inset-left, 0px) + 15px)' : '40px',
+            paddingRight: esMovil ? 'calc(env(safe-area-inset-right, 0px) + 15px)' : '40px',
+            backgroundColor: '#000',
+            color: '#fff',
+            // 🛠️ FIX DE SCROLL: Fijamos la altura al viewport y usamos flexbox
+            height: '100vh',
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
+            width: '100%',
+            overflow: 'hidden' // Corta cualquier desborde global
+        }}>
+            
+            {/* Header Adaptable */}
+            <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '20px',
+                width: '100%',
+                gap: '10px',
+                flexShrink: 0 // Evita que se encoja
+            }}>
+                <button 
+                    onClick={onBack} 
+                    style={{ 
+                        ...(styles?.btnOutline || {}), 
+                        width: 'auto', 
+                        padding: esMovil ? '10px 15px' : '8px 15px', 
+                        fontSize: esMovil ? '1rem' : '0.8rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxSizing: 'border-box',
+                        margin: 0
+                    }}
+                >
+                    ← {esMovil ? '' : ' VOLVER AL HUB'}
+                </button>
+                <h2 style={{ 
+                    color: '#d4af37', 
+                    margin: 0, 
+                    fontSize: esMovil ? '1.1rem' : '1.5rem', 
+                    textTransform: 'uppercase',
+                    textAlign: 'right'
+                }}>
+                    BÚSQUEDA
+                </h2>
+            </div>
 
-            <h2 style={{ color: '#d4af37', marginTop: '20px', fontSize: '1.5rem' }}>BUSCADOR DE TÉCNICAS</h2>
-
+            {/* Input de Búsqueda Mejorado */}
             <input
                 type="text"
-                placeholder="Buscar técnica (ej: Sweep, Guard, Kimur...)"
-                autoFocus
+                placeholder="Buscar técnica (ej: Sweep, Guard...)"
+                // 🛠️ FIX: Solo auto-foco en PC. En móvil obliga al usuario a tocar para no tapar la pantalla
+                autoFocus={!esMovil} 
                 style={{
                     width: '100%',
-                    padding: '15px',
+                    padding: esMovil ? '16px 15px' : '15px',
                     backgroundColor: '#111',
                     border: '1px solid #d4af37',
                     color: '#fff',
                     borderRadius: '8px',
-                    margin: '20px 0',
-                    fontSize: '1rem'
+                    marginBottom: '20px',
+                    fontSize: '1rem',
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                    flexShrink: 0
                 }}
+                value={termino}
                 onChange={(e) => setTermino(e.target.value)}
             />
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '70vh' }}>
+            {/* Contenedor de Resultados Independiente (Scroll Local) */}
+            <div style={{ 
+                flex: 1,  // Toma todo el espacio restante dinámicamente
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '10px', 
+                overflowY: 'auto', 
+                paddingBottom: '20px', // Extra padding al final para separar del borde inferior
+                width: '100%',
+                minWidth: 0,
+                scrollBehavior: 'smooth'
+            }}>
                 {resultados.length > 0 ? (
                     resultados.map((t, i) => (
                         <div
@@ -104,21 +170,70 @@ const BusquedaPage = ({ onBack, onSelectVideo, styles }) => {
                                 border: '1px solid #222',
                                 borderRadius: '8px',
                                 cursor: 'pointer',
-                                transition: 'border-color 0.3s'
+                                transition: 'border-color 0.2s, background-color 0.2s',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '6px',
+                                width: '100%',
+                                boxSizing: 'border-box',
+                                // Truco para evitar que la tarjeta se encoja de forma rara
+                                minHeight: 'min-content'
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.borderColor = '#d4af37'}
-                            onMouseLeave={(e) => e.currentTarget.style.borderColor = '#222'}
+                            // Efecto Hover solo si no es movil (evita que se queden pegados los clicks)
+                            onMouseEnter={(e) => {
+                                if (!esMovil) {
+                                    e.currentTarget.style.borderColor = '#d4af37';
+                                    e.currentTarget.style.backgroundColor = '#151515';
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                if (!esMovil) {
+                                    e.currentTarget.style.borderColor = '#222';
+                                    e.currentTarget.style.backgroundColor = '#0a0a0a';
+                                }
+                            }}
+                            // Efecto Táctil activo para celulares
+                            onTouchStart={(e) => e.currentTarget.style.borderColor = '#d4af37'}
+                            onTouchEnd={(e) => e.currentTarget.style.borderColor = '#222'}
                         >
-                            <div style={{ color: '#d4af37', fontWeight: 'bold' }}>{t.nombre}</div>
-                            <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '4px' }}>
-                                {t.curso} • {t.volNombre}
+                            <div style={{ 
+                                color: '#d4af37', 
+                                fontWeight: 'bold',
+                                fontSize: esMovil ? '0.9rem' : '1rem',
+                                lineHeight: '1.3'
+                            }}>
+                                {t.nombre}
+                            </div>
+                            
+                            {/* Layout de Etiquetas de Curso (Chips visuales) */}
+                            <div style={{ 
+                                fontSize: esMovil ? '0.7rem' : '0.75rem', 
+                                color: '#888',
+                                display: 'flex',
+                                alignItems: 'center',
+                                flexWrap: 'wrap',
+                                gap: '6px'
+                            }}>
+                                <span style={{ color: '#ccc' }}>{t.curso}</span> 
+                                <span style={{ opacity: 0.5 }}>•</span> 
+                                <span>{t.volNombre}</span>
+                                {t.subcategoria && (
+                                    <>
+                                        <span style={{ opacity: 0.5 }}>•</span>
+                                        <span style={{ color: '#4CAF50', fontWeight: 'bold' }}>{t.subcategoria}</span>
+                                    </>
+                                )}
                             </div>
                         </div>
                     ))
                 ) : (
-                    <div style={{ color: '#666', textAlign: 'center', marginTop: '20px' }}>
-                        No se encontraron técnicas con ese nombre.
-                    </div>
+                    termino !== "" && (
+                        <div style={{ color: '#666', textAlign: 'center', marginTop: '40px', padding: '0 20px' }}>
+                            <div style={{ fontSize: '2rem', marginBottom: '10px' }}>🥋</div>
+                            <p style={{ fontSize: '1.1rem', marginBottom: '10px', color: '#888' }}>No se encontraron técnicas para "{termino}"</p>
+                            <p style={{ fontSize: '0.85rem' }}>Intenta con términos más generales en inglés o español.</p>
+                        </div>
+                    )
                 )}
             </div>
         </div>

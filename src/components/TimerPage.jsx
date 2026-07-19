@@ -2,11 +2,33 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Swal from 'sweetalert2';
 
+// 🛠️ FIX GLOBAL: Evita el Memory Leak y el bloqueo de audio en móviles
+let globalAudioCtx = null;
+const getAudioContext = () => {
+    if (!globalAudioCtx) {
+        globalAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (globalAudioCtx.state === 'suspended') {
+        globalAudioCtx.resume();
+    }
+    return globalAudioCtx;
+};
+
 export default function TimerPage({ onBack, styles }) {
+    // ==========================================
+    // ESTADO DE RESPONSIVIDAD (MÓVIL)
+    // ==========================================
+    const [esMovil, setEsMovil] = useState(window.innerWidth < 768);
+
+    useEffect(() => {
+        const handleResize = () => setEsMovil(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
     // ==========================================
     // ESTADO GENERAL Y DE PREPARACIÓN
     // ==========================================
-
     const [isCasualMode, setIsCasualMode] = useState(true);
     const [isPreparing, setIsPreparing] = useState(false);
     const [prepTimeLeft, setPrepTimeLeft] = useState(3);
@@ -51,16 +73,16 @@ export default function TimerPage({ onBack, styles }) {
     // ==========================================
     const playSound = (type) => {
         try {
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            if (!AudioContext) return;
-            const ctx = new AudioContext();
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            
             const osc = ctx.createOscillator();
             const gainNode = ctx.createGain();
 
             osc.connect(gainNode);
             gainNode.connect(ctx.destination);
 
-            if (type === 'beep') { // Cuenta regresiva de preparación
+            if (type === 'beep') { // Cuenta regresiva
                 osc.frequency.value = 440;
                 gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
                 osc.start();
@@ -105,7 +127,7 @@ export default function TimerPage({ onBack, styles }) {
     // EFECTOS (TICK DE LOS RELOJES)
     // ==========================================
 
-    // 1. Efecto: Fase de Preparación (Cuenta regresiva antes de empezar)
+    // 1. Efecto: Fase de Preparación
     useEffect(() => {
         if (isPreparing) {
             prepInterval.current = setInterval(() => {
@@ -115,7 +137,6 @@ export default function TimerPage({ onBack, styles }) {
                         triggerVibration([50]);
                         return prev - 1;
                     }
-                    // Termina preparación y arranca el timer
                     clearInterval(prepInterval.current);
                     playSound('start');
                     triggerVibration([500]);
@@ -138,7 +159,6 @@ export default function TimerPage({ onBack, styles }) {
         if (isCasualRunning) {
             casualTimerInterval.current = setInterval(() => {
                 setCasualTimeLeft(prevTime => {
-                    // Aviso de 10 segundos
                     if (prevTime === 11) {
                         playSound('warning');
                         triggerVibration([100, 50, 100]);
@@ -146,7 +166,6 @@ export default function TimerPage({ onBack, styles }) {
 
                     if (prevTime > 0) return prevTime - 1;
 
-                    // Al llegar a 0
                     clearInterval(casualTimerInterval.current);
                     playSound('end');
                     triggerVibration([500, 200, 500]);
@@ -184,7 +203,6 @@ export default function TimerPage({ onBack, styles }) {
         if (isMatchRunning) {
             matchTimerInterval.current = setInterval(() => {
                 setMatchTimeLeft((prevTime) => {
-                    // Aviso de 10 segundos
                     if (prevTime === 11) {
                         playSound('warning');
                         triggerVibration([100, 50, 100]);
@@ -192,17 +210,14 @@ export default function TimerPage({ onBack, styles }) {
 
                     if (prevTime > 0) return prevTime - 1;
 
-                    // Al llegar a 0
                     clearInterval(matchTimerInterval.current);
                     playSound('end');
-                    triggerVibration([500, 200, 500, 200, 500]); // Vibración más larga para combate
+                    triggerVibration([500, 200, 500, 200, 500]); 
 
                     if (isWarmupPhase) {
                         setIsWarmupPhase(false);
                         setCurrentMatchRound(1);
                         setMatchTimeLeft(matchDuration);
-                        // No necesitamos llamar startMatchTimer, el intervalo se limpia y se debe reiniciar
-                        // Hacemos que corra directo
                         setIsMatchRunning(false);
                         setTimeout(() => setIsMatchRunning(true), 100);
                     } else {
@@ -230,8 +245,8 @@ export default function TimerPage({ onBack, styles }) {
     // ==========================================
     const startCasualTimer = () => {
         if (isCasualRunning || isPreparing) return;
+        getAudioContext(); // 🛠️ FIX: Desbloquea el audio en el primer click táctil
 
-        // Configuramos el estado inicial antes de la preparación
         if (currentRepetition === 0) {
             setCurrentRepetition(1);
             setCasualTimeLeft(duration);
@@ -240,7 +255,6 @@ export default function TimerPage({ onBack, styles }) {
             setCasualTimeLeft(isRestPhase ? rest : duration);
         }
 
-        // Iniciamos la preparación
         setPrepMode('casual');
         setPrepTimeLeft(3);
         setIsPreparing(true);
@@ -266,6 +280,7 @@ export default function TimerPage({ onBack, styles }) {
     // ==========================================
     const startMatchTimer = () => {
         if (isMatchRunning || isPreparing) return;
+        getAudioContext(); // 🛠️ FIX: Desbloquea el audio
         setWinner('');
 
         if (currentMatchRound === 0) {
@@ -279,7 +294,6 @@ export default function TimerPage({ onBack, styles }) {
             }
         }
 
-        // Iniciamos la preparación
         setPrepMode('match');
         setPrepTimeLeft(3);
         setIsPreparing(true);
@@ -317,203 +331,226 @@ export default function TimerPage({ onBack, styles }) {
     };
 
     const puntosBloqueados = !isMatchRunning || isWarmupPhase || isPreparing;
+
     // ==========================================
-    // INTERCEPTOR DE SALIDA (VERSIÓN SWEETALERT2)
+    // INTERCEPTOR DE SALIDA (SWEETALERT2)
     // ==========================================
     const handleBack = async () => {
-        // Evaluamos si hay progreso sin terminar en el modo Casual
         const hayActividadCasual = isCasualMode &&
             (isCasualRunning || currentRepetition > 0 || casualTimeLeft !== duration);
 
-        // Evaluamos si hay progreso sin terminar en el modo Competición
         const hayActividadMatch = !isCasualMode &&
             (isMatchRunning || currentMatchRound > 0 || matchTimeLeft !== matchDuration ||
                 score1 > 0 || score2 > 0 || advantage1 > 0 || advantage2 > 0 || penalty1 > 0 || penalty2 > 0);
 
-        // Si hay preparación activa o alguna actividad en los relojes, lanzamos Swal
         if (isPreparing || hayActividadCasual || hayActividadMatch) {
             const result = await Swal.fire({
                 text: "¿Seguro que quieres salir? El temporizador y los puntos se perderán.",
                 icon: 'warning',
                 showCancelButton: true,
-                confirmButtonColor: '#ff4444', // Rojo para la acción destructiva (salir)
+                confirmButtonColor: '#ff4444', 
                 cancelButtonColor: '#333',
                 confirmButtonText: 'Sí, salir',
                 cancelButtonText: 'Cancelar',
                 background: '#0a0a0a',
                 color: '#fff',
-                iconColor: '#ffcc00', // Amarillo de advertencia
+                iconColor: '#ffcc00', 
                 customClass: { popup: 'gold-border-alert' }
             });
 
-            // Si el usuario no confirma (cancela o cierra la alerta), detenemos la salida
             if (!result.isConfirmed) return;
         }
 
-        // Si no había actividad o el usuario confirmó la salida: limpiamos intervalos
         clearInterval(prepInterval.current);
         clearInterval(casualTimerInterval.current);
         clearInterval(matchTimerInterval.current);
-
         onBack();
     };
+
     // ==========================================
-    // ESTILOS LOCALES
+    // ESTILOS LOCALES (RESPONSIVOS)
     // ==========================================
     const localStyles = {
-        timerContainer: { backgroundColor: '#111', padding: '30px', borderRadius: '12px', border: '1px solid #333', marginTop: '20px', textAlign: 'center' },
+        timerContainer: { 
+            backgroundColor: '#111', 
+            padding: esMovil ? '20px 10px' : '30px', 
+            borderRadius: '12px', 
+            border: '1px solid #333', 
+            marginTop: '20px', 
+            textAlign: 'center',
+            boxSizing: 'border-box',
+            width: '100%'
+        },
         flexCenter: { display: 'flex', justifyContent: 'center', gap: '15px', flexWrap: 'wrap', marginBottom: '20px' },
-        inputGroup: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' },
+        inputGroup: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', flex: esMovil ? '1 1 45%' : '0 1 auto' },
         label: { color: '#aaa', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px' },
-        input: { backgroundColor: '#222', color: '#fff', border: '1px solid #444', padding: '10px', borderRadius: '4px', width: '120px', textAlign: 'center', outline: 'none' },
-        competitorCard: { backgroundColor: '#0a0a0a', border: '1px solid #d4af37', padding: '20px', borderRadius: '8px', flex: '1', minWidth: '280px' },
-        scoreBtn: { backgroundColor: '#222', color: '#fff', border: '1px solid #444', padding: '8px 12px', cursor: 'pointer', borderRadius: '4px', fontSize: '0.85rem', margin: '5px' },
-        scoreBtnDisabled: { backgroundColor: '#111', color: '#444', border: '1px solid #222', cursor: 'not-allowed', padding: '8px 12px', borderRadius: '4px', fontSize: '0.85rem', margin: '5px' },
-        statText: { fontSize: '1.2rem', margin: '5px 0', color: '#fff' },
-        bigTime: { fontSize: '4rem', fontWeight: 'bold', color: '#d4af37', textShadow: '0px 0px 10px rgba(212, 175, 55, 0.3)', margin: '20px 0', minHeight: '80px' }
+        input: { backgroundColor: '#222', color: '#fff', border: '1px solid #444', padding: '10px', borderRadius: '4px', width: '100%', maxWidth: '120px', textAlign: 'center', outline: 'none', boxSizing: 'border-box' },
+        competitorCard: { backgroundColor: '#0a0a0a', border: '1px solid #d4af37', padding: '15px', borderRadius: '8px', flex: '1 1 280px', minWidth: '0', boxSizing: 'border-box' },
+        scoreBtn: { backgroundColor: '#222', color: '#fff', border: '1px solid #444', padding: esMovil ? '6px 8px' : '8px 12px', cursor: 'pointer', borderRadius: '4px', fontSize: esMovil ? '0.75rem' : '0.85rem', margin: '4px', flex: '1 1 30%' },
+        scoreBtnDisabled: { backgroundColor: '#111', color: '#444', border: '1px solid #222', cursor: 'not-allowed', padding: esMovil ? '6px 8px' : '8px 12px', borderRadius: '4px', fontSize: esMovil ? '0.75rem' : '0.85rem', margin: '4px', flex: '1 1 30%' },
+        statText: { fontSize: esMovil ? '1.5rem' : '1.8rem', margin: '5px 0', color: '#fff' },
+        bigTime: { fontSize: esMovil ? '3.5rem' : '5rem', fontWeight: 'bold', color: '#d4af37', textShadow: '0px 0px 10px rgba(212, 175, 55, 0.3)', margin: '20px 0', minHeight: '80px', lineHeight: '1' }
     };
 
     // ==========================================
     // RENDER UI
     // ==========================================
     return (
-        <div style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto', color: '#fff', fontFamily: 'sans-serif' }}>
+        <div style={{ 
+            // 🛡️ PROTECCIÓN NOTCH Y BARRA DE INICIO
+            paddingTop: `calc(env(safe-area-inset-top, 0px) + ${esMovil ? '15px' : '30px'})`,
+            paddingBottom: `calc(env(safe-area-inset-bottom, 0px) + ${esMovil ? '20px' : '40px'})`,
+            paddingLeft: `calc(env(safe-area-inset-left, 0px) + ${esMovil ? '15px' : '30px'})`,
+            paddingRight: `calc(env(safe-area-inset-right, 0px) + ${esMovil ? '15px' : '30px'})`,
+            minHeight: '100vh',
+            backgroundColor: '#000',
+            color: '#fff',
+            fontFamily: 'sans-serif',
+            boxSizing: 'border-box',
+            width: '100%',
+            overflowX: 'hidden'
+        }}>
+            <div style={{ maxWidth: '1000px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
+                <button onClick={handleBack} style={{ ...(styles?.btnOutline || {}), width: 'auto', marginBottom: '20px', padding: '8px 15px' }}>
+                    ← {esMovil ? '' : 'VOLVER'}
+                </button>
+                
+                <div style={{ textAlign: 'center' }}>
+                    <h2 style={{ ...(styles?.goldTitle || {}), fontSize: esMovil ? '1.2rem' : '1.8rem' }}>
+                        RELOJ DE ENTRENAMIENTO
+                    </h2>
 
-            <button onClick={handleBack} style={{ ...styles.btnOutline, width: 'auto', marginBottom: '20px' }}>
-                ←
-            </button>
-            <div style={{ textAlign: 'center' }}>
-                <h2 style={styles.goldTitle}>RELOJ DE ENTRENAMIENTO</h2>
+                    <div style={localStyles.flexCenter}>
+                        <button onClick={() => { setIsCasualMode(true); resetMatchTimer(); resetCasualTimer(); }} style={isCasualMode ? { ...(styles?.btnGold || {}), flex: esMovil ? '1' : '0 0 150px' } : { ...(styles?.btnOutline || {}), flex: esMovil ? '1' : '0 0 150px' }}>
+                            CASUAL
+                        </button>
+                        <button onClick={() => { setIsCasualMode(false); resetMatchTimer(); resetCasualTimer(); }} style={!isCasualMode ? { ...(styles?.btnGold || {}), flex: esMovil ? '1' : '0 0 150px' } : { ...(styles?.btnOutline || {}), flex: esMovil ? '1' : '0 0 150px' }}>
+                            COMPETICIÓN
+                        </button>
+                    </div>
 
-                <div style={localStyles.flexCenter}>
-                    <button onClick={() => { setIsCasualMode(true); resetMatchTimer(); resetCasualTimer(); }} style={isCasualMode ? { ...styles.btnGold, width: '150px' } : { ...styles.btnOutline, width: '150px' }}>
-                        CASUAL
-                    </button>
-                    <button onClick={() => { setIsCasualMode(false); resetMatchTimer(); resetCasualTimer(); }} style={!isCasualMode ? { ...styles.btnGold, width: '150px' } : { ...styles.btnOutline, width: '150px' }}>
-                        COMPETICIÓN
-                    </button>
+                    {/* MODO CASUAL */}
+                    {isCasualMode && (
+                        <div style={localStyles.timerContainer}>
+                            <div style={localStyles.flexCenter}>
+                                <div style={localStyles.inputGroup}>
+                                    <span style={localStyles.label}>Minutos</span>
+                                    <select style={localStyles.input} value={Math.floor(duration / 60)} onChange={(e) => { setDuration(e.target.value * 60); if (!isCasualRunning && currentRepetition === 0) setCasualTimeLeft(e.target.value * 60); }}>
+                                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20].map(min => <option key={min} value={min}>{min}</option>)}
+                                    </select>
+                                </div>
+                                <div style={localStyles.inputGroup}>
+                                    <span style={localStyles.label}>Rondas</span>
+                                    <input style={localStyles.input} type="number" min="1" value={repetitions} onChange={(e) => { setRepetitions(Number(e.target.value)); if (!isCasualRunning) setCurrentRepetition(0); }} />
+                                </div>
+                                <div style={localStyles.inputGroup}>
+                                    <span style={localStyles.label}>Descanso (seg)</span>
+                                    <input style={localStyles.input} type="number" min="0" value={rest} onChange={(e) => setRest(Number(e.target.value))} />
+                                </div>
+                            </div>
+
+                            <div style={localStyles.bigTime}>
+                                {isPreparing ? (
+                                    <span style={{ color: '#ffcc00' }}>PREP: {prepTimeLeft}</span>
+                                ) : isRestPhase ? (
+                                    <span style={{ color: '#ff4444', fontSize: esMovil ? '2.5rem' : '4rem' }}>DESCANSO: {formatTime(casualTimeLeft)}</span>
+                                ) : (
+                                    formatTime(casualTimeLeft)
+                                )}
+                            </div>
+
+                            {!isPreparing && (
+                                <p style={{ fontSize: '1.2rem', color: '#aaa', margin: '10px 0' }}>Ronda: <span style={{ color: '#fff', fontWeight: 'bold' }}>{currentRepetition > 0 ? currentRepetition : 1} / {repetitions}</span></p>
+                            )}
+
+                            <div style={{ marginTop: '30px', display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                {!isCasualRunning && !isPreparing ? (
+                                    <button style={{ ...(styles?.btnGold || {}), flex: '1 1 120px', maxWidth: '200px' }} onClick={startCasualTimer}>INICIAR</button>
+                                ) : (
+                                    <button style={{ ...(styles?.btnOutline || {}), flex: '1 1 120px', maxWidth: '200px', color: '#ff4444', borderColor: '#ff4444' }} onClick={pauseCasualTimer}>PAUSAR</button>
+                                )}
+                                <button style={{ ...(styles?.btnOutline || {}), flex: '1 1 120px', maxWidth: '200px' }} onClick={resetCasualTimer}>REINICIAR</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* MODO COMPETICIÓN */}
+                    {!isCasualMode && (
+                        <div style={localStyles.timerContainer}>
+                            <div style={localStyles.flexCenter}>
+                                <div style={localStyles.inputGroup}>
+                                    <span style={localStyles.label}>Minutos</span>
+                                    <select style={localStyles.input} value={Math.floor(matchDuration / 60)} onChange={(e) => { setMatchDuration(e.target.value * 60); if (!isMatchRunning && currentMatchRound === 0 && !isWarmupPhase) setMatchTimeLeft(e.target.value * 60); }}>
+                                        {[2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20].map(min => <option key={min} value={min}>{min}</option>)}
+                                    </select>
+                                </div>
+                                <div style={localStyles.inputGroup}>
+                                    <span style={localStyles.label}>Calentamiento (seg)</span>
+                                    <input style={localStyles.input} type="number" min="0" value={warmupTime} onChange={(e) => setWarmupTime(Number(e.target.value))} />
+                                </div>
+                            </div>
+
+                            <div style={localStyles.bigTime}>
+                                {isPreparing ? (
+                                    <span style={{ color: '#ffcc00' }}>PREP: {prepTimeLeft}</span>
+                                ) : isWarmupPhase ? (
+                                    <span style={{ color: '#aaa', fontSize: esMovil ? '2rem' : '3rem' }}>WARMUP: {formatTime(matchTimeLeft)}</span>
+                                ) : (
+                                    formatTime(matchTimeLeft)
+                                )}
+                            </div>
+
+                            {winner && <h3 style={{ color: '#4CAF50', fontSize: esMovil ? '1.5rem' : '2rem', margin: '10px 0' }}>🏆 ¡GANADOR: {winner}! 🏆</h3>}
+
+                            {/* CONTENEDOR DE PUNTUACIONES */}
+                            <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', marginTop: '20px' }}>
+                                {/* COMPETIDOR 1 */}
+                                <div style={localStyles.competitorCard}>
+                                    <input style={{ ...localStyles.input, width: '100%', maxWidth: '100%', marginBottom: '15px', fontSize: '1.1rem', backgroundColor: 'transparent', border: 'none', borderBottom: '1px solid #d4af37' }} value={competitor1Name} onChange={(e) => setCompetitor1Name(e.target.value)} placeholder="Atleta 1" />
+                                    <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: '15px', alignItems: 'center' }}>
+                                        <div><span style={localStyles.label}>PTS</span><div style={{ ...localStyles.statText, color: '#4CAF50' }}>{score1}</div></div>
+                                        <div><span style={localStyles.label}>ADV</span><div style={{ ...localStyles.statText, color: '#d4af37' }}>{advantage1}</div></div>
+                                        <div><span style={localStyles.label}>PEN</span><div style={{ ...localStyles.statText, color: '#ff4444' }}>{penalty1}</div></div>
+                                    </div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
+                                        <button disabled={puntosBloqueados} style={puntosBloqueados ? localStyles.scoreBtnDisabled : localStyles.scoreBtn} onClick={() => updateScore(1, 2)}>Derribo (+2)</button>
+                                        <button disabled={puntosBloqueados} style={puntosBloqueados ? localStyles.scoreBtnDisabled : localStyles.scoreBtn} onClick={() => updateScore(1, 3)}>Pase (+3)</button>
+                                        <button disabled={puntosBloqueados} style={puntosBloqueados ? localStyles.scoreBtnDisabled : localStyles.scoreBtn} onClick={() => updateScore(1, 4)}>Montada (+4)</button>
+                                        <button disabled={puntosBloqueados} style={puntosBloqueados ? localStyles.scoreBtnDisabled : localStyles.scoreBtn} onClick={() => updateAdvantage(1, 1)}>Ventaja (+1)</button>
+                                        <button disabled={puntosBloqueados} style={puntosBloqueados ? localStyles.scoreBtnDisabled : localStyles.scoreBtn} onClick={() => updatePenalty(1, 1)}>Castigo (+1)</button>
+                                    </div>
+                                </div>
+
+                                {/* COMPETIDOR 2 */}
+                                <div style={localStyles.competitorCard}>
+                                    <input style={{ ...localStyles.input, width: '100%', maxWidth: '100%', marginBottom: '15px', fontSize: '1.1rem', backgroundColor: 'transparent', border: 'none', borderBottom: '1px solid #d4af37' }} value={competitor2Name} onChange={(e) => setCompetitor2Name(e.target.value)} placeholder="Atleta 2" />
+                                    <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: '15px', alignItems: 'center' }}>
+                                        <div><span style={localStyles.label}>PTS</span><div style={{ ...localStyles.statText, color: '#4CAF50' }}>{score2}</div></div>
+                                        <div><span style={localStyles.label}>ADV</span><div style={{ ...localStyles.statText, color: '#d4af37' }}>{advantage2}</div></div>
+                                        <div><span style={localStyles.label}>PEN</span><div style={{ ...localStyles.statText, color: '#ff4444' }}>{penalty2}</div></div>
+                                    </div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
+                                        <button disabled={puntosBloqueados} style={puntosBloqueados ? localStyles.scoreBtnDisabled : localStyles.scoreBtn} onClick={() => updateScore(2, 2)}>Derribo (+2)</button>
+                                        <button disabled={puntosBloqueados} style={puntosBloqueados ? localStyles.scoreBtnDisabled : localStyles.scoreBtn} onClick={() => updateScore(2, 3)}>Pase (+3)</button>
+                                        <button disabled={puntosBloqueados} style={puntosBloqueados ? localStyles.scoreBtnDisabled : localStyles.scoreBtn} onClick={() => updateScore(2, 4)}>Montada (+4)</button>
+                                        <button disabled={puntosBloqueados} style={puntosBloqueados ? localStyles.scoreBtnDisabled : localStyles.scoreBtn} onClick={() => updateAdvantage(2, 1)}>Ventaja (+1)</button>
+                                        <button disabled={puntosBloqueados} style={puntosBloqueados ? localStyles.scoreBtnDisabled : localStyles.scoreBtn} onClick={() => updatePenalty(2, 1)}>Castigo (+1)</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style={{ marginTop: '30px', display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                {!isMatchRunning && !isPreparing ? (
+                                    <button style={{ ...(styles?.btnGold || {}), flex: '1 1 140px', maxWidth: '250px' }} onClick={startMatchTimer}>▶ INICIAR COMBATE</button>
+                                ) : (
+                                    <button style={{ ...(styles?.btnOutline || {}), flex: '1 1 140px', maxWidth: '250px', color: '#ff4444', borderColor: '#ff4444' }} onClick={pauseMatchTimer}>⏸ PAUSAR</button>
+                                )}
+                                <button style={{ ...(styles?.btnOutline || {}), flex: '1 1 100px' }} onClick={resetMatchTimer}>REINICIAR</button>
+                                <button style={{ ...(styles?.btnOutline || {}), flex: '1 1 100px', color: '#4CAF50', borderColor: '#4CAF50' }} onClick={designateWinner}>FINALIZAR</button>
+                            </div>
+                        </div>
+                    )}
                 </div>
-
-                {/* MODO CASUAL */}
-                {isCasualMode && (
-                    <div style={localStyles.timerContainer}>
-                        <div style={localStyles.flexCenter}>
-                            <div style={localStyles.inputGroup}>
-                                <span style={localStyles.label}>Minutos</span>
-                                <select style={localStyles.input} value={duration / 60} onChange={(e) => { setDuration(e.target.value * 60); if (!isCasualRunning && currentRepetition === 0) setCasualTimeLeft(e.target.value * 60); }}>
-                                    {[1, 2, 3, 5, 6, 7, 8, 10].map(min => <option key={min} value={min}>{min}</option>)}
-                                </select>
-                            </div>
-                            <div style={localStyles.inputGroup}>
-                                <span style={localStyles.label}>Rondas</span>
-                                <input style={localStyles.input} type="number" min="1" value={repetitions} onChange={(e) => { setRepetitions(Number(e.target.value)); if (!isCasualRunning) setCurrentRepetition(0); }} />
-                            </div>
-                            <div style={localStyles.inputGroup}>
-                                <span style={localStyles.label}>Descanso (seg)</span>
-                                <input style={localStyles.input} type="number" min="0" value={rest} onChange={(e) => setRest(Number(e.target.value))} />
-                            </div>
-                        </div>
-
-                        <div style={localStyles.bigTime}>
-                            {isPreparing ? (
-                                <span style={{ color: '#ffcc00' }}>PREP: {prepTimeLeft}</span>
-                            ) : isRestPhase ? (
-                                <span style={{ color: '#ff4444' }}>DESCANSO: {formatTime(casualTimeLeft)}</span>
-                            ) : (
-                                formatTime(casualTimeLeft)
-                            )}
-                        </div>
-
-                        {!isPreparing && (
-                            <p style={{ fontSize: '1.2rem', color: '#aaa' }}>Ronda: <span style={{ color: '#fff' }}>{currentRepetition > 0 ? currentRepetition : 1} / {repetitions}</span></p>
-                        )}
-
-                        <div style={{ marginTop: '30px', display: 'flex', justifyContent: 'center', gap: '15px' }}>
-                            {!isCasualRunning && !isPreparing ? (
-                                <button style={{ ...styles.btnGold, width: '150px' }} onClick={startCasualTimer}>INICIAR</button>
-                            ) : (
-                                <button style={{ ...styles.btnOutline, width: '150px', color: '#ff4444', borderColor: '#ff4444' }} onClick={pauseCasualTimer}>PAUSAR</button>
-                            )}
-                            <button style={{ ...styles.btnOutline, width: '150px' }} onClick={resetCasualTimer}>REINICIAR</button>
-                        </div>
-                    </div>
-                )}
-
-                {/* MODO COMPETICIÓN */}
-                {!isCasualMode && (
-                    <div style={localStyles.timerContainer}>
-                        <div style={localStyles.flexCenter}>
-                            <div style={localStyles.inputGroup}>
-                                <span style={localStyles.label}>Minutos</span>
-                                <select style={localStyles.input} value={matchDuration / 60} onChange={(e) => { setMatchDuration(e.target.value * 60); if (!isMatchRunning && currentMatchRound === 0 && !isWarmupPhase) setMatchTimeLeft(e.target.value * 60); }}>
-                                    {[4, 5, 6, 7, 8, 9, 10].map(min => <option key={min} value={min}>{min}</option>)}
-                                </select>
-                            </div>
-                            <div style={localStyles.inputGroup}>
-                                <span style={localStyles.label}>Calentamiento (seg)</span>
-                                <input style={localStyles.input} type="number" min="0" value={warmupTime} onChange={(e) => setWarmupTime(Number(e.target.value))} />
-                            </div>
-                        </div>
-
-                        <div style={localStyles.bigTime}>
-                            {isPreparing ? (
-                                <span style={{ color: '#ffcc00' }}>PREP: {prepTimeLeft}</span>
-                            ) : isWarmupPhase ? (
-                                <span style={{ color: '#aaa', fontSize: '3rem' }}>CALENTAMIENTO: {formatTime(matchTimeLeft)}</span>
-                            ) : (
-                                formatTime(matchTimeLeft)
-                            )}
-                        </div>
-
-                        {winner && <h3 style={{ color: '#4CAF50', fontSize: '2rem', margin: '10px 0' }}>🏆 ¡GANADOR: {winner}! 🏆</h3>}
-
-                        <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', marginTop: '20px' }}>
-                            {/* COMPETIDOR 1 */}
-                            <div style={localStyles.competitorCard}>
-                                <input style={{ ...localStyles.input, width: '100%', marginBottom: '15px', fontSize: '1.2rem', backgroundColor: 'transparent', border: 'none', borderBottom: '1px solid #d4af37' }} value={competitor1Name} onChange={(e) => setCompetitor1Name(e.target.value)} placeholder="Competidor 1" />
-                                <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: '20px' }}>
-                                    <div><span style={localStyles.label}>PTS</span><div style={{ ...localStyles.statText, color: '#4CAF50', fontSize: '2rem' }}>{score1}</div></div>
-                                    <div><span style={localStyles.label}>ADV</span><div style={{ ...localStyles.statText, color: '#d4af37', fontSize: '1.5rem' }}>{advantage1}</div></div>
-                                    <div><span style={localStyles.label}>PEN</span><div style={{ ...localStyles.statText, color: '#ff4444', fontSize: '1.5rem' }}>{penalty1}</div></div>
-                                </div>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
-                                    <button disabled={puntosBloqueados} style={puntosBloqueados ? localStyles.scoreBtnDisabled : localStyles.scoreBtn} onClick={() => updateScore(1, 2)}>Takedown (+2)</button>
-                                    <button disabled={puntosBloqueados} style={puntosBloqueados ? localStyles.scoreBtnDisabled : localStyles.scoreBtn} onClick={() => updateScore(1, 3)}>Pass (+3)</button>
-                                    <button disabled={puntosBloqueados} style={puntosBloqueados ? localStyles.scoreBtnDisabled : localStyles.scoreBtn} onClick={() => updateScore(1, 4)}>Montada (+4)</button>
-                                    <button disabled={puntosBloqueados} style={puntosBloqueados ? localStyles.scoreBtnDisabled : localStyles.scoreBtn} onClick={() => updateAdvantage(1, 1)}>Advantage (+1)</button>
-                                    <button disabled={puntosBloqueados} style={puntosBloqueados ? localStyles.scoreBtnDisabled : localStyles.scoreBtn} onClick={() => updatePenalty(1, 1)}>Penalty (+1)</button>
-                                </div>
-                            </div>
-
-                            {/* COMPETIDOR 2 */}
-                            <div style={localStyles.competitorCard}>
-                                <input style={{ ...localStyles.input, width: '100%', marginBottom: '15px', fontSize: '1.2rem', backgroundColor: 'transparent', border: 'none', borderBottom: '1px solid #d4af37' }} value={competitor2Name} onChange={(e) => setCompetitor2Name(e.target.value)} placeholder="Competidor 2" />
-                                <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: '20px' }}>
-                                    <div><span style={localStyles.label}>PTS</span><div style={{ ...localStyles.statText, color: '#4CAF50', fontSize: '2rem' }}>{score2}</div></div>
-                                    <div><span style={localStyles.label}>ADV</span><div style={{ ...localStyles.statText, color: '#d4af37', fontSize: '1.5rem' }}>{advantage2}</div></div>
-                                    <div><span style={localStyles.label}>PEN</span><div style={{ ...localStyles.statText, color: '#ff4444', fontSize: '1.5rem' }}>{penalty2}</div></div>
-                                </div>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
-                                    <button disabled={puntosBloqueados} style={puntosBloqueados ? localStyles.scoreBtnDisabled : localStyles.scoreBtn} onClick={() => updateScore(2, 2)}>Takedown (+2)</button>
-                                    <button disabled={puntosBloqueados} style={puntosBloqueados ? localStyles.scoreBtnDisabled : localStyles.scoreBtn} onClick={() => updateScore(2, 3)}>Pass (+3)</button>
-                                    <button disabled={puntosBloqueados} style={puntosBloqueados ? localStyles.scoreBtnDisabled : localStyles.scoreBtn} onClick={() => updateScore(2, 4)}>Montada (+4)</button>
-                                    <button disabled={puntosBloqueados} style={puntosBloqueados ? localStyles.scoreBtnDisabled : localStyles.scoreBtn} onClick={() => updateAdvantage(2, 1)}>Advantage (+1)</button>
-                                    <button disabled={puntosBloqueados} style={puntosBloqueados ? localStyles.scoreBtnDisabled : localStyles.scoreBtn} onClick={() => updatePenalty(2, 1)}>Penalty (+1)</button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div style={{ marginTop: '30px', display: 'flex', justifyContent: 'center', gap: '15px', flexWrap: 'wrap' }}>
-                            {!isMatchRunning && !isPreparing ? (
-                                <button style={{ ...styles.btnGold, width: '200px' }} onClick={startMatchTimer}>▶ INICIAR COMBATE</button>
-                            ) : (
-                                <button style={{ ...styles.btnOutline, width: '200px', color: '#ff4444', borderColor: '#ff4444' }} onClick={pauseMatchTimer}>⏸ PAUSAR</button>
-                            )}
-                            <button style={{ ...styles.btnOutline, width: 'auto' }} onClick={resetMatchTimer}>REINICIAR</button>
-                            <button style={{ ...styles.btnOutline, width: 'auto', color: '#4CAF50', borderColor: '#4CAF50' }} onClick={designateWinner}>FINALIZAR</button>
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
     );
