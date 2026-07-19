@@ -138,6 +138,7 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
 
         const cargarDatos = () => {
             try {
+                // AQUÍ A FUTURO: Podrías modificar la query para traer las clases públicas de toda la academia, o las privadas solo del usuario.
                 const qClases = query(collection(db, "clases"), where("teamId", "==", teamIdEfectivo));
                 unsubClases = onSnapshot(qClases, (snap) => {
                     setClases(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -193,6 +194,7 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
     // --- DATOS Y FORMULARIOS ---
     const estadoInicial = {
         titulo: '',
+        esPublica: true, // NUEVO: Por defecto es pública
         fecha: new Date().toISOString().split('T')[0],
         bloques: [
             { id: 'b1', tipo: 'Calentamiento', ligero: '', intenso: '', minutos: 5 },
@@ -266,10 +268,9 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
                 <div style={{
                     position: 'sticky', 
                     top: 0, 
-                    zIndex: 9999, // Super Z-Index para no ser tapado por nada
+                    zIndex: 9999,
                     backgroundColor: isPrepTime ? '#ff4444' : '#d4af37',
                     color: '#000', 
-                    // El padding top se expande para rellenar la barra de estado en iPhone
                     padding: 'calc(15px + env(safe-area-inset-top)) 15px 15px 15px',
                     display: 'flex', 
                     justifyContent: 'space-between', 
@@ -287,14 +288,13 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
                         <button onClick={() => setTimerActive(!timerActive)} style={{ backgroundColor: '#000', color: '#fff', border: 'none', padding: '12px 18px', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.75rem', minHeight: '44px' }}>
                             {timerActive ? 'PAUSA' : 'RESUME'}
                         </button>
-                        <button onClick={() => { setTimerActive(false); setTimeLeft(0); }} style={{ backgroundColor: 'rgba(0,0,0,0.2)', border: '1px solid #000', borderRadius: '8px', width: '44px', minHeight: '44px', fontSize: '1rem' }}>⏹</button>
+                        <button onClick={() => { setTimerActive(false); setTimeLeft(0); }} style={{ backgroundColor: 'rgba(0,0,0,0.2)', border: '1px solid #000', borderRadius: '8px', width: '44px', minHeight: '44px', fontSize: '1rem', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>⏹</button>
                     </div>
                 </div>
             )}
 
             <div style={{ 
                 padding: '15px', 
-                // Si el modo NO es clase activa, aplicamos el notch top aquí. Si sí, el timer ya lo cubre.
                 paddingTop: modo !== 'clase_activa' ? 'calc(15px + env(safe-area-inset-top))' : '15px',
                 maxWidth: '1200px', 
                 margin: '0 auto', 
@@ -311,16 +311,24 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
 
                 {/* VISTA: LISTA */}
                 {modo === 'lista' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '15px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '15px' }}>
                         <button onClick={() => setModo('crear')} style={{ ...styles.btnGold, padding: '15px', gridColumn: '1 / -1', minHeight: '50px' }}>+ NUEVA SESIÓN</button>
                         {clases.map(c => (
                             <div key={c.id} style={{ display: 'flex', gap: '8px', boxSizing: 'border-box' }}>
                                 <div onClick={() => { setClaseSeleccionada(c); setModo('clase_activa'); }}
-                                    style={{ ...styles.card, flex: 1, textAlign: 'left', padding: '15px', boxSizing: 'border-box', cursor: 'pointer' }}>
-                                    <h3 style={{ margin: 0, color: '#d4af37', fontSize: '0.95rem', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{c.titulo.toUpperCase()}</h3>
+                                    style={{ ...styles.card, flex: 1, textAlign: 'left', padding: '15px', boxSizing: 'border-box', cursor: 'pointer', position: 'relative' }}>
+                                    
+                                    {/* BADGE PÚBLICA/PRIVADA */}
+                                    <span style={{ position: 'absolute', top: '10px', right: '15px', fontSize: '1.2rem' }}>
+                                        {c.esPublica ? '🌍' : '🔒'}
+                                    </span>
+
+                                    <h3 style={{ margin: '0 0 5px 0', color: '#d4af37', fontSize: '0.95rem', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', paddingRight: '25px' }}>
+                                        {c.titulo.toUpperCase()}
+                                    </h3>
                                     <span style={{ fontSize: '0.7rem', color: '#888' }}>{c.fecha}</span>
                                 </div>
-                                <button onClick={() => { if (window.confirm("¿Borrar?")) deleteDoc(doc(db, "clases", c.id)) }} style={{ background: '#111', border: '1px solid #333', color: '#ff4444', padding: '10px 15px', borderRadius: '8px', minWidth: '50px' }}>🗑</button>
+                                <button onClick={() => { if (window.confirm("¿Borrar esta clase?")) deleteDoc(doc(db, "clases", c.id)) }} style={{ background: '#111', border: '1px solid #333', color: '#ff4444', borderRadius: '8px', minWidth: '50px', fontSize: '1.2rem', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>🗑</button>
                             </div>
                         ))}
                     </div>
@@ -328,10 +336,24 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
 
                 {/* VISTA: CREAR */}
                 {modo === 'crear' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', paddingBottom: '100px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', paddingBottom: '100px' }}>
                         <div style={{ gridColumn: '1 / -1' }}>
-                            {/* fontSize 16px crucial para evitar auto-zoom en iOS */}
                             <input placeholder="TÍTULO DE LA SESIÓN" style={{ ...styles.input, width: '100%', boxSizing: 'border-box', textAlign: 'center', borderBottom: '2px solid #d4af37', fontSize: '16px', padding: '15px' }} onChange={e => setNuevaClase({ ...nuevaClase, titulo: e.target.value })} />
+                            
+                            {/* NUEVO: TOGGLE DE VISIBILIDAD */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '15px', marginTop: '20px', backgroundColor: '#0a0a0a', padding: '15px', borderRadius: '12px', border: '1px solid #222' }}>
+                                <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: nuevaClase.esPublica ? '#555' : '#d4af37', transition: '0.3s' }}>🔒</span>
+                                <div 
+                                    onClick={() => setNuevaClase({...nuevaClase, esPublica: !nuevaClase.esPublica})}
+                                    style={{ width: '50px', height: '26px', backgroundColor: nuevaClase.esPublica ? '#d4af37' : '#333', borderRadius: '26px', position: 'relative', cursor: 'pointer', transition: '0.3s' }}
+                                >
+                                    <div style={{ width: '20px', height: '20px', backgroundColor: '#fff', borderRadius: '50%', position: 'absolute', top: '3px', left: nuevaClase.esPublica ? '27px' : '3px', transition: '0.3s' }} />
+                                </div>
+                                <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: nuevaClase.esPublica ? '#d4af37' : '#555', transition: '0.3s' }}>🌍</span>
+                            </div>
+                            <p style={{ textAlign: 'center', fontSize: '0.65rem', color: '#666', marginTop: '8px' }}>
+                                {nuevaClase.esPublica ? 'Todos los instructores de tu alianza podrán ver y usar esta clase.' : 'Solo tú podrás ver esta clase en tu panel.'}
+                            </p>
                         </div>
 
                         {nuevaClase.bloques.map((bloque, index) => (
@@ -371,7 +393,7 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
 
                 {/* VISTA: CLASE ACTIVA */}
                 {modo === 'clase_activa' && claseSeleccionada && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '15px', paddingBottom: '100px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '15px', paddingBottom: '100px' }}>
                         {claseSeleccionada.bloques.map((b, i) => (
                             <div key={i} style={{ ...styles.card, borderLeft: '4px solid #d4af37', padding: '15px', textAlign: 'left', boxSizing: 'border-box' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
@@ -406,9 +428,8 @@ const PlaneadorClasesPage = ({ onBack, styles, usuario }) => {
                                 {alumnos.map(a => (
                                     <div key={a.id} style={{ display: 'flex', gap: '8px', alignItems: 'center', background: '#000', padding: '12px', borderRadius: '8px', border: '1px solid #222' }}>
                                         <span style={{ flex: 1, fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.nombre}</span>
-                                        {/* Nota: fontSize a 16px evita zoom */}
                                         <input placeholder="Nota" style={{ ...styles.input, width: '80px', marginBottom: 0, padding: '8px', fontSize: '16px' }} onBlur={(e) => e.target.value && registrarAsistenciaConNota(a.id, e.target.value)} />
-                                        <button onClick={() => registrarAsistenciaConNota(a.id, "Asistió")} style={{ backgroundColor: '#d4af37', color: '#000', border: 'none', padding: '10px 15px', borderRadius: '6px', fontWeight: 'bold' }}>✓</button>
+                                        <button onClick={() => registrarAsistenciaConNota(a.id, "Asistió")} style={{ backgroundColor: '#d4af37', color: '#000', border: 'none', padding: '10px 15px', borderRadius: '6px', fontWeight: 'bold', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>✓</button>
                                     </div>
                                 ))}
                             </div>
