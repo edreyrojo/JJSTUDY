@@ -163,7 +163,6 @@ const HubPage = ({
     const cinturon = usuario?.cinturon || 'Blanco';
 
     // --- LÓGICA DE DISTRIBUCIÓN RADIAL MATEMÁTICA ---
-    // Agregamos dinámicamente los botones principales al dial
     const herramientasDial = [
         { id: 'mapa', label: 'MAPA', icon: <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>, route: 'mapa' },
         { id: 'notas', label: 'BITÁCORA', icon: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></>, route: 'notas_hub' },
@@ -178,9 +177,10 @@ const HubPage = ({
         herramientasDial.push({ id: 'dojo', label: 'DOJO', icon: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></>, route: 'alumnos' });
     }
 
-    const radioDial = 135; // Distancia desde el centro en pixeles
+    const radioDial = 135; 
     const angleStep = (2 * Math.PI) / herramientasDial.length;
 
+    // 🛡️ CONTENEDOR CON SOPORTE DE NOTCH (Safe Area Insets de 4 Puntos)
     const contenedorEstilos = {
         ...styles.container,
         position: 'relative',
@@ -189,6 +189,10 @@ const HubPage = ({
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
+        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 30px)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 30px)',
+        paddingLeft: 'calc(env(safe-area-inset-left, 0px) + 20px)',
+        paddingRight: 'calc(env(safe-area-inset-right, 0px) + 20px)',
         backgroundImage: fondoAcademia
             ? `linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.95)), url(${fondoAcademia})`
             : 'none',
@@ -196,7 +200,8 @@ const HubPage = ({
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
         backgroundAttachment: 'fixed',
-        overflowX: 'hidden'
+        overflowX: 'hidden',
+        boxSizing: 'border-box'
     };
 
     return (
@@ -214,7 +219,7 @@ const HubPage = ({
                     100% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 15px rgba(212,175,55,0.4); }
                 }
 
-                /* --- Tarjeta de Usuario --- */
+                /* --- Tarjeta de Usuario con Notch Safe Area --- */
                 .user-profile-card {
                     display: flex;
                     flex-direction: column;
@@ -231,8 +236,8 @@ const HubPage = ({
                     width: 120px;
                     backdrop-filter: blur(5px);
                     position: absolute;
-                    top: 20px;
-                    right: 20px;
+                    top: calc(env(safe-area-inset-top, 0px) + 15px);
+                    right: calc(env(safe-area-inset-right, 0px) + 15px);
                 }
                 .user-profile-card:hover {
                     transform: scale(1.05);
@@ -244,7 +249,7 @@ const HubPage = ({
                     position: relative;
                     width: 340px;
                     height: 340px;
-                    margin: 40px auto 20px auto;
+                    margin: 30px auto 15px auto;
                 }
 
                 /* Núcleo Central (CONTINUAR) */
@@ -294,7 +299,7 @@ const HubPage = ({
                     transform: translate(-50%, -50%);
                     width: 50px;
                     height: 50px;
-                    border-radius: 25px; /* Comprimido circular */
+                    border-radius: 25px;
                     background-color: rgba(15, 15, 15, 0.95);
                     border: 1px solid #d4af37;
                     color: #d4af37;
@@ -308,7 +313,6 @@ const HubPage = ({
                     backdrop-filter: blur(4px);
                 }
 
-                /* Estado Expandido (Preseleccionado) */
                 .dial-btn:hover, .dial-btn:focus {
                     width: 140px;
                     background-color: #d4af37;
@@ -342,11 +346,11 @@ const HubPage = ({
                     margin-left: 8px;
                 }
 
-                /* Botones Inferiores (Secundarios) */
+                /* Acciones Secundarias Inferiores */
                 .secondary-actions {
                     display: flex;
                     flex-direction: column;
-                    gap: 12px;
+                    gap: 10px;
                     width: 100%;
                     max-width: 320px;
                     position: relative;
@@ -355,13 +359,13 @@ const HubPage = ({
 
                 @media (max-width: 480px) {
                     .radial-hub-container {
-                        width: 290px;
-                        height: 290px;
+                        width: 280px;
+                        height: 280px;
                     }
                 }
             `}</style>
 
-            <h1 style={{ ...styles.goldTitle, marginTop: '20px', marginBottom: '0', fontSize: '1.4rem', position: 'relative', zIndex: 10 }}>LA FORTUNA VAULT</h1>
+            <h1 style={{ ...styles.goldTitle, marginTop: '10px', marginBottom: '0', fontSize: '1.3rem', position: 'relative', zIndex: 10, textAlign: 'center' }}>LA FORTUNA VAULT</h1>
 
             {/* --- TARJETA DE USUARIO --- */}
             <div className="user-profile-card" onClick={() => onNavigate('mi_cuenta')}>
@@ -390,23 +394,23 @@ const HubPage = ({
                 {tienePerfil ? (
                     <>
                         <div style={{
-                            width: '45px', height: '45px', borderRadius: '10px',
+                            width: '42px', height: '42px', borderRadius: '10px',
                             backgroundImage: `url(${usuario.fotoBase64})`, backgroundSize: 'cover',
-                            backgroundPosition: 'center', border: '1px solid #333', marginBottom: '6px'
+                            backgroundPosition: 'center', border: '1px solid #333', marginBottom: '5px'
                         }} />
-                        <p style={{ color: '#fff', fontSize: '0.7rem', fontWeight: 'bold', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+                        <p style={{ color: '#fff', fontSize: '0.65rem', fontWeight: 'bold', margin: '0 0 3px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
                             {usuario?.nombre || 'Guerrero'}
                         </p>
-                        <div style={{ height: '8px', width: '100%', backgroundColor: coloresCinturon[cinturon], borderRadius: '2px', display: 'flex', justifyContent: 'flex-end', border: '1px solid #222' }}>
-                            <div style={{ height: '100%', width: '30px', backgroundColor: cinturon === 'Negro' ? '#D32F2F' : '#111', display: 'flex', justifyContent: 'space-evenly' }}>
+                        <div style={{ height: '7px', width: '100%', backgroundColor: coloresCinturon[cinturon], borderRadius: '2px', display: 'flex', justifyContent: 'flex-end', border: '1px solid #222' }}>
+                            <div style={{ height: '100%', width: '28px', backgroundColor: cinturon === 'Negro' ? '#D32F2F' : '#111', display: 'flex', justifyContent: 'space-evenly' }}>
                                 {[...Array(4)].map((_, i) => <div key={i} style={{ height: '100%', width: '2px', backgroundColor: i < grados ? '#FFF' : 'transparent' }} />)}
                             </div>
                         </div>
                     </>
                 ) : (
-                    <div style={{ textAlign: 'center', padding: '5px' }}>
-                        <span style={{ fontSize: '1.4rem' }}>⚠️</span>
-                        <p style={{ color: '#d4af37', fontSize: '0.6rem', fontWeight: 'bold', margin: 0 }}>ACTUALIZAR PERFIL</p>
+                    <div style={{ textAlign: 'center', padding: '4px' }}>
+                        <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+                        <p style={{ color: '#d4af37', fontSize: '0.55rem', fontWeight: 'bold', margin: 0 }}>ACTUALIZAR PERFIL</p>
                     </div>
                 )}
             </div>
@@ -422,13 +426,13 @@ const HubPage = ({
                 >
                     {hasSession ? (
                         <>
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <polygon points="5 3 19 12 5 21 5 3"></polygon>
                             </svg>
-                            <span style={{ fontSize: '0.65rem', fontWeight: 'bold', marginTop: '4px', letterSpacing: '1px' }}>CONTINUAR</span>
+                            <span style={{ fontSize: '0.6rem', fontWeight: 'bold', marginTop: '3px', letterSpacing: '1px' }}>CONTINUAR</span>
                         </>
                     ) : (
-                        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <circle cx="12" cy="12" r="10"></circle>
                             <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
                             <path d="M2 12h20"></path>
@@ -438,7 +442,6 @@ const HubPage = ({
 
                 {/* 2. Distribución Matemática de los Botones del Dial */}
                 {herramientasDial.map((herramienta, index) => {
-                    // Calculamos la posición X y Y usando senos y cosenos (empezando desde arriba)
                     const angulo = index * angleStep - (Math.PI / 2);
                     const coordX = Math.cos(angulo) * radioDial;
                     const coordY = Math.sin(angulo) * radioDial;
@@ -467,27 +470,26 @@ const HubPage = ({
             {/* --- ACCIONES SECUNDARIAS INFERIORES --- */}
             <div className="secondary-actions">
                 <div style={{ display: 'flex', gap: '10px' }}>
-                    <button style={{ ...styles.hubBtn, flex: 1, padding: '12px', border: '1px solid #ff4444', color: '#ff4444', backgroundColor: 'rgba(0,0,0,0.8)', fontSize: '0.8rem', borderRadius: '8px' }} onClick={() => setShowSoporte(true)}>
+                    <button style={{ ...styles.hubBtn, flex: 1, padding: '10px', border: '1px solid #ff4444', color: '#ff4444', backgroundColor: 'rgba(0,0,0,0.8)', fontSize: '0.75rem', borderRadius: '8px' }} onClick={() => setShowSoporte(true)}>
                         SOPORTE
                     </button>
-                    <button style={{ ...styles.hubBtn, flex: 1, padding: '12px', border: '1px solid #4CAF50', color: '#4CAF50', backgroundColor: 'rgba(0,0,0,0.8)', fontSize: '0.8rem', borderRadius: '8px' }} onClick={() => setShowTutoriales(true)}>
+                    <button style={{ ...styles.hubBtn, flex: 1, padding: '10px', border: '1px solid #4CAF50', color: '#4CAF50', backgroundColor: 'rgba(0,0,0,0.8)', fontSize: '0.75rem', borderRadius: '8px' }} onClick={() => setShowTutoriales(true)}>
                         TUTORIALES
                     </button>
                 </div>
 
                 {userRole === 'admin' && (
-                    <button style={{ ...styles.hubBtn, padding: '12px', backgroundColor: 'rgba(26,26,26,0.9)', border: '1px solid #d4af37', color: '#d4af37', borderRadius: '8px', fontWeight: 'bold' }} onClick={() => onNavigate('admin')}>
+                    <button style={{ ...styles.hubBtn, padding: '10px', backgroundColor: 'rgba(26,26,26,0.9)', border: '1px solid #d4af37', color: '#d4af37', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.75rem' }} onClick={() => onNavigate('admin')}>
                         CONTROL DE ACCESOS
                     </button>
                 )}
 
-                <button onClick={onLogout} style={{ ...styles.btnOutline, padding: '12px', backgroundColor: 'rgba(0,0,0,0.6)' }}>
+                <button onClick={onLogout} style={{ ...styles.btnOutline, padding: '10px', backgroundColor: 'rgba(0,0,0,0.6)', fontSize: '0.75rem' }}>
                     CERRAR SESIÓN
                 </button>
             </div>
 
             {/* --- MODALES CONSERVADOS --- */}
-            {/* Modal de Actualizaciones */}
             {showAnuncio && anuncioReciente && (
                 <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10001, padding: '20px', boxSizing: 'border-box' }}>
                     <div style={{ backgroundColor: '#0a0a0a', border: '1px solid #d4af37', padding: '25px', borderRadius: '12px', width: '100%', maxWidth: '400px' }}>
@@ -502,7 +504,6 @@ const HubPage = ({
                 </div>
             )}
 
-            {/* Modal de Soporte */}
             {showSoporte && (
                 <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10001, padding: '20px', boxSizing: 'border-box' }}>
                     <div style={{ backgroundColor: '#111', border: '1px solid #ff4444', padding: '25px', borderRadius: '12px', width: '100%', maxWidth: '400px', textAlign: 'center' }}>
@@ -516,7 +517,6 @@ const HubPage = ({
                 </div>
             )}
 
-            {/* Modal de Tutoriales */}
             {showTutoriales && (
                 <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10001, padding: '20px', boxSizing: 'border-box' }}>
                     <div style={{ backgroundColor: '#111', border: '1px solid #4CAF50', padding: '25px', borderRadius: '12px', width: '100%', maxWidth: '450px' }}>
