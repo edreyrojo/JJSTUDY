@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc } from 'firebase/firestore'; 
 import Swal from 'sweetalert2';
@@ -19,55 +19,60 @@ const notify = (mensaje, tipo = 'success') => {
 };
 
 const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles }) => {
-    const [notas, setNotas] = useState([]);
     const [cargando, setCargando] = useState(true);
     const [esMovil, setEsMovil] = useState(window.innerWidth < 768);
 
+    // 🛡️ Optimización de ciclo de vida para el listener de tamaño de pantalla
     useEffect(() => {
         const handleResize = () => setEsMovil(window.innerWidth < 768);
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
+    // 🛡️ Simulación de carga defensiva si el usuario tarda en sincronizar
     useEffect(() => {
         if (!usuario) {
-            const timer = setTimeout(() => setCargando(false), 2000);
+            const timer = setTimeout(() => setCargando(false), 1500);
             return () => clearTimeout(timer);
-        }
-
-        if (usuario.notas) {
-            const listaConvertida = Object.entries(usuario.notas).map(([id, data]) => {
-                const esObjeto = typeof data === 'object' && data !== null;
-                return {
-                    id: id,
-                    titulo: esObjeto && data.titulo ? data.titulo : "NOTA TÉCNICA",
-                    texto: esObjeto ? (data.texto || "") : data,
-                    fecha: esObjeto && data.fecha ? data.fecha : "Reciente",
-                    videoId: esObjeto && data.videoId ? data.videoId : id,
-                    timestamp: esObjeto && data.timestamp ? data.timestamp : (!isNaN(parseInt(id)) ? parseInt(id) : 0)
-                };
-            });
-
-            listaConvertida.sort((a, b) => {
-                if (a.timestamp && b.timestamp) return b.timestamp - a.timestamp;
-                const idA = parseInt(a.id);
-                const idB = parseInt(b.id);
-                if (!isNaN(idA) && !isNaN(idB) && idA > 10000000) return idB - idA;
-                
-                const dateA = new Date(a.fecha).getTime();
-                const dateB = new Date(b.fecha).getTime();
-                if (!isNaN(dateA) && !isNaN(dateB)) return dateB - dateA;
-                
-                return 0; 
-            });
-
-            setNotas(listaConvertida);
-        } else {
-            setNotas([]);
         }
         setCargando(false);
     }, [usuario]);
 
+    // ⚡ USO DE USEMEMO (Buenas prácticas de React): 
+    // Procesamos y ordenamos las notas únicamente cuando el objeto `usuario.notas` cambia,
+    // evitando recálculos pesados de ordenamiento en cada renderizado de la UI.
+    const notas = useMemo(() => {
+        if (!usuario?.notas) return [];
+
+        const listaConvertida = Object.entries(usuario.notas).map(([id, data]) => {
+            const esObjeto = typeof data === 'object' && data !== null;
+            return {
+                id: id,
+                titulo: esObjeto && data.titulo ? data.titulo : "NOTA TÉCNICA",
+                texto: esObjeto ? (data.texto || "") : data,
+                fecha: esObjeto && data.fecha ? data.fecha : "Reciente",
+                videoId: esObjeto && data.videoId ? data.videoId : id,
+                timestamp: esObjeto && data.timestamp ? data.timestamp : (!isNaN(parseInt(id)) ? parseInt(id) : 0)
+            };
+        });
+
+        listaConvertida.sort((a, b) => {
+            if (a.timestamp && b.timestamp) return b.timestamp - a.timestamp;
+            const idA = parseInt(a.id);
+            const idB = parseInt(b.id);
+            if (!isNaN(idA) && !isNaN(idB) && idA > 10000000) return idB - idA;
+            
+            const dateA = new Date(a.fecha).getTime();
+            const dateB = new Date(b.fecha).getTime();
+            if (!isNaN(dateA) && !isNaN(dateB)) return dateB - dateA;
+            
+            return 0; 
+        });
+
+        return listaConvertida;
+    }, [usuario?.notas]);
+
+    // Función para eliminar notas con sincronización Firestore
     const eliminarNota = async (idNota) => {
         if (window.confirm("¿Seguro que deseas eliminar esta nota del Vault?")) {
             try {
@@ -76,7 +81,6 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles }) => {
                 delete nuevasNotas[idNota];
                 
                 await updateDoc(userRef, { notas: nuevasNotas });
-                setNotas(prevNotas => prevNotas.filter(n => n.id !== idNota));
                 notify("Nota eliminada del Vault.");
             } catch (err) {
                 console.error("Error al eliminar nota:", err);
@@ -88,18 +92,18 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles }) => {
     if (cargando) {
         return (
             <div style={{ minHeight: '100vh', backgroundColor: '#000', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                <div style={{ color: '#d4af37', fontFamily: 'monospace' }}>ACCEDIENDO AL VAULT...</div>
+                <div style={{ color: '#d4af37', fontFamily: 'monospace', letterSpacing: '2px' }}>ACCEDIENDO AL VAULT...</div>
             </div>
         );
     }
 
     return (
         <div style={{
-            // 🛡️ PROTECCIÓN TOTAL CONTRA NOTCH (Safe Area Insets de 4 Puntos)
-            paddingTop: esMovil ? 'calc(env(safe-area-inset-top, 0px) + 20px)' : '30px',
-            paddingBottom: esMovil ? 'calc(env(safe-area-inset-bottom, 0px) + 30px)' : '40px',
-            paddingLeft: esMovil ? 'calc(env(safe-area-inset-left, 0px) + 15px)' : '30px',
-            paddingRight: esMovil ? 'calc(env(safe-area-inset-right, 0px) + 15px)' : '30px',
+            // 🛡️ Protección adaptativa contra notches y safe areas
+            paddingTop: esMovil ? 'calc(env(safe-area-inset-top, 0px) + 20px)' : '40px',
+            paddingBottom: esMovil ? 'calc(env(safe-area-inset-bottom, 0px) + 30px)' : '50px',
+            paddingLeft: esMovil ? 'calc(env(safe-area-inset-left, 0px) + 16px)' : '40px',
+            paddingRight: esMovil ? 'calc(env(safe-area-inset-right, 0px) + 16px)' : '40px',
             minHeight: '100vh',
             backgroundColor: '#000',
             color: '#fff',
@@ -107,44 +111,65 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles }) => {
             width: '100%',
             overflowX: 'hidden' 
         }}>
+            <style>{`
+                .nota-card {
+                    transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+                }
+                .nota-card:hover {
+                    transform: translateY(-4px);
+                    border-color: #d4af37 !important;
+                    box-shadow: 0 8px 25px rgba(212, 175, 55, 0.15);
+                }
+                .delete-btn {
+                    transition: color 0.2s ease, transform 0.2s ease;
+                }
+                .delete-btn:hover {
+                    color: #ff4444 !important;
+                    transform: scale(1.1);
+                }
+            `}</style>
 
-            {/* Header */}
+            {/* Header del Hub */}
             <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                marginBottom: '20px',
+                marginBottom: '30px',
                 maxWidth: '1200px', 
-                margin: '0 auto 20px auto',
+                margin: '0 auto 30px auto',
                 width: '100%',
                 boxSizing: 'border-box',
-                gap: '10px'
+                gap: '15px'
             }}>
                 <button 
                     onClick={onBack} 
                     style={{ 
                         ...(styles.btnOutline || {}), 
                         width: 'auto', 
-                        padding: esMovil ? '10px 15px' : '8px 15px', 
-                        fontSize: esMovil ? '1rem' : '0.8rem',
+                        padding: esMovil ? '10px 18px' : '10px 20px', 
+                        fontSize: esMovil ? '1rem' : '0.9rem',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        boxSizing: 'border-box'
+                        boxSizing: 'border-box',
+                        borderColor: '#d4af37',
+                        color: '#d4af37',
+                        cursor: 'pointer',
+                        borderRadius: '6px'
                     }}
                 >
                     ←
                 </button>
-                <h2 style={{ ...(styles.goldTitle || {}), margin: 0, fontSize: '1.2rem', textTransform: 'uppercase' }}>
-                    BITÁCORA
+                <h2 style={{ ...(styles.goldTitle || {}), margin: 0, fontSize: esMovil ? '1.1rem' : '1.4rem', letterSpacing: '3px', textTransform: 'uppercase' }}>
+                    BITÁCORA TÉCNICA
                 </h2>
             </div>
 
-            {/* Grid Responsivo Inteligente */}
+            {/* Grid Responsivo Inteligente (PC vs Móvil) */}
             <div style={{
                 display: 'grid',
-                gridTemplateColumns: esMovil ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))',
-                gap: '15px',
+                gridTemplateColumns: esMovil ? '1fr' : 'repeat(auto-fill, minmax(320px, 1fr))',
+                gap: '20px',
                 maxWidth: '1200px',
                 margin: '0 auto',
                 paddingBottom: '40px',
@@ -152,8 +177,9 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles }) => {
                 boxSizing: 'border-box'
             }}>
                 {notas.length === 0 ? (
-                    <div style={{ gridColumn: '1/-1', textAlign: 'center', marginTop: '50px' }}>
-                        <p style={{ color: '#444' }}>Bitácora vacía. Añade notas mientras estudias un instruccional.</p>
+                    <div style={{ gridColumn: '1/-1', textAlign: 'center', marginTop: '80px', padding: '40px', border: '1px dashed #222', borderRadius: '12px' }}>
+                        <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '10px' }}>🛡️</span>
+                        <p style={{ color: '#888', fontSize: '0.95rem' }}>Bitácora vacía. Añade notas técnicas mientras estudias los instruccionales en el mapa.</p>
                     </div>
                 ) : (
                     notas.map((n) => {
@@ -161,51 +187,55 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles }) => {
                         const segs = match ? (parseInt(match[1]) * 60 + parseInt(match[2])) : 0;
 
                         return (
-                            <div key={n.id} style={{
+                            <div key={n.id} className="nota-card" style={{
                                 ...(styles?.card || {}),
                                 border: '1px solid #222',
-                                padding: '20px',
+                                padding: '22px',
                                 display: 'flex',
                                 flexDirection: 'column',
-                                minHeight: esMovil ? '220px' : '200px',
+                                minHeight: esMovil ? '210px' : '230px',
                                 justifyContent: 'space-between',
-                                backgroundColor: '#0a0a0a',
+                                backgroundColor: '#0f0f0f',
                                 boxSizing: 'border-box',
                                 position: 'relative',
-                                borderRadius: '10px',
+                                borderRadius: '12px',
                                 width: '100%',
                                 minWidth: '0',  
                                 maxWidth: '100%', 
                                 overflow: 'hidden' 
                             }}>
                                 <div style={{ overflow: 'hidden', width: '100%', minWidth: '0' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', alignItems: 'flex-start', width: '100%', minWidth: '0' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', alignItems: 'flex-start', width: '100%', minWidth: '0' }}>
                                         <h4 style={{
                                             color: '#d4af37',
                                             margin: 0,
-                                            fontSize: '0.8rem',
+                                            fontSize: '0.85rem',
                                             paddingRight: '35px', 
                                             whiteSpace: 'nowrap',
                                             overflow: 'hidden',
                                             textOverflow: 'ellipsis',
                                             flex: 1,
-                                            minWidth: '0' 
+                                            minWidth: '0',
+                                            letterSpacing: '1px'
                                         }}>
                                             {n.titulo.toUpperCase()}
                                         </h4>
                                         <button
+                                            className="delete-btn"
                                             onClick={() => eliminarNota(n.id)}
+                                            title="Eliminar nota"
                                             style={{ 
-                                                color: '#666', 
+                                                color: '#555', 
                                                 background: 'none', 
                                                 border: 'none', 
-                                                fontSize: esMovil ? '1.5rem' : '1.2rem', 
+                                                fontSize: esMovil ? '1.5rem' : '1.3rem', 
                                                 cursor: 'pointer', 
                                                 position: 'absolute', 
-                                                top: '12px', 
-                                                right: '15px',
-                                                padding: '5px',
-                                                zIndex: 10
+                                                top: '14px', 
+                                                right: '16px',
+                                                padding: '4px',
+                                                zIndex: 10,
+                                                lineHeight: 1
                                             }}
                                         >
                                             ×
@@ -214,8 +244,8 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles }) => {
 
                                     <p style={{
                                         color: '#ccc',
-                                        fontSize: esMovil ? '0.85rem' : '0.8rem',
-                                        lineHeight: '1.5',
+                                        fontSize: esMovil ? '0.9rem' : '0.85rem',
+                                        lineHeight: '1.6',
                                         display: '-webkit-box',
                                         WebkitLineClamp: esMovil ? '5' : '4', 
                                         WebkitBoxOrient: 'vertical',
@@ -230,21 +260,21 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles }) => {
                                 </div>
 
                                 <div style={{
-                                    marginTop: '15px',
+                                    marginTop: '18px',
                                     display: 'flex',
                                     flexDirection: 'column',
                                     gap: '12px',
-                                    borderTop: '1px solid #1a1a1a',
+                                    borderTop: '1px solid #222',
                                     paddingTop: '15px',
                                     width: '100%',
                                     minWidth: '0'
                                 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '5px' }}>
-                                        <span style={{ fontSize: '0.65rem', color: '#555', fontWeight: 'bold' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                                        <span style={{ fontSize: '0.7rem', color: '#666', fontWeight: 'bold' }}>
                                             {n.fecha.split(',')[0]}
                                         </span>
                                         {n.videoId && (
-                                            <span style={{ fontSize: '0.65rem', color: '#d4af37', fontWeight: 'bold', backgroundColor: '#d4af3711', padding: '2px 8px', borderRadius: '4px' }}>
+                                            <span style={{ fontSize: '0.7rem', color: '#d4af37', fontWeight: 'bold', backgroundColor: 'rgba(212, 175, 55, 0.1)', padding: '3px 8px', borderRadius: '4px', border: '1px solid rgba(212, 175, 55, 0.2)' }}>
                                                 {match ? match[0] : 'VINCULADO'}
                                             </span>
                                         )}
@@ -256,12 +286,17 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles }) => {
                                             style={{
                                                 ...(styles.btnGold || {}),
                                                 width: '100%',
-                                                padding: esMovil ? '12px 0' : '8px 0', 
-                                                fontSize: esMovil ? '0.75rem' : '0.65rem',
+                                                padding: esMovil ? '12px 0' : '10px 0', 
+                                                fontSize: esMovil ? '0.8rem' : '0.75rem',
                                                 fontWeight: 'bold',
                                                 margin: 0,
                                                 borderRadius: '6px',
-                                                boxSizing: 'border-box' 
+                                                boxSizing: 'border-box',
+                                                cursor: 'pointer',
+                                                letterSpacing: '1px',
+                                                backgroundColor: '#d4af37',
+                                                color: '#000',
+                                                border: 'none'
                                             }}
                                         >
                                             ▶ ABRIR EN REPRODUCTOR

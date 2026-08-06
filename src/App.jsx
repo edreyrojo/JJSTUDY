@@ -52,24 +52,24 @@ import Swal from 'sweetalert2';
 
 // Actualiza tu función notify
 const notify = (mensaje, tipo = 'success') => {
-    Swal.fire({
-        text: mensaje,
-        icon: tipo,
-        background: '#0a0a0a',
-        color: '#fff',
-        confirmButtonColor: '#d4af37',
-        iconColor: tipo === 'success' ? '#4CAF50' : '#ff4444',
-        border: '1px solid #d4af37',
-        // --- ESTA ES LA CLAVE ---
-        customClass: { 
-            popup: 'gold-border-alert',
-            container: 'my-swal-container' // Añadimos una clase de contenedor
-        },
-        didOpen: (toast) => {
-            // Esto asegura que el contenedor tenga un z-index altísimo
-            toast.parentElement.style.zIndex = '9999';
-        }
-    });
+  Swal.fire({
+    text: mensaje,
+    icon: tipo,
+    background: '#0a0a0a',
+    color: '#fff',
+    confirmButtonColor: '#d4af37',
+    iconColor: tipo === 'success' ? '#4CAF50' : '#ff4444',
+    border: '1px solid #d4af37',
+    // --- ESTA ES LA CLAVE ---
+    customClass: {
+      popup: 'gold-border-alert',
+      container: 'my-swal-container' // Añadimos una clase de contenedor
+    },
+    didOpen: (toast) => {
+      // Esto asegura que el contenedor tenga un z-index altísimo
+      toast.parentElement.style.zIndex = '9999';
+    }
+  });
 };
 
 // --- 1. CONFIGURACIÓN DE ESTILOS ---
@@ -609,11 +609,22 @@ export default function App() {
   return (
     <div className="App" style={{ backgroundColor: '#0a0a0a', color: '#fff', minHeight: '100vh', width: '100vw', fontFamily: 'sans-serif' }}>
       <style>{`
-        @keyframes float { 0% { transform: translate(0px, 0px); } 50% { transform: translate(0px, -15px); } 100% { transform: translate(0px, 0px); } }
+        @keyframes float { 
+          0% { transform: translate(0px, 0px); } 
+          50% { transform: translate(0px, -10px); } 
+          100% { transform: translate(0px, 0px); } 
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.98); }
+          to { opacity: 1; transform: scale(1); }
+        }
         .floating-node { animation: float 6s ease-in-out infinite; }
+        .page-transition { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
       `}</style>
 
-      {getContent()}
+      <div className="page-transition" key={page}>
+        {getContent()}
+      </div>
     </div>
   );
 }
