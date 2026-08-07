@@ -34,9 +34,9 @@ const EJES_MAESTROS = ['AUTORES', 'POSICIÓN', 'NO GI', 'GI', 'CLA',
 
 const mapStyles = {
     layout: { display: 'flex', height: '100vh', width: '100%', backgroundColor: '#050505', overflow: 'hidden', boxSizing: 'border-box' },
-    sidebar: { width: '250px', borderRight: '1px solid #222', padding: '20px', backgroundColor: '#0a0a0a', boxSizing: 'border-box' },
+    sidebar: { borderRight: '1px solid #222', padding: '20px', backgroundColor: '#0a0a0a', boxSizing: 'border-box' },
     sideItem: { padding: '12px', cursor: 'pointer', borderRadius: '4px', fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px' },
-    mapArea: { flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', touchAction: 'none', cursor: 'grab' },
+    mapArea: { position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', touchAction: 'none', cursor: 'grab', boxSizing: 'border-box' },
     canvas: { position: 'relative', width: '800px', height: '800px', display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none', margin: 'auto', boxSizing: 'border-box' },
     svgLayer: { position: 'absolute', width: '800px', height: '800px', pointerEvents: 'none', overflow: 'visible', left: 0, top: 0 },
     mainNode: { position: 'absolute', left: '330px', top: '330px', width: '140px', height: '140px', borderRadius: '50%', border: '4px solid #d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#000', zIndex: 5, fontSize: '0.9rem', textAlign: 'center', fontWeight: 'bold', boxShadow: '0 0 20px rgba(212,175,55,0.3)', boxSizing: 'border-box', padding: '10px' },
@@ -66,11 +66,14 @@ const MapaPage = ({
     const initialScaleRef = useRef(1);
     const mapAreaRef = useRef(null);
 
-    // 2. ASEGURAR ESTADO INICIAL ACTIVO
+    // 2. ASEGURAR ESTADO INICIAL ACTIVO Y CENTRADO AUTOMÁTICO AL CAMBIAR DE NIVEL
     useEffect(() => {
         if (!categoriaSel && !autorSel && !instrSel && !volSel) {
             setCategoriaSel('AUTORES');
         }
+        setPosition({ x: 0, y: 0 });
+        setScale(1);
+        setNodoExpandidoId(null);
     }, [categoriaSel, autorSel, instrSel, volSel, setCategoriaSel]);
 
     // 3. EL CAZADOR DE TÉCNICAS
@@ -236,18 +239,12 @@ const MapaPage = ({
             } else {
                 setCategoriaSel(nodo.nombre);
             }
-            setScale(1);
-            setPosition({ x: 0, y: 0 });
         }
         else if (nodo.type === 'curso') {
             setInstrSel(nodo.id || nodo.nombre);
-            setScale(1);
-            setPosition({ x: 0, y: 0 });
         }
         else if (nodo.type === 'volumen') {
             setVolSel(nodo.raw);
-            setScale(1);
-            setPosition({ x: 0, y: 0 });
         }
         else if (nodo.type === 'parte') {
             const cursoId = nodo.cursoId;
@@ -335,7 +332,8 @@ const MapaPage = ({
                 paddingBottom: '15px',
                 boxSizing: 'border-box',
                 borderBottom: esMovil ? '1px solid #222' : 'none',
-                borderRight: esMovil ? 'none' : '1px solid #222'
+                borderRight: esMovil ? 'none' : '1px solid #222',
+                flexShrink: 0
             }}>
                 {/* FILA 1: NAVEGACIÓN */}
                 <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -466,9 +464,6 @@ const MapaPage = ({
                                         setInstrSel(null);
                                         setVolSel(null);
                                         setTerminoBusqueda("");
-                                        setNodoExpandidoId(null);
-                                        setScale(1);
-                                        setPosition({ x: 0, y: 0 });
                                     }}
                                     style={{
                                         ...mapStyles.sideItem,
@@ -496,7 +491,10 @@ const MapaPage = ({
                 ref={mapAreaRef}
                 style={{
                     ...mapStyles.mapArea,
-                    marginLeft: esMovil ? '0px' : '250px',
+                    flex: 1,
+                    width: '100%',
+                    height: esMovil ? 'calc(100vh - 150px)' : '100vh',
+                    marginLeft: '0px',
                 }}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
