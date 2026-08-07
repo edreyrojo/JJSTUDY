@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, addDoc, doc, getDoc, query, orderBy, limit, getDocs, updateDoc, where } from 'firebase/firestore';
+import Swal from 'sweetalert2';
 
 const HubPage = ({
     onNavigate,
@@ -35,6 +36,30 @@ const HubPage = ({
     const coloresCinturon = {
         'Blanco': '#FFFFFF', 'Azul': '#2196F3', 'Morado': '#9C27B0',
         'Café': '#795548', 'Negro': '#212121'
+    };
+
+    // --- NUEVA FUNCIÓN: Confirmación de Cierre de Sesión Seguro ---
+    const handleConfirmarLogout = () => {
+        Swal.fire({
+            title: '¿CERRAR SESIÓN?',
+            text: '¿Estás seguro de que deseas salir del Vault? Esto bloqueará el acceso hasta tu próximo ingreso.',
+            icon: 'warning',
+            background: '#0a0a0a',
+            color: '#fff',
+            showCancelButton: true,
+            confirmButtonColor: '#d4af37',
+            cancelButtonColor: '#333',
+            confirmButtonText: 'SÍ, CERRAR SESIÓN',
+            cancelButtonText: 'CANCELAR',
+            iconColor: '#d4af37',
+            customClass: {
+                popup: 'gold-border-alert'
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                onLogout();
+            }
+        });
     };
 
     // Efecto para cargar Fondo de Academia
@@ -177,11 +202,9 @@ const HubPage = ({
         herramientasDial.push({ id: 'dojo', label: 'DOJO', icon: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></>, route: 'alumnos' });
     }
 
-    // Radio reducido para acercar los botones periféricos más al centro
     const radioDial = 105; 
     const angleStep = (2 * Math.PI) / herramientasDial.length;
 
-    // 🛡️ CONTENEDOR CON SOPORTE DE NOTCH
     const contenedorEstilos = {
         ...styles.container,
         position: 'relative',
@@ -208,7 +231,6 @@ const HubPage = ({
     return (
         <div style={contenedorEstilos}>
             <style>{`
-                /* --- Animaciones Base --- */
                 @keyframes pulse-rojo {
                     0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 50, 50, 0.7); }
                     70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(255, 50, 50, 0); }
@@ -220,7 +242,6 @@ const HubPage = ({
                     100% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 15px rgba(212,175,55,0.4); }
                 }
 
-                /* --- Tarjeta de Usuario Circular Centrada --- */
                 .user-profile-card-circular {
                     position: relative;
                     display: flex;
@@ -246,7 +267,6 @@ const HubPage = ({
                     box-shadow: 0 0 20px rgba(212, 175, 55, 0.5);
                 }
 
-                /* --- Sistema Dial Radial --- */
                 .radial-hub-container {
                     position: relative;
                     width: 300px;
@@ -254,7 +274,6 @@ const HubPage = ({
                     margin: 15px auto 10px auto;
                 }
 
-                /* Núcleo Central (CONTINUAR) */
                 .center-hub-node {
                     position: absolute;
                     top: 50%;
@@ -288,7 +307,6 @@ const HubPage = ({
                     stroke: #000;
                 }
 
-                /* Botones de Herramientas Orbitando (Ligeramente más grandes: 60px) */
                 .dial-btn-wrapper {
                     position: absolute;
                     top: 50%;
@@ -348,7 +366,6 @@ const HubPage = ({
                     margin-left: 8px;
                 }
 
-                /* Acciones Secundarias Inferiores (Con espacio suficiente para no chocar) */
                 .secondary-actions {
                     display: flex;
                     flex-direction: column;
@@ -402,7 +419,6 @@ const HubPage = ({
 
                 {tienePerfil ? (
                     <>
-                        {/* Foto de perfil ampliada a 64px para destacar dentro del frame circular de 125px */}
                         <div style={{
                             width: '64px', height: '64px', borderRadius: '50%',
                             backgroundImage: `url(${usuario.fotoBase64})`, backgroundSize: 'cover',
@@ -428,8 +444,6 @@ const HubPage = ({
 
             {/* --- NÚCLEO RADIAL DE HERRAMIENTAS --- */}
             <div className="radial-hub-container">
-                
-                {/* 1. Botón Central (Continuar o Logo) */}
                 <div 
                     className={`center-hub-node ${hasSession ? 'active-session' : ''}`} 
                     onClick={hasSession ? onContinue : undefined}
@@ -451,7 +465,6 @@ const HubPage = ({
                     )}
                 </div>
 
-                {/* 2. Distribución Matemática de los Botones del Dial (Más cerca del centro y un poco más grandes) */}
                 {herramientasDial.map((herramienta, index) => {
                     const angulo = index * angleStep - (Math.PI / 2);
                     const coordX = Math.cos(angulo) * radioDial;
@@ -495,7 +508,8 @@ const HubPage = ({
                     </button>
                 )}
 
-                <button onClick={onLogout} style={{ ...styles.btnOutline, padding: '10px', backgroundColor: 'rgba(0,0,0,0.6)', fontSize: '0.75rem' }}>
+                {/* Botón de cierre de sesión actualizado con confirmación por SweetAlert2 */}
+                <button onClick={handleConfirmarLogout} style={{ ...styles.btnOutline, padding: '10px', backgroundColor: 'rgba(0,0,0,0.6)', fontSize: '0.75rem' }}>
                     CERRAR SESIÓN
                 </button>
             </div>

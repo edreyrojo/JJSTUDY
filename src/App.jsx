@@ -3,12 +3,14 @@ import React, { useState, useEffect } from 'react';
 // 1. Conexión principal
 import { auth, db } from './firebase';
 
-// 2. Funciones de Autenticación
+// 2. Funciones de Autenticación (Añadido GoogleAuthProvider y signInWithPopup)
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   onAuthStateChanged,
-  signOut
+  signOut,
+  GoogleAuthProvider,
+  signInWithPopup
 } from 'firebase/auth';
 
 // 3. Funciones de Firestore
@@ -60,13 +62,11 @@ const notify = (mensaje, tipo = 'success') => {
     confirmButtonColor: '#d4af37',
     iconColor: tipo === 'success' ? '#4CAF50' : '#ff4444',
     border: '1px solid #d4af37',
-    // --- ESTA ES LA CLAVE ---
     customClass: {
       popup: 'gold-border-alert',
-      container: 'my-swal-container' // Añadimos una clase de contenedor
+      container: 'my-swal-container'
     },
     didOpen: (toast) => {
-      // Esto asegura que el contenedor tenga un z-index altísimo
       toast.parentElement.style.zIndex = '9999';
     }
   });
@@ -90,7 +90,7 @@ export default function App() {
   // --- 1. ESTADOS ---
   const [academiaData, setAcademiaData] = useState(null);
   const [showInstalar, setShowInstalar] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false); // Estado para el nuevo OnboardingModal
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [usuario, setUsuario] = React.useState(null);
   const [cargando, setCargando] = React.useState(true);
   const [page, setPage] = useState('login');
@@ -113,7 +113,6 @@ export default function App() {
   });
   const [academiaIdInput, setAcademiaIdInput] = useState('');
 
-  // --- 2. EFECTO DE AUTENTICACIÓN ---
   // --- 2. EFECTO DE AUTENTICACIÓN (VERSIÓN BLINDADA) ---
   React.useEffect(() => {
     let unsubSnapshot = null;
@@ -122,20 +121,15 @@ export default function App() {
       setCargando(true);
 
       if (user) {
-        // 1. Limpiamos cualquier escucha previo antes de crear uno nuevo
         if (unsubSnapshot) unsubSnapshot();
 
         unsubSnapshot = onSnapshot(doc(db, "usuarios", user.uid), (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data();
 
-            // --- Sincronización de Estado Global ---
             setUsuario({ uid: user.uid, email: user.email, ...data });
             setUserRole(data.rol || 'usuario');
 
-            // --- 🚨 NUEVO: Buscar datos de la sede (academiaData) 🚨 ---
-            // Si el usuario tiene un teamId, buscamos la sede correspondiente
-            // para que la pantalla de "Mi Cuenta" no quede vacía.
             if (data.teamId) {
               const q = query(collection(db, "sedes"), where("teamId", "==", data.teamId));
               getDocs(q).then((querySnapshot) => {
@@ -146,12 +140,9 @@ export default function App() {
                 }
               }).catch(err => console.error("Error cargando sede:", err));
             } else {
-              // Si no tiene equipo, limpiamos el estado por seguridad
               setAcademiaData(null);
             }
 
-            // --- Sincronización de Datos (Vistos y Notas) ---
-            // Mantenemos la lógica de LocalStorage para resiliencia
             if (data.vistos) {
               setVistos(data.vistos);
               localStorage.setItem('lafortuna_vistos', JSON.stringify(data.vistos));
@@ -160,20 +151,15 @@ export default function App() {
               localStorage.setItem('lafortuna_notas', JSON.stringify(data.notas));
             }
 
-            // --- Lógica de Onboarding y TeamID ---
-            // Si el usuario tiene teamId, ya no necesita onboarding, sin importar la bandera
             const necesitaOnboarding = data.necesitaOnboarding === true && !data.teamId;
             setShowOnboarding(necesitaOnboarding);
 
-            // --- Redirección Inteligente ---
             if (data.validado) {
-              // Solo redireccionamos si estábamos en pantallas de espera o login
               setPage(prev => (['login', 'espera'].includes(prev) ? 'hub' : prev));
             } else {
               setPage('espera');
             }
           } else {
-            // Caso: Usuario autenticado pero sin documento en BD (posible error de registro)
             console.warn("Usuario sin documento en Firestore");
             setPage('espera');
           }
@@ -183,7 +169,6 @@ export default function App() {
           setCargando(false);
         });
       } else {
-        // Caso: Usuario deslogueado
         if (unsubSnapshot) unsubSnapshot();
         setUsuario(null);
         setPage('login');
@@ -191,7 +176,6 @@ export default function App() {
       }
     });
 
-    // --- Limpieza al desmontar el componente ---
     return () => {
       unsubAuth();
       if (unsubSnapshot) unsubSnapshot();
@@ -203,15 +187,12 @@ export default function App() {
   const handleLogout = async () => {
     try {
       await auth.signOut();
-      // Limpiamos estados de la aplicación
       setVistos([]);
       setVideoActual(null);
       setUsuario(null);
-      // Limpiamos persistencia local
       localStorage.removeItem('lafortuna_vistos');
       localStorage.removeItem('lafortuna_last_video');
       localStorage.removeItem('lafortuna_notas');
-      // Redirigimos al inicio
       setPage('login');
       console.log("Sesión cerrada y Vault bloqueado 🛡️");
     } catch (error) {
@@ -225,10 +206,7 @@ export default function App() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Identificación del Admin Maestro
       const isAdmin = email === "zamna.ed@gmail.com";
-
-      // LÓGICA DE ROLES Y VINCULACIÓN:
       let rolAsignado = 'alumno';
       if (isAdmin) {
         rolAsignado = 'admin';
@@ -241,25 +219,22 @@ export default function App() {
         email: user.email,
         nombre: nombreCompleto,
         rol: rolAsignado,
-        // Solo guardamos el academiaId si se registró como instructor vinculado
         academiaId: (rolAsignado === 'instructor') ? academiaIdInput.trim() : null,
-        validado: isAdmin, // Solo el admin entra directo, los demás esperan validación
+        validado: isAdmin,
         fechaRegistro: new Date().toISOString(),
-        necesitaOnboarding: true // Añadido para gestionar el OnboardingModal
+        necesitaOnboarding: true
       });
 
-      // Feedback personalizado
       if (isAdmin) {
         notify("¡Bienvenido, Ngasi! Acceso total concedido.");
       } else if (rolAsignado === 'instructor') {
-        notify("Solicitud de Instructor enviada. El profesor debe validar tu cuenta para vincularte a la sede.");
+        notify("Solicitud de Instructor enviada. El profesor debe validar tu cuenta.");
       } else {
-        notify("Solicitud enviada a La Fortuna. Espera a que el profesor valide tu perfil.");
+        notify("Solicitud enviada a La Fortuna. Espera validación.");
       }
 
       setPage('login');
-      setAcademiaIdInput(''); // Limpiamos el campo del código después del uso
-
+      setAcademiaIdInput('');
     } catch (err) {
       setError("Error al registrar: " + err.message);
     }
@@ -288,6 +263,62 @@ export default function App() {
     }
   };
 
+  // --- NUEVA FUNCIÓN: INICIO DE SESIÓN CON GOOGLE (CON FUSIÓN DE CUENTAS) ---
+  const handleGoogleLogin = async () => {
+    try {
+      setError('');
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      const userRef = doc(db, "usuarios", user.uid);
+      const userSnap = await getDoc(userRef);
+
+      const isAdmin = user.email === "zamna.ed@gmail.com";
+
+      if (!userSnap.exists()) {
+        // Verificamos si ya existía un registro previo con el mismo correo por contraseña
+        const q = query(collection(db, "usuarios"), where("email", "==", user.email));
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+          // Si ya existía, migramos sus datos al nuevo documento con el UID de Google para no perder progreso
+          const oldDoc = querySnapshot.docs[0];
+          const oldData = oldDoc.data();
+
+          await setDoc(userRef, {
+            ...oldData,
+            uid: user.uid,
+            validado: isAdmin || oldData.validado,
+            fechaActualizacionGoogle: new Date().toISOString()
+          });
+
+          notify("¡Cuenta vinculada con éxito a Google!");
+        } else {
+          // Usuario totalmente nuevo mediante Google
+          await setDoc(userRef, {
+            uid: user.uid,
+            email: user.email,
+            nombre: user.displayName || 'Guerrero de Google',
+            rol: isAdmin ? 'admin' : 'alumno',
+            validado: isAdmin,
+            fechaRegistro: new Date().toISOString(),
+            necesitaOnboarding: true
+          });
+
+          if (isAdmin) {
+            notify("¡Bienvenido, Ngasi! Acceso total concedido vía Google.");
+          } else {
+            notify("Registro con Google exitoso. Espera validación del profesor.");
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error en Google Login:", err);
+      setError("No se pudo iniciar sesión con Google: " + err.message);
+    }
+  };
+
   const toggleVisto = async (id) => {
     if (!id) return;
 
@@ -295,16 +326,13 @@ export default function App() {
       ? vistos.filter(v => v !== id)
       : [...vistos, id];
 
-    // 1. Actualización Instantánea (UI local)
     setVistos(nuevaLista);
     localStorage.setItem('lafortuna_vistos', JSON.stringify(nuevaLista));
 
-    // 2. Sincronización con la Nube
     if (auth.currentUser) {
       try {
         const userRef = doc(db, "usuarios", auth.currentUser.uid);
         await setDoc(userRef, { vistos: nuevaLista }, { merge: true });
-        console.log("Vistos sincronizados en la nube");
       } catch (error) {
         console.error("Error sincronizando vistos:", error);
       }
@@ -313,7 +341,6 @@ export default function App() {
 
   const handleEliminarNota = async (notaId) => {
     if (!usuario) return;
-
     if (!window.confirm("¿Seguro que quieres eliminar esta nota técnica?")) return;
 
     try {
@@ -323,14 +350,11 @@ export default function App() {
       if (userSnap.exists()) {
         const data = userSnap.data();
         const nuevasNotas = { ...data.notas };
-        delete nuevasNotas[notaId]; // Eliminamos la nota del objeto
+        delete nuevasNotas[notaId];
 
         await updateDoc(userRef, { notas: nuevasNotas });
-
-        // Actualizamos localmente para que la UI responda de inmediato
         setUsuario(prev => ({ ...prev, notas: nuevasNotas }));
         localStorage.setItem('lafortuna_notas', JSON.stringify(nuevasNotas));
-
         notify("Nota eliminada del Vault.");
       }
     } catch (err) {
@@ -339,44 +363,34 @@ export default function App() {
     }
   };
 
-  // --- FUNCIÓN PARA FINALIZAR EL ONBOARDING ---
   const handleOnboardingComplete = (resultado) => {
-    // 1. Ocultamos el modal inmediatamente
     setShowOnboarding(false);
-
-    // 2. Actualizamos la memoria (estado) de React con los nuevos datos
-    // Esto es crucial para que App.jsx sepa que el profesor YA TIENE team.
     setUsuario((prevUsuario) => ({
       ...prevUsuario,
       teamId: resultado.teamId,
       sedeId: resultado.sedeId,
-      academiaId: resultado.academiaId || resultado.teamId, // Aseguramos el academiaId
-      necesitaOnboarding: false // ¡Apagamos el loop!
+      academiaId: resultado.academiaId || resultado.teamId,
+      necesitaOnboarding: false
     }));
-
-    // (Opcional pero recomendado) 
-    // Si tu app requiere una recarga dura para que otros componentes 
-    // lean desde cero la base de datos ya actualizada, descomenta la siguiente línea:
-    // window.location.reload(); 
   };
 
   // --- 4. RENDERIZADO DE PÁGINAS ---
   const getContent = () => {
-    // 1. Si no hay usuario, directo a Login
     if (!usuario) {
       return (
         <LoginPage
           email={email} setEmail={setEmail}
           password={password} setPassword={setPassword}
           nombreCompleto={nombreCompleto} setNombreCompleto={setNombreCompleto}
-          onLogin={handleLogin} onRegister={handleRegister} error={error} styles={styles}
+          onLogin={handleLogin} onRegister={handleRegister} 
+          onGoogleLogin={handleGoogleLogin} // <-- Pasamos la función de Google aquí
+          error={error} styles={styles}
           academiaIdInput={academiaIdInput}
           setAcademiaIdInput={setAcademiaIdInput}
         />
       );
     }
 
-    // 2. Si hay usuario pero NO está validado, mostrar Sala de Espera
     if (!usuario.validado) {
       return (
         <div style={{ ...styles.containerCenter, padding: '20px', background: 'radial-gradient(circle, #1a1a1a 0%, #000 100%)' }}>
@@ -390,7 +404,6 @@ export default function App() {
       );
     }
 
-    // 3. SI EL USUARIO ESTÁ VALIDADO: Navegación según Rol
     switch (page) {
       case 'hub':
         return (
@@ -399,7 +412,7 @@ export default function App() {
               usuario={usuario}
               onNavigate={(p) => {
                 if (p === 'instalar') setShowInstalar(true);
-                else if (p === 'onboarding') setShowOnboarding(true); // Permitir abrirlo manualmente si es necesario
+                else if (p === 'onboarding') setShowOnboarding(true);
                 else setPage(p);
               }}
               onContinue={() => setPage('estudio')}
@@ -501,9 +514,7 @@ export default function App() {
         return (
           <MiCuenta
             usuario={usuario}
-            // Pasamos el objeto de la sede que seguramente ya cargas en tu App
             sedeActual={academiaData}
-            // Pasamos la función de notificaciones si la tienes disponible en App
             notify={notify}
             onBack={() => setPage('hub')}
             styles={styles}
@@ -518,7 +529,6 @@ export default function App() {
           />
         );
 
-      // --- NUEVA RUTA INTEGRADA ---
       case 'panel_maestro':
         if (['admin', 'profesor'].includes(userRole)) {
           return (
