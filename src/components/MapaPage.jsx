@@ -36,8 +36,10 @@ const mapStyles = {
     layout: { display: 'flex', height: '100vh', width: '100%', backgroundColor: '#050505', overflow: 'hidden', boxSizing: 'border-box' },
     sidebar: { borderRight: '1px solid #222', padding: '20px', backgroundColor: '#0a0a0a', boxSizing: 'border-box' },
     sideItem: { padding: '12px', cursor: 'pointer', borderRadius: '4px', fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px' },
-    mapArea: { position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', touchAction: 'none', cursor: 'grab', boxSizing: 'border-box' },
-    canvas: { position: 'relative', width: '800px', height: '800px', display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none', margin: 'auto', boxSizing: 'border-box' },
+    // Eliminamos display flex del mapArea para evitar conflictos de centrado y delegamos al absolute de canvas
+    mapArea: { position: 'relative', flex: 1, overflow: 'hidden', touchAction: 'none', cursor: 'grab', boxSizing: 'border-box' },
+    // Canvas centrado de forma absoluta matemática
+    canvas: { position: 'absolute', top: '50%', left: '50%', width: '800px', height: '800px', marginLeft: '-400px', marginTop: '-400px', userSelect: 'none', boxSizing: 'border-box' },
     svgLayer: { position: 'absolute', width: '800px', height: '800px', pointerEvents: 'none', overflow: 'visible', left: 0, top: 0 },
     mainNode: { position: 'absolute', left: '330px', top: '330px', width: '140px', height: '140px', borderRadius: '50%', border: '4px solid #d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#000', zIndex: 5, fontSize: '0.9rem', textAlign: 'center', fontWeight: 'bold', boxShadow: '0 0 20px rgba(212,175,55,0.3)', boxSizing: 'border-box', padding: '10px' },
     subNodeFloating: { position: 'absolute', width: '110px', height: '110px', borderRadius: '50%', border: '1px solid #d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', textAlign: 'center', backgroundColor: '#111', cursor: 'pointer', zIndex: 6, padding: '10px', boxSizing: 'border-box', transition: 'width 0.3s ease, height 0.3s ease, font-size 0.3s ease, background-color 0.3s ease, left 0.3s ease, top 0.3s ease' },
@@ -180,7 +182,7 @@ const MapaPage = ({
     }, []);
 
     const handlePointerDown = (e) => {
-        if (e.target.closest('.floating-node') || e.target.closest('button')) return;
+        if (e.target.closest('.floating-node') || e.target.closest('button') || e.target.closest('.search-results')) return;
         isDraggingRef.current = true;
         dragStartRef.current = { x: e.clientX - position.x, y: e.clientY - position.y };
     };
@@ -330,7 +332,6 @@ const MapaPage = ({
                 paddingLeft: '15px',
                 paddingRight: '15px',
                 paddingBottom: '15px',
-                boxSizing: 'border-box',
                 borderBottom: esMovil ? '1px solid #222' : 'none',
                 borderRight: esMovil ? 'none' : '1px solid #222',
                 flexShrink: 0
@@ -491,10 +492,7 @@ const MapaPage = ({
                 ref={mapAreaRef}
                 style={{
                     ...mapStyles.mapArea,
-                    flex: 1,
-                    width: '100%',
-                    height: esMovil ? 'calc(100vh - 150px)' : '100vh',
-                    marginLeft: '0px',
+                    marginLeft: esMovil ? '0px' : '250px' // Respeta el menú fijo en PC
                 }}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
@@ -503,114 +501,112 @@ const MapaPage = ({
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
             >
-                <div style={{
-                    ...mapStyles.canvas,
-                    transform: `translate(${position.x}px, ${position.y}px) scale(${esMovil ? scale * 0.48 : scale})`,
-                    transformOrigin: 'center center',
-                    transition: isDraggingRef.current ? 'none' : 'transform 0.1s ease-out'
-                }}>
-                    {terminoBusqueda ? (
-                        <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', zIndex: 10, width: '100%', maxWidth: '500px', maxHeight: '80vh', overflowY: 'auto', padding: '20px', backgroundColor: 'rgba(10,10,10,0.95)', border: '1px solid #d4af37', borderRadius: '12px' }}>
-                            <h2 style={{ color: '#d4af37', textAlign: 'center', marginBottom: '20px', fontSize: '1.1rem' }}>RESULTADOS DE BÚSQUEDA</h2>
-                            {resultadosBusqueda.length === 0 ? (
-                                <p style={{ color: '#aaa', textAlign: 'center' }}>No se encontraron técnicas.</p>
-                            ) : (
-                                resultadosBusqueda.map((t, i) => (
-                                    <div key={i} onClick={() => onSelectVideo({ titulo: t.nombre, id: t.id })} style={{ padding: '12px', backgroundColor: '#0a0a0a', border: `1px solid ${vistos?.includes(t.id) ? '#4CAF50' : '#333'}`, margin: '8px 0', borderRadius: '8px', cursor: 'pointer' }}>
-                                        <div style={{ color: vistos?.includes(t.id) ? '#4CAF50' : '#d4af37', fontWeight: 'bold', fontSize: '0.85rem' }}>{vistos?.includes(t.id) ? '✅ ' : ''}{t.nombre}</div>
-                                        <div style={{ fontSize: '0.65rem', color: '#886' }}>{t.curso} • {t.volNombre}</div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    ) : (
-                        <>
-                            {/* CAPA DE LÍNEAS SVG CON CONEXIÓN EXACTA DE CENTROS (400, 400) */}
-                            <svg style={mapStyles.svgLayer}>
-                                {nodosAMostrar.map((n, i) => {
-                                    const total = totalNodos;
-                                    let radioBase = 260;
-                                    let radio = radioBase;
-                                    if (total > 12) {
-                                        radio = (i % 2 === 0) ? radioBase : radioBase + 120;
-                                    }
-                                    const angle = (i * (360 / total)) * (Math.PI / 180);
-                                    const x = Math.cos(angle) * radio;
-                                    const y = Math.sin(angle) * radio;
-
-                                    return (
-                                        <line 
-                                            key={i} 
-                                            x1="400" 
-                                            y1="400" 
-                                            x2={400 + x} 
-                                            y2={400 + y} 
-                                            stroke={vistos?.includes(n.id) ? '#4CAF50' : '#d4af37'} 
-                                            strokeWidth="2" 
-                                            opacity="0.35" 
-                                        />
-                                    );
-                                })}
-                            </svg>
-
-                            {/* NODO CENTRAL ABSOLUTAMENTE CENTRADO EN (400, 400) */}
-                            <div style={mapStyles.mainNode}>{tituloCentral}</div>
-
-                            {/* NODOS EXTERIORES ORBITALES */}
+                {terminoBusqueda ? (
+                    <div className="search-results" style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', zIndex: 10, width: '90%', maxWidth: '500px', maxHeight: '80vh', overflowY: 'auto', padding: '20px', backgroundColor: 'rgba(10,10,10,0.95)', border: '1px solid #d4af37', borderRadius: '12px' }}>
+                        <h2 style={{ color: '#d4af37', textAlign: 'center', marginBottom: '20px', fontSize: '1.1rem' }}>RESULTADOS DE BÚSQUEDA</h2>
+                        {resultadosBusqueda.length === 0 ? (
+                            <p style={{ color: '#aaa', textAlign: 'center' }}>No se encontraron técnicas.</p>
+                        ) : (
+                            resultadosBusqueda.map((t, i) => (
+                                <div key={i} onClick={() => onSelectVideo({ titulo: t.nombre, id: t.id })} style={{ padding: '12px', backgroundColor: '#0a0a0a', border: `1px solid ${vistos?.includes(t.id) ? '#4CAF50' : '#333'}`, margin: '8px 0', borderRadius: '8px', cursor: 'pointer' }}>
+                                    <div style={{ color: vistos?.includes(t.id) ? '#4CAF50' : '#d4af37', fontWeight: 'bold', fontSize: '0.85rem' }}>{vistos?.includes(t.id) ? '✅ ' : ''}{t.nombre}</div>
+                                    <div style={{ fontSize: '0.65rem', color: '#886' }}>{t.curso} • {t.volNombre}</div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                ) : (
+                    <div style={{
+                        ...mapStyles.canvas,
+                        transform: `translate(${position.x}px, ${position.y}px) scale(${esMovil ? scale * 0.48 : scale})`,
+                        transformOrigin: 'center center',
+                        transition: isDraggingRef.current ? 'none' : 'transform 0.1s ease-out'
+                    }}>
+                        {/* CAPA DE LÍNEAS SVG CON CONEXIÓN EXACTA DE CENTROS (400, 400) */}
+                        <svg style={mapStyles.svgLayer}>
                             {nodosAMostrar.map((n, i) => {
                                 const total = totalNodos;
                                 let radioBase = 260;
                                 let radio = radioBase;
-
                                 if (total > 12) {
                                     radio = (i % 2 === 0) ? radioBase : radioBase + 120;
                                 }
-
                                 const angle = (i * (360 / total)) * (Math.PI / 180);
                                 const x = Math.cos(angle) * radio;
                                 const y = Math.sin(angle) * radio;
 
-                                const visto = n.type === 'parte' ? vistos?.includes(n.id) : n.raw?.partes?.every(p => vistos?.includes(p.id));
-                                const estaExpandido = nodoExpandidoId === i;
-                                const nodeSize = estaExpandido ? 170 : 110;
-                                const halfSize = nodeSize / 2;
-
                                 return (
-                                    <div key={i}
-                                        onClick={(e) => handleNodeClick(n, i, e)}
-                                        className="floating-node"
-                                        style={{
-                                            ...mapStyles.subNodeFloating,
-                                            left: `${400 + x - halfSize}px`,
-                                            top: `${400 + y - halfSize}px`,
-                                            borderColor: visto ? '#4CAF50' : '#d4af37',
-                                            backgroundColor: estaExpandido ? '#181818' : '#111',
-                                            color: visto ? '#4CAF50' : '#fff',
-                                            fontSize: estaExpandido ? '1.05rem' : '0.82rem',
-                                            width: `${nodeSize}px`,
-                                            height: `${nodeSize}px`,
-                                            zIndex: estaExpandido ? 50 : 10,
-                                            boxShadow: estaExpandido ? '0 0 30px rgba(212,175,55,0.8)' : '0 4px 15px rgba(0,0,0,0.6)'
-                                        }}
-                                        title={n.nombre}
-                                    >
-                                        <span style={{ 
-                                            overflow: 'hidden', 
-                                            textOverflow: 'ellipsis', 
-                                            display: '-webkit-box', 
-                                            WebkitLineClamp: estaExpandido ? 6 : 3, 
-                                            WebkitBoxOrient: 'vertical',
-                                            padding: '4px',
-                                            lineHeight: '1.3'
-                                        }}>
-                                            {visto ? '✅ ' : ''}{n.nombre}
-                                        </span>
-                                    </div>
+                                    <line 
+                                        key={i} 
+                                        x1="400" 
+                                        y1="400" 
+                                        x2={400 + x} 
+                                        y2={400 + y} 
+                                        stroke={vistos?.includes(n.id) ? '#4CAF50' : '#d4af37'} 
+                                        strokeWidth="2" 
+                                        opacity="0.35" 
+                                    />
                                 );
                             })}
-                        </>
-                    )}
-                </div>
+                        </svg>
+
+                        {/* NODO CENTRAL ABSOLUTAMENTE CENTRADO EN (400, 400) */}
+                        <div style={mapStyles.mainNode}>{tituloCentral}</div>
+
+                        {/* NODOS EXTERIORES ORBITALES */}
+                        {nodosAMostrar.map((n, i) => {
+                            const total = totalNodos;
+                            let radioBase = 260;
+                            let radio = radioBase;
+
+                            if (total > 12) {
+                                radio = (i % 2 === 0) ? radioBase : radioBase + 120;
+                            }
+
+                            const angle = (i * (360 / total)) * (Math.PI / 180);
+                            const x = Math.cos(angle) * radio;
+                            const y = Math.sin(angle) * radio;
+
+                            const visto = n.type === 'parte' ? vistos?.includes(n.id) : n.raw?.partes?.every(p => vistos?.includes(p.id));
+                            const estaExpandido = nodoExpandidoId === i;
+                            const nodeSize = estaExpandido ? 170 : 110;
+                            const halfSize = nodeSize / 2;
+
+                            return (
+                                <div key={i}
+                                    onClick={(e) => handleNodeClick(n, i, e)}
+                                    className="floating-node"
+                                    style={{
+                                        ...mapStyles.subNodeFloating,
+                                        left: `${400 + x - halfSize}px`,
+                                        top: `${400 + y - halfSize}px`,
+                                        borderColor: visto ? '#4CAF50' : '#d4af37',
+                                        backgroundColor: estaExpandido ? '#181818' : '#111',
+                                        color: visto ? '#4CAF50' : '#fff',
+                                        fontSize: estaExpandido ? '1.05rem' : '0.82rem',
+                                        width: `${nodeSize}px`,
+                                        height: `${nodeSize}px`,
+                                        zIndex: estaExpandido ? 50 : 10,
+                                        boxShadow: estaExpandido ? '0 0 30px rgba(212,175,55,0.8)' : '0 4px 15px rgba(0,0,0,0.6)'
+                                    }}
+                                    title={n.nombre}
+                                >
+                                    <span style={{ 
+                                        overflow: 'hidden', 
+                                        textOverflow: 'ellipsis', 
+                                        display: '-webkit-box', 
+                                        WebkitLineClamp: estaExpandido ? 6 : 3, 
+                                        WebkitBoxOrient: 'vertical',
+                                        padding: '4px',
+                                        lineHeight: '1.3'
+                                    }}>
+                                        {visto ? '✅ ' : ''}{n.nombre}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </main>
         </div>
     );
