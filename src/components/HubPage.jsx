@@ -113,7 +113,7 @@ const HubPage = ({
         }
     }, [usuario]);
 
-    const handleAbrirAnuncio = async (e) => {
+    const handleAbrirAnuncio = (e) => {
         e.stopPropagation();
         setShowAnuncio(true);
         setHayNotificacion(false);
@@ -125,7 +125,7 @@ const HubPage = ({
         if (usuario?.uid && anuncioReciente?.id !== usuario?.ultimoAnuncioVisto) {
             try {
                 const userRef = doc(db, "usuarios", usuario.uid);
-                await updateDoc(userRef, {
+                updateDoc(userRef, {
                     ultimoAnuncioVisto: anuncioReciente.id
                 });
             } catch (error) {
@@ -180,7 +180,7 @@ const HubPage = ({
     const radioDial = 135; 
     const angleStep = (2 * Math.PI) / herramientasDial.length;
 
-    // 🛡️ CONTENEDOR CON SOPORTE DE NOTCH (Safe Area Insets de 4 Puntos)
+    // 🛡️ CONTENEDOR CON SOPORTE DE NOTCH
     const contenedorEstilos = {
         ...styles.container,
         position: 'relative',
@@ -188,8 +188,8 @@ const HubPage = ({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
-        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 30px)',
+        justifyContent: 'center', // Corregido de justifyContent a justifyContent (estaba como justify-content)
+        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)',
         paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 30px)',
         paddingLeft: 'calc(env(safe-area-inset-left, 0px) + 20px)',
         paddingRight: 'calc(env(safe-area-inset-right, 0px) + 20px)',
@@ -219,29 +219,30 @@ const HubPage = ({
                     100% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 15px rgba(212,175,55,0.4); }
                 }
 
-                /* --- Tarjeta de Usuario con Notch Safe Area --- */
-                .user-profile-card {
+                /* --- Tarjeta de Usuario Circular Centrada --- */
+                .user-profile-card-circular {
+                    position: relative;
                     display: flex;
                     flex-direction: column;
                     align-items: center;
                     justify-content: center;
-                    background-color: rgba(10, 10, 10, 0.8);
-                    border: 1px solid #d4af37;
-                    border-radius: 12px;
+                    background-color: rgba(12, 12, 12, 0.9);
+                    border: 2px solid #d4af37;
+                    border-radius: 50%;
+                    width: 125px;
+                    height: 125px;
                     padding: 8px;
+                    margin: 15px auto 5px auto;
                     cursor: pointer;
-                    transition: transform 0.2s, box-shadow 0.2s;
-                    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+                    transition: transform 0.25s ease, box-shadow 0.25s ease;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.7);
                     z-index: 100;
-                    width: 120px;
-                    backdrop-filter: blur(5px);
-                    position: absolute;
-                    top: calc(env(safe-area-inset-top, 0px) + 15px);
-                    right: calc(env(safe-area-inset-right, 0px) + 15px);
+                    backdrop-filter: blur(6px);
+                    box-sizing: border-box;
                 }
-                .user-profile-card:hover {
-                    transform: scale(1.05);
-                    box-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
+                .user-profile-card-circular:hover {
+                    transform: scale(1.06);
+                    box-shadow: 0 0 20px rgba(212, 175, 55, 0.5);
                 }
 
                 /* --- Sistema Dial Radial --- */
@@ -249,7 +250,7 @@ const HubPage = ({
                     position: relative;
                     width: 340px;
                     height: 340px;
-                    margin: 30px auto 15px auto;
+                    margin: 20px auto 10px auto;
                 }
 
                 /* Núcleo Central (CONTINUAR) */
@@ -346,15 +347,16 @@ const HubPage = ({
                     margin-left: 8px;
                 }
 
-                /* Acciones Secundarias Inferiores */
+                /* Acciones Secundarias Inferiores (Con espacio suficiente para no chocar) */
                 .secondary-actions {
                     display: flex;
                     flex-direction: column;
-                    gap: 10px;
+                    gap: 12px;
                     width: 100%;
                     max-width: 320px;
                     position: relative;
                     z-index: 10;
+                    margin-top: 45px;
                 }
 
                 @media (max-width: 480px) {
@@ -362,55 +364,61 @@ const HubPage = ({
                         width: 280px;
                         height: 280px;
                     }
+                    .secondary-actions {
+                        margin-top: 35px;
+                    }
                 }
             `}</style>
 
-            <h1 style={{ ...styles.goldTitle, marginTop: '10px', marginBottom: '0', fontSize: '1.3rem', position: 'relative', zIndex: 10, textAlign: 'center' }}>LA FORTUNA VAULT</h1>
+            <h1 style={{ ...styles.goldTitle, marginTop: '5px', marginBottom: '0', fontSize: '1.3rem', position: 'relative', zIndex: 10, textAlign: 'center' }}>
+                LA FORTUNA VAULT
+            </h1>
 
-            {/* --- TARJETA DE USUARIO --- */}
-            <div className="user-profile-card" onClick={() => onNavigate('mi_cuenta')}>
+            {/* --- PANEL DE USUARIO CIRCULAR CENTRADO --- */}
+            <div className="user-profile-card-circular" onClick={() => onNavigate('mi_cuenta')}>
                 {(hayNotificacion || anuncioReciente) && (
                     <div
                         onClick={handleAbrirAnuncio}
                         style={{
-                            position: 'absolute', top: '-10px', left: '-10px',
+                            position: 'absolute', top: '-2px', right: '-2px',
                             backgroundColor: hayNotificacion ? '#ff3333' : '#222',
                             border: `2px solid ${hayNotificacion ? '#ffcccc' : '#d4af37'}`,
-                            borderRadius: '50%', width: '30px', height: '30px',
+                            borderRadius: '50%', width: '28px', height: '28px',
                             display: 'flex', justifyContent: 'center', alignItems: 'center',
                             cursor: 'pointer', zIndex: 101,
                             animation: hayNotificacion ? 'pulse-rojo 2s infinite' : 'none',
                             boxShadow: '0 2px 5px rgba(0,0,0,0.5)'
                         }}
+                        title="Anuncio Reciente"
                     >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={hayNotificacion ? "#fff" : "#d4af37"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={hayNotificacion ? "#fff" : "#d4af37"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                             <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
                         </svg>
-                        {hayNotificacion && <div style={{ position: 'absolute', top: 0, right: 0, width: '8px', height: '8px', backgroundColor: '#fff', borderRadius: '50%' }} />}
+                        {hayNotificacion && <div style={{ position: 'absolute', top: 0, right: 0, width: '7px', height: '7px', backgroundColor: '#fff', borderRadius: '50%' }} />}
                     </div>
                 )}
 
                 {tienePerfil ? (
                     <>
                         <div style={{
-                            width: '42px', height: '42px', borderRadius: '10px',
+                            width: '42px', height: '42px', borderRadius: '50%',
                             backgroundImage: `url(${usuario.fotoBase64})`, backgroundSize: 'cover',
-                            backgroundPosition: 'center', border: '1px solid #333', marginBottom: '5px'
+                            backgroundPosition: 'center', border: '1px solid #d4af37', marginBottom: '4px'
                         }} />
-                        <p style={{ color: '#fff', fontSize: '0.65rem', fontWeight: 'bold', margin: '0 0 3px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+                        <p style={{ color: '#fff', fontSize: '0.62rem', fontWeight: 'bold', margin: '0 0 3px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '90px', textAlign: 'center' }}>
                             {usuario?.nombre || 'Guerrero'}
                         </p>
-                        <div style={{ height: '7px', width: '100%', backgroundColor: coloresCinturon[cinturon], borderRadius: '2px', display: 'flex', justifyContent: 'flex-end', border: '1px solid #222' }}>
-                            <div style={{ height: '100%', width: '28px', backgroundColor: cinturon === 'Negro' ? '#D32F2F' : '#111', display: 'flex', justifyContent: 'space-evenly' }}>
+                        <div style={{ height: '6px', width: '75px', backgroundColor: coloresCinturon[cinturon], borderRadius: '2px', display: 'flex', justifyContent: 'flex-end', border: '1px solid #111' }}>
+                            <div style={{ height: '100%', width: '22px', backgroundColor: cinturon === 'Negro' ? '#D32F2F' : '#111', display: 'flex', justifyContent: 'space-evenly' }}>
                                 {[...Array(4)].map((_, i) => <div key={i} style={{ height: '100%', width: '2px', backgroundColor: i < grados ? '#FFF' : 'transparent' }} />)}
                             </div>
                         </div>
                     </>
                 ) : (
-                    <div style={{ textAlign: 'center', padding: '4px' }}>
+                    <div style={{ textAlign: 'center', padding: '2px' }}>
                         <span style={{ fontSize: '1.2rem' }}>⚠️</span>
-                        <p style={{ color: '#d4af37', fontSize: '0.55rem', fontWeight: 'bold', margin: 0 }}>ACTUALIZAR PERFIL</p>
+                        <p style={{ color: '#d4af37', fontSize: '0.55rem', fontWeight: 'bold', margin: 0 }}>MI PERFIL</p>
                     </div>
                 )}
             </div>
@@ -427,7 +435,7 @@ const HubPage = ({
                     {hasSession ? (
                         <>
                             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                <polygon points="5 3 19 12 5 21 5 3"></polygon> 
                             </svg>
                             <span style={{ fontSize: '0.6rem', fontWeight: 'bold', marginTop: '3px', letterSpacing: '1px' }}>CONTINUAR</span>
                         </>
