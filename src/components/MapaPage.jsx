@@ -182,12 +182,14 @@ const MapaPage = ({
     }, []);
 
     const handlePointerDown = (e) => {
+        if (e.pointerType === 'touch') return; // Evita conflictos con eventos touch nativos
         if (e.target.closest('.floating-node') || e.target.closest('button') || e.target.closest('.search-results')) return;
         isDraggingRef.current = true;
         dragStartRef.current = { x: e.clientX - position.x, y: e.clientY - position.y };
     };
 
     const handlePointerMove = (e) => {
+        if (e.pointerType === 'touch') return;
         if (!isDraggingRef.current) return;
         setPosition({
             x: e.clientX - dragStartRef.current.x,
@@ -195,34 +197,53 @@ const MapaPage = ({
         });
     };
 
-    const handlePointerUp = () => {
+    const handlePointerUp = (e) => {
+        if (e.pointerType === 'touch') return;
         isDraggingRef.current = false;
     };
 
     const handleTouchStart = (e) => {
         if (e.touches.length === 2) {
+            isDraggingRef.current = false; // Bloquea estrictamente el pan/desplazamiento al hacer zoom con 2 dedos
             const dist = Math.hypot(
                 e.touches[0].clientX - e.touches[1].clientX,
                 e.touches[0].clientY - e.touches[1].clientY
             );
             touchStartDistRef.current = dist;
             initialScaleRef.current = scale;
+        } else if (e.touches.length === 1) {
+            if (e.target.closest('.floating-node') || e.target.closest('button') || e.target.closest('.search-results')) return;
+            isDraggingRef.current = true;
+            dragStartRef.current = { x: e.touches[0].clientX - position.x, y: e.touches[0].clientY - position.y };
         }
     };
 
     const handleTouchMove = (e) => {
-        if (e.touches.length === 2 && touchStartDistRef.current !== null) {
-            const dist = Math.hypot(
-                e.touches[0].clientX - e.touches[1].clientX,
-                e.touches[0].clientY - e.touches[1].clientY
-            );
-            const factor = dist / touchStartDistRef.current;
-            setScale(Math.min(Math.max(initialScaleRef.current * factor, 0.4), 3.5));
+        if (e.touches.length === 2) {
+            isDraggingRef.current = false; // Asegura que nunca se arrastre mientras se hace zoom con dos dedos
+            if (touchStartDistRef.current !== null) {
+                const dist = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                const factor = dist / touchStartDistRef.current;
+                setScale(Math.min(Math.max(initialScaleRef.current * factor, 0.4), 3.5));
+            }
+        } else if (e.touches.length === 1 && isDraggingRef.current) {
+            setPosition({
+                x: e.touches[0].clientX - dragStartRef.current.x,
+                y: e.touches[0].clientY - dragStartRef.current.y
+            });
         }
     };
 
-    const handleTouchEnd = () => {
-        touchStartDistRef.current = null;
+    const handleTouchEnd = (e) => {
+        if (e.touches.length < 2) {
+            touchStartDistRef.current = null;
+        }
+        if (e.touches.length === 0) {
+            isDraggingRef.current = false;
+        }
     };
 
     // 7. INTERACCIÓN Y NAVEGACIÓN

@@ -177,7 +177,8 @@ const HubPage = ({
         herramientasDial.push({ id: 'dojo', label: 'DOJO', icon: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></>, route: 'alumnos' });
     }
 
-    const radioDial = 135; 
+    // Radio reducido para acercar los botones periféricos más al centro
+    const radioDial = 105; 
     const angleStep = (2 * Math.PI) / herramientasDial.length;
 
     // 🛡️ CONTENEDOR CON SOPORTE DE NOTCH
@@ -188,7 +189,7 @@ const HubPage = ({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center', // Corregido de justifyContent a justifyContent (estaba como justify-content)
+        justifyContent: 'center',
         paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)',
         paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 30px)',
         paddingLeft: 'calc(env(safe-area-inset-left, 0px) + 20px)',
@@ -231,7 +232,7 @@ const HubPage = ({
                     border-radius: 50%;
                     width: 125px;
                     height: 125px;
-                    padding: 8px;
+                    padding: 6px;
                     margin: 15px auto 5px auto;
                     cursor: pointer;
                     transition: transform 0.25s ease, box-shadow 0.25s ease;
@@ -248,9 +249,9 @@ const HubPage = ({
                 /* --- Sistema Dial Radial --- */
                 .radial-hub-container {
                     position: relative;
-                    width: 340px;
-                    height: 340px;
-                    margin: 20px auto 10px auto;
+                    width: 300px;
+                    height: 300px;
+                    margin: 15px auto 10px auto;
                 }
 
                 /* Núcleo Central (CONTINUAR) */
@@ -287,7 +288,7 @@ const HubPage = ({
                     stroke: #000;
                 }
 
-                /* Botones de Herramientas Orbitando */
+                /* Botones de Herramientas Orbitando (Ligeramente más grandes: 60px) */
                 .dial-btn-wrapper {
                     position: absolute;
                     top: 50%;
@@ -298,9 +299,9 @@ const HubPage = ({
                 .dial-btn {
                     position: absolute;
                     transform: translate(-50%, -50%);
-                    width: 50px;
-                    height: 50px;
-                    border-radius: 25px;
+                    width: 60px;
+                    height: 60px;
+                    border-radius: 30px;
                     background-color: rgba(15, 15, 15, 0.95);
                     border: 1px solid #d4af37;
                     color: #d4af37;
@@ -315,7 +316,7 @@ const HubPage = ({
                 }
 
                 .dial-btn:hover, .dial-btn:focus {
-                    width: 140px;
+                    width: 145px;
                     background-color: #d4af37;
                     color: #000;
                     z-index: 50;
@@ -356,16 +357,16 @@ const HubPage = ({
                     max-width: 320px;
                     position: relative;
                     z-index: 10;
-                    margin-top: 45px;
+                    margin-top: 40px;
                 }
 
                 @media (max-width: 480px) {
                     .radial-hub-container {
-                        width: 280px;
-                        height: 280px;
+                        width: 260px;
+                        height: 260px;
                     }
                     .secondary-actions {
-                        margin-top: 35px;
+                        margin-top: 30px;
                     }
                 }
             `}</style>
@@ -401,16 +402,18 @@ const HubPage = ({
 
                 {tienePerfil ? (
                     <>
+                        {/* Foto de perfil ampliada a 64px para destacar dentro del frame circular de 125px */}
                         <div style={{
-                            width: '42px', height: '42px', borderRadius: '50%',
+                            width: '64px', height: '64px', borderRadius: '50%',
                             backgroundImage: `url(${usuario.fotoBase64})`, backgroundSize: 'cover',
-                            backgroundPosition: 'center', border: '1px solid #d4af37', marginBottom: '4px'
+                            backgroundPosition: 'center', border: '1.5px solid #d4af37', marginBottom: '2px',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.5)'
                         }} />
-                        <p style={{ color: '#fff', fontSize: '0.62rem', fontWeight: 'bold', margin: '0 0 3px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '90px', textAlign: 'center' }}>
+                        <p style={{ color: '#fff', fontSize: '0.62rem', fontWeight: 'bold', margin: '0 0 2px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '95px', textAlign: 'center' }}>
                             {usuario?.nombre || 'Guerrero'}
                         </p>
-                        <div style={{ height: '6px', width: '75px', backgroundColor: coloresCinturon[cinturon], borderRadius: '2px', display: 'flex', justifyContent: 'flex-end', border: '1px solid #111' }}>
-                            <div style={{ height: '100%', width: '22px', backgroundColor: cinturon === 'Negro' ? '#D32F2F' : '#111', display: 'flex', justifyContent: 'space-evenly' }}>
+                        <div style={{ height: '5px', width: '70px', backgroundColor: coloresCinturon[cinturon], borderRadius: '2px', display: 'flex', justifyContent: 'flex-end', border: '1px solid #111' }}>
+                            <div style={{ height: '100%', width: '20px', backgroundColor: cinturon === 'Negro' ? '#D32F2F' : '#111', display: 'flex', justifyContent: 'space-evenly' }}>
                                 {[...Array(4)].map((_, i) => <div key={i} style={{ height: '100%', width: '2px', backgroundColor: i < grados ? '#FFF' : 'transparent' }} />)}
                             </div>
                         </div>
@@ -448,7 +451,7 @@ const HubPage = ({
                     )}
                 </div>
 
-                {/* 2. Distribución Matemática de los Botones del Dial */}
+                {/* 2. Distribución Matemática de los Botones del Dial (Más cerca del centro y un poco más grandes) */}
                 {herramientasDial.map((herramienta, index) => {
                     const angulo = index * angleStep - (Math.PI / 2);
                     const coordX = Math.cos(angulo) * radioDial;
@@ -465,7 +468,7 @@ const HubPage = ({
                                 onClick={() => onNavigate(herramienta.route)}
                                 title={herramienta.label}
                             >
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     {herramienta.icon}
                                 </svg>
                                 <span className="dial-label">{herramienta.label}</span>
