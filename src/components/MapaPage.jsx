@@ -34,13 +34,13 @@ const EJES_MAESTROS = ['AUTORES', 'POSICIÓN', 'NO GI', 'GI', 'CLA',
 
 const mapStyles = {
     layout: { display: 'flex', height: '100vh', width: '100%', backgroundColor: '#050505', overflow: 'hidden', boxSizing: 'border-box' },
-    sidebar: { width: '250px', borderRight: '1px solid #222', padding: '20px', backgroundColor: '#0a0a0a' },
+    sidebar: { width: '250px', borderRight: '1px solid #222', padding: '20px', backgroundColor: '#0a0a0a', boxSizing: 'border-box' },
     sideItem: { padding: '12px', cursor: 'pointer', borderRadius: '4px', fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px' },
     mapArea: { flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', touchAction: 'none', cursor: 'grab' },
-    canvas: { position: 'relative', width: '800px', height: '800px', display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none' },
-    svgLayer: { position: 'absolute', width: '800px', height: '800px', pointerEvents: 'none', overflow: 'visible' },
-    mainNode: { width: '140px', height: '140px', borderRadius: '50%', border: '4px solid #d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#000', zIndex: 5, fontSize: '0.9rem', textAlign: 'center', fontWeight: 'bold', boxShadow: '0 0 20px rgba(212,175,55,0.3)' },
-    subNodeFloating: { position: 'absolute', width: '110px', height: '110px', borderRadius: '50%', border: '1px solid #d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', textAlign: 'center', backgroundColor: '#111', cursor: 'pointer', zIndex: 6, padding: '10px', transition: 'width 0.3s ease, height 0.3s ease, font-size 0.3s ease, background-color 0.3s ease' },
+    canvas: { position: 'relative', width: '800px', height: '800px', display: 'flex', alignItems: 'center', justifyContent: 'center', userSelect: 'none', margin: 'auto', boxSizing: 'border-box' },
+    svgLayer: { position: 'absolute', width: '800px', height: '800px', pointerEvents: 'none', overflow: 'visible', left: 0, top: 0 },
+    mainNode: { position: 'absolute', left: '330px', top: '330px', width: '140px', height: '140px', borderRadius: '50%', border: '4px solid #d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#000', zIndex: 5, fontSize: '0.9rem', textAlign: 'center', fontWeight: 'bold', boxShadow: '0 0 20px rgba(212,175,55,0.3)', boxSizing: 'border-box', padding: '10px' },
+    subNodeFloating: { position: 'absolute', width: '110px', height: '110px', borderRadius: '50%', border: '1px solid #d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', textAlign: 'center', backgroundColor: '#111', cursor: 'pointer', zIndex: 6, padding: '10px', boxSizing: 'border-box', transition: 'width 0.3s ease, height 0.3s ease, font-size 0.3s ease, background-color 0.3s ease, left 0.3s ease, top 0.3s ease' },
 };
 
 const MapaPage = ({
@@ -64,6 +64,7 @@ const MapaPage = ({
     const dragStartRef = useRef({ x: 0, y: 0 });
     const touchStartDistRef = useRef(null);
     const initialScaleRef = useRef(1);
+    const mapAreaRef = useRef(null);
 
     // 2. ASEGURAR ESTADO INICIAL ACTIVO
     useEffect(() => {
@@ -158,12 +159,22 @@ const MapaPage = ({
         }
     }
 
-    // 6. CONTROL DE GESTOS: ZOOM (Pinch & Wheel) y PAN (Arrastre)
-    const handleWheel = (e) => {
-        e.preventDefault();
-        const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
-        setScale(prev => Math.min(Math.max(prev * zoomFactor, 0.4), 3.5));
-    };
+    // 6. CONTROL DE GESTOS: ZOOM Y PAN CON ADICIÓN NO-PASSIVE
+    useEffect(() => {
+        const mapArea = mapAreaRef.current;
+        if (!mapArea) return;
+
+        const handleWheel = (e) => {
+            e.preventDefault();
+            const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
+            setScale(prev => Math.min(Math.max(prev * zoomFactor, 0.4), 3.5));
+        };
+
+        mapArea.addEventListener('wheel', handleWheel, { passive: false });
+        return () => {
+            mapArea.removeEventListener('wheel', handleWheel);
+        };
+    }, []);
 
     const handlePointerDown = (e) => {
         if (e.target.closest('.floating-node') || e.target.closest('button')) return;
@@ -183,7 +194,6 @@ const MapaPage = ({
         isDraggingRef.current = false;
     };
 
-    // Soporte táctil avanzado para Pinch-to-Zoom de dos dedos y Paneo
     const handleTouchStart = (e) => {
         if (e.touches.length === 2) {
             const dist = Math.hypot(
@@ -210,7 +220,7 @@ const MapaPage = ({
         touchStartDistRef.current = null;
     };
 
-    // 7. FUNCIONES DE INTERACCIÓN Y EXPANSIÓN MÓVIL
+    // 7. INTERACCIÓN Y NAVEGACIÓN
     const handleNodeClick = (nodo, index, e) => {
         e.stopPropagation();
         if (esMovil && nodoExpandidoId !== index) {
@@ -264,6 +274,7 @@ const MapaPage = ({
         setNodoExpandidoId(null);
         setScale(1);
         setPosition({ x: 0, y: 0 });
+
         if (volSel) {
             setVolSel(null);
         }
@@ -278,7 +289,11 @@ const MapaPage = ({
                 setCategoriaSel('POSICIÓN');
             }
             else if (EJES_MAESTROS.includes(categoriaSel)) {
-                setCategoriaSel('AUTORES');
+                if (categoriaSel === 'AUTORES') {
+                    if (onBack) onBack();
+                } else {
+                    setCategoriaSel('AUTORES');
+                }
             }
             else {
                 const tecnica = todasLasTecnicas.find(t => t.tags.includes(categoriaSel));
@@ -291,7 +306,7 @@ const MapaPage = ({
             }
         }
         else {
-            onBack();
+            if (onBack) onBack();
         }
     };
 
@@ -478,11 +493,11 @@ const MapaPage = ({
 
             {/* ÁREA PRINCIPAL DEL MAPA RADIAL */}
             <main 
+                ref={mapAreaRef}
                 style={{
                     ...mapStyles.mapArea,
                     marginLeft: esMovil ? '0px' : '250px',
                 }}
-                onWheel={handleWheel}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
@@ -492,12 +507,12 @@ const MapaPage = ({
             >
                 <div style={{
                     ...mapStyles.canvas,
-                    transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+                    transform: `translate(${position.x}px, ${position.y}px) scale(${esMovil ? scale * 0.48 : scale})`,
                     transformOrigin: 'center center',
                     transition: isDraggingRef.current ? 'none' : 'transform 0.1s ease-out'
                 }}>
                     {terminoBusqueda ? (
-                        <div style={{ zIndex: 10, width: '100%', maxWidth: '500px', maxHeight: '80vh', overflowY: 'auto', padding: '20px', backgroundColor: 'rgba(10,10,10,0.95)', border: '1px solid #d4af37', borderRadius: '12px' }}>
+                        <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', zIndex: 10, width: '100%', maxWidth: '500px', maxHeight: '80vh', overflowY: 'auto', padding: '20px', backgroundColor: 'rgba(10,10,10,0.95)', border: '1px solid #d4af37', borderRadius: '12px' }}>
                             <h2 style={{ color: '#d4af37', textAlign: 'center', marginBottom: '20px', fontSize: '1.1rem' }}>RESULTADOS DE BÚSQUEDA</h2>
                             {resultadosBusqueda.length === 0 ? (
                                 <p style={{ color: '#aaa', textAlign: 'center' }}>No se encontraron técnicas.</p>
@@ -512,7 +527,7 @@ const MapaPage = ({
                         </div>
                     ) : (
                         <>
-                            {/* CAPA DE LÍNEAS SVG CON CONEXIÓN EXACTA DE CENTROS */}
+                            {/* CAPA DE LÍNEAS SVG CON CONEXIÓN EXACTA DE CENTROS (400, 400) */}
                             <svg style={mapStyles.svgLayer}>
                                 {nodosAMostrar.map((n, i) => {
                                     const total = totalNodos;
@@ -525,7 +540,6 @@ const MapaPage = ({
                                     const x = Math.cos(angle) * radio;
                                     const y = Math.sin(angle) * radio;
 
-                                    // Coordenada central del canvas (400, 400) conectando exactamente con el centro del nodo (400 + x, 400 + y)
                                     return (
                                         <line 
                                             key={i} 
@@ -541,8 +555,10 @@ const MapaPage = ({
                                 })}
                             </svg>
 
+                            {/* NODO CENTRAL ABSOLUTAMENTE CENTRADO EN (400, 400) */}
                             <div style={mapStyles.mainNode}>{tituloCentral}</div>
 
+                            {/* NODOS EXTERIORES ORBITALES */}
                             {nodosAMostrar.map((n, i) => {
                                 const total = totalNodos;
                                 let radioBase = 260;
@@ -558,6 +574,8 @@ const MapaPage = ({
 
                                 const visto = n.type === 'parte' ? vistos?.includes(n.id) : n.raw?.partes?.every(p => vistos?.includes(p.id));
                                 const estaExpandido = nodoExpandidoId === i;
+                                const nodeSize = estaExpandido ? 170 : 110;
+                                const halfSize = nodeSize / 2;
 
                                 return (
                                     <div key={i}
@@ -565,15 +583,14 @@ const MapaPage = ({
                                         className="floating-node"
                                         style={{
                                             ...mapStyles.subNodeFloating,
-                                            // Posicionamiento calculado en píxeles absolutos centrados respecto al canvas 800x800
-                                            left: `${400 + x - (estaExpandido ? 85 : 55)}px`,
-                                            top: `${400 + y - (estaExpandido ? 85 : 55)}px`,
+                                            left: `${400 + x - halfSize}px`,
+                                            top: `${400 + y - halfSize}px`,
                                             borderColor: visto ? '#4CAF50' : '#d4af37',
                                             backgroundColor: estaExpandido ? '#181818' : '#111',
                                             color: visto ? '#4CAF50' : '#fff',
                                             fontSize: estaExpandido ? '1.05rem' : '0.82rem',
-                                            width: estaExpandido ? '170px' : '110px',
-                                            height: estaExpandido ? '170px' : '110px',
+                                            width: `${nodeSize}px`,
+                                            height: `${nodeSize}px`,
                                             zIndex: estaExpandido ? 50 : 10,
                                             boxShadow: estaExpandido ? '0 0 30px rgba(212,175,55,0.8)' : '0 4px 15px rgba(0,0,0,0.6)'
                                         }}
