@@ -43,12 +43,12 @@ const LoginPage = ({
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Verificación defensiva
+    // Verificación defensiva de props
     if (!setPassword || !setEmail) {
         console.error("ERROR: LoginPage no recibió las funciones setPassword o setEmail desde App.jsx");
     }
 
-    // --- LÓGICA DE GOOGLE AUTH CON ENLACE DE PROGRESO ---
+    // --- LÓGICA DE GOOGLE AUTH CON ENLACE Y MIGRACIÓN DE PROGRESO ---
     const handleGoogleLogin = async () => {
         setCargandoGoogle(true);
         const provider = new GoogleAuthProvider();
@@ -60,22 +60,24 @@ const LoginPage = ({
             const userSnap = await getDoc(userRef);
 
             if (!userSnap.exists()) {
-                // Buscamos si ya existe cuenta previa con el mismo correo electrónico para enlazarla
+                // Buscamos si ya existe una cuenta previa registrada con el mismo correo electrónico
                 const q = query(collection(db, "usuarios"), where("email", "==", user.email));
                 const querySnapshot = await getDocs(q);
 
                 if (!querySnapshot.empty) {
+                    // ¡Cuenta previa encontrada! Enlazamos y migramos el progreso al nuevo UID de Google
                     const docAntiguo = querySnapshot.docs[0];
                     const datosViejos = docAntiguo.data();
 
                     await setDoc(userRef, {
                         ...datosViejos,
-                        uid: user.uid,
+                        uid: user.uid, // Actualizamos al UID actual de Google
                         fechaUltimoAcceso: new Date().toISOString()
                     });
 
-                    notify("¡Cuenta sincronizada! Se recuperó tu progreso anterior.");
+                    notify("¡Cuenta sincronizada con éxito! Se recuperó tu progreso anterior.");
                 } else {
+                    // Usuario totalmente nuevo por Google
                     const ADMIN_MAESTRO = "zamna.ed@gmail.com";
                     const isAdmin = user.email === ADMIN_MAESTRO;
 
@@ -92,14 +94,13 @@ const LoginPage = ({
                     if (isAdmin) {
                         notify("¡Bienvenido Maestro! Acceso total concedido.");
                     } else {
-                        notify("Registro con Google exitoso. Espera la validación del profesor.");
+                        notify("Registro con Google exitoso. Espera a que el profesor valide tu perfil.");
                     }
                 }
             } else {
                 notify("¡Bienvenido de vuelta!");
             }
 
-            // Llamamos a la función onLogin global para que App.jsx detecte la sesión activa
             if (typeof onLogin === 'function') {
                 onLogin();
             }
@@ -123,6 +124,7 @@ const LoginPage = ({
             flexDirection: 'column',
             justifyContent: 'center',
             alignItems: 'center',
+            // 🛡️ Soporte Notch Integral (Safe Area)
             paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)',
             paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)',
             paddingLeft: 'calc(env(safe-area-inset-left, 0px) + 20px)',
@@ -225,7 +227,7 @@ const LoginPage = ({
                                     ...(styles.input || {}),
                                     width: '100%',
                                     boxSizing: 'border-box',
-                                    fontSize: '16px', // Evita zoom automático en móviles
+                                    fontSize: '16px',
                                     padding: '10px'
                                 }}
                                 value={nombreCompleto}
