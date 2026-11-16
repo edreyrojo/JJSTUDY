@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { buscarTecnicas, FACETAS, ESTADISTICAS, esVideoGratis } from '../data/vaultIndex';
 import { tieneAccesoVideo, pedirAcceso } from '../utils/accesoVault';
+import VaultIcon from './VaultIcon';
 
 const FILTROS_VACIOS = { posicion: null, tipo: null, modalidad: null, autor: null, etiqueta: null };
 
@@ -78,7 +79,7 @@ const BusquedaPage = ({ onBack, onSelectVideo, styles, usuario, vistos = [] }) =
             return;
         }
         if (window.confirm(
-            `CONTENIDO BLOQUEADO 🔒\n\n"${t.nombre}" requiere autorización.\nCada curso tiene un video de prueba gratuito; para ver el resto necesitas acceso.\n\n¿Deseas solicitar acceso a "${t.cursoTitulo}" por WhatsApp?`
+            `CONTENIDO BLOQUEADO\n\n"${t.nombre}" requiere autorización.\nCada curso tiene un video de prueba gratuito; para ver el resto necesitas acceso.\n\n¿Deseas solicitar acceso a "${t.cursoTitulo}" por WhatsApp?`
         )) {
             pedirAcceso(usuario, t.cursoTitulo);
         }
@@ -117,7 +118,7 @@ const BusquedaPage = ({ onBack, onSelectVideo, styles, usuario, vistos = [] }) =
 
             {/* BUSCADOR */}
             <div style={{ position: 'relative', width: '100%', marginBottom: '10px', flexShrink: 0 }}>
-                <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#d4af37' }}>🔍</span>
+                <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#d4af37', display: 'flex', alignItems: 'center' }}><VaultIcon name="search" size={15} /></span>
                 <input
                     type="text"
                     placeholder="Busca técnica, posición, autor, etiqueta... (ej: darce, media guardia, Gordon)"
@@ -126,7 +127,7 @@ const BusquedaPage = ({ onBack, onSelectVideo, styles, usuario, vistos = [] }) =
                     style={{ width: '100%', padding: '13px 42px 13px 40px', backgroundColor: '#111', border: '1px solid #d4af37', color: '#fff', borderRadius: '8px', fontSize: '0.9rem', boxSizing: 'border-box', outline: 'none' }}
                 />
                 {termino && (
-                    <button onClick={() => { setTermino(''); setLimite(60); }} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#888', fontSize: '1rem', cursor: 'pointer', padding: '6px' }}>✕</button>
+                    <button onClick={() => { setTermino(''); setLimite(60); }} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: '6px', display: 'flex', alignItems: 'center' }}><VaultIcon name="close" size={14} color="#888" /></button>
                 )}
             </div>
 
@@ -136,7 +137,7 @@ const BusquedaPage = ({ onBack, onSelectVideo, styles, usuario, vistos = [] }) =
                     <span style={{ color: '#666', fontSize: '0.65rem' }}>FILTROS:</span>
                     {activos.map(([campo, valor]) => (
                         <Chip key={campo} activo onClick={() => alternarFiltro(campo, valor)}>
-                            {valor} ✕
+                            {valor} <VaultIcon name="close" size={10} color="#000" />
                         </Chip>
                     ))}
                     <button onClick={limpiarTodo} style={{ background: 'none', border: 'none', color: '#ff6666', fontSize: '0.68rem', cursor: 'pointer', textDecoration: 'underline' }}>
@@ -224,7 +225,7 @@ const BusquedaPage = ({ onBack, onSelectVideo, styles, usuario, vistos = [] }) =
                     <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px', paddingBottom: '16px' }}>
                         {visibles.length === 0 && (
                             <div style={{ textAlign: 'center', marginTop: '50px', color: '#666' }}>
-                                <div style={{ fontSize: '2.4rem', marginBottom: '8px' }}>🥋</div>
+                                <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'center' }}><VaultIcon name="bookOpen" size={40} color="#d4af37" /></div>
                                 <p style={{ color: '#999', margin: '0 0 6px' }}>No se encontraron técnicas</p>
                                 <p style={{ fontSize: '0.8rem', color: '#555' }}>Prueba con otra palabra o quita algún filtro.</p>
                             </div>
@@ -253,8 +254,10 @@ const BusquedaPage = ({ onBack, onSelectVideo, styles, usuario, vistos = [] }) =
                                     }}
                                 >
                                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
-                                        <span style={{ color: visto ? '#4CAF50' : '#d4af37', fontWeight: 'bold', fontSize: esMovil ? '0.88rem' : '0.95rem', lineHeight: 1.3 }}>
-                                            {visto ? '✅ ' : ''}{bloqueado ? '🔒 ' : ''}{t.nombre}
+                                        <span style={{ color: visto ? '#4CAF50' : '#d4af37', fontWeight: 'bold', fontSize: esMovil ? '0.88rem' : '0.95rem', lineHeight: 1.3, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                            {visto && <VaultIcon name="check" size={12} color="#4CAF50" />}
+                                            {bloqueado && <VaultIcon name="lock" size={12} color="#d4af37" />}
+                                            <span>{t.nombre}</span>
                                         </span>
                                         <span style={{ color: '#555', fontSize: '0.62rem', whiteSpace: 'nowrap', paddingTop: '3px' }}>
                                             {t.modalidad}
@@ -269,7 +272,9 @@ const BusquedaPage = ({ onBack, onSelectVideo, styles, usuario, vistos = [] }) =
 
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
                                         {esVideoGratis(t) && (
-                                            <span style={{ fontSize: '0.62rem', color: '#000', backgroundColor: '#4CAF50', borderRadius: '3px', padding: '2px 6px', fontWeight: 'bold' }}>🎁 GRATIS</span>
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.62rem', color: '#000', backgroundColor: '#d4af37', borderRadius: '3px', padding: '2px 6px', fontWeight: 'bold' }}>
+                                                <VaultIcon name="gift" size={11} color="#000" /> GRATIS
+                                            </span>
                                         )}
                                         <span style={{ fontSize: '0.62rem', color: '#0a0a0a', backgroundColor: '#d4af37', borderRadius: '3px', padding: '2px 6px', fontWeight: 'bold' }}>{t.posicion}</span>
                                         <span style={{ fontSize: '0.62rem', color: '#d4af37', border: '1px solid #3a3320', borderRadius: '3px', padding: '2px 6px' }}>{t.tipo}</span>

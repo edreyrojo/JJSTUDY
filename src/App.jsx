@@ -218,7 +218,7 @@ export default function App() {
       localStorage.removeItem('lafortuna_last_video');
       localStorage.removeItem('lafortuna_notas');
       setPage('login');
-      console.log("Sesión cerrada y Vault bloqueado 🛡️");
+      console.log("Sesión cerrada y Vault bloqueado");
     } catch (error) {
       console.error("Error al cerrar sesión:", error);
     }
@@ -371,7 +371,7 @@ export default function App() {
     const tecnica = obtenerTecnica(v.id);
     if (tecnica && !tieneAccesoVideo(usuario, tecnica)) {
       if (window.confirm(
-        `CONTENIDO BLOQUEADO 🔒\n\n"${tecnica.nombre}" requiere autorización.\nCada curso tiene un video de prueba gratuito; para ver el resto necesitas acceso.\n\n¿Deseas solicitar acceso a "${tecnica.cursoTitulo}" por WhatsApp?`
+        `CONTENIDO BLOQUEADO\n\n"${tecnica.nombre}" requiere autorización.\nCada curso tiene un video de prueba gratuito; para ver el resto necesitas acceso.\n\n¿Deseas solicitar acceso a "${tecnica.cursoTitulo}" por WhatsApp?`
       )) {
         pedirAcceso(usuario, tecnica.cursoTitulo);
       }

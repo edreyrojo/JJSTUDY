@@ -3,12 +3,24 @@ import { db } from '../firebase';
 import { collection, onSnapshot, getDocs, doc, deleteDoc, addDoc, writeBatch, setDoc, updateDoc } from 'firebase/firestore';
 import Swal from 'sweetalert2';
 import { DB_INSTRUCCIONALES } from '../data/instruccionales';
+import VaultIcon from './VaultIcon';
 
-// Iconos rápidos
+// Iconos monocromáticos en dorado (sin emojis de colores)
 const Icons = {
-    User: "👤", Ticket: "🎫", Key: "🔑", Trash: "🗑️", Check: "✅",
-    Search: "🔍", Mail: "✉️", Shield: "🛡️", Megaphone: "📢", Send: "🚀",
-    Down: "🔻", Up: "🔺", Building: "🏢", MapPin: "📍"
+    User: <VaultIcon name="user" size={18} />,
+    Ticket: <VaultIcon name="flag" size={18} />,
+    Key: <VaultIcon name="lock" size={18} />,
+    Trash: <VaultIcon name="trash" size={18} />,
+    Check: <VaultIcon name="check" size={18} />,
+    Search: <VaultIcon name="search" size={16} />,
+    Mail: <VaultIcon name="mail" size={18} />,
+    Shield: <VaultIcon name="shield" size={18} />,
+    Megaphone: <VaultIcon name="megaphone" size={18} />,
+    Send: <VaultIcon name="send" size={18} />,
+    Down: <VaultIcon name="chevronDown" size={16} />,
+    Up: <VaultIcon name="chevronUp" size={16} />,
+    Building: <VaultIcon name="building" size={18} />,
+    MapPin: <VaultIcon name="pin" size={18} />,
 };
 
 const AdminPage = ({ onBack }) => {
@@ -131,7 +143,7 @@ const AdminPage = ({ onBack }) => {
         try {
             const nombreLimpio = nombreAcademia.trim().toUpperCase();
             await addDoc(collection(db, "academias"), { nombre: nombreLimpio, nombreAcademia: nombreLimpio, horarios: [], logoBase64: logoAcademiaBase64, programas: ["BJJ Adultos", "BJJ Kids", "No-Gi"], sede: "", fechaCreacion: new Date().toLocaleString(), ultimaActualizacion: new Date().toISOString(), timestamp: Date.now() });
-            notify(`Academia "${nombreLimpio}" registrada con éxito 🏢`);
+            notify(`Academia "${nombreLimpio}" registrada con éxito`);
             setNombreAcademia('');
         } catch (error) { notify("Error al crear la academia", "error"); } finally { setCreandoAcademia(false); }
     };
@@ -144,7 +156,7 @@ const AdminPage = ({ onBack }) => {
         try {
             const sedeRef = doc(collection(db, "sedes"));
             await setDoc(sedeRef, { id: sedeRef.id, nombre: nombreSede.trim(), nombreSede: nombreSede.trim(), academiaId: academiaSeleccionada, academiaNombre: academiaMadre?.nombre || "Desconocida", teamId: teamIdProfesor.trim(), fechaCreacion: new Date().toISOString(), activa: true, tipo: 'sede_afiliada' });
-            notify("Sede vinculada exitosamente 📍", "success");
+            notify("Sede vinculada exitosamente", "success");
             setNombreSede(""); setTeamIdProfesor("");
         } catch (e) { notify(`Error al vincular: ${e.message}`, "error"); } finally { setCreandoSede(false); }
     };
@@ -179,7 +191,7 @@ const AdminPage = ({ onBack }) => {
         setEnviandoAnuncio(true);
         try {
             await addDoc(collection(db, "anuncios"), { titulo: tituloAnuncio.trim(), mensaje: mensajeAnuncio.trim(), fecha: new Date().toLocaleString(), timestamp: Date.now() });
-            notify("¡Anuncio publicado! 📢");
+            notify("¡Anuncio publicado!");
             setTituloAnuncio(""); setMensajeAnuncio("");
         } catch (error) { notify("Error al publicar.", "error"); } finally { setEnviandoAnuncio(false); }
     };
@@ -213,7 +225,7 @@ const AdminPage = ({ onBack }) => {
                 <button onClick={() => setTabActiva('tickets')} style={tabActiva === 'tickets' ? s.tabActiveInfo : s.tabInactive}>
                     {Icons.Ticket} Soporte {tickets.length > 0 && <span style={s.badge}>{tickets.length}</span>}
                 </button>
-                <button onClick={() => setTabActiva('mantenimiento')} style={tabActiva === 'mantenimiento' ? s.tabActive : s.tabInactive}>⚙️ Mantenimiento</button>
+                <button onClick={() => setTabActiva('mantenimiento')} style={tabActiva === 'mantenimiento' ? s.tabActive : s.tabInactive}><VaultIcon name="settings" size={14} /> Mantenimiento</button>
             </div>
 
             {cargando ? (
@@ -242,7 +254,7 @@ const AdminPage = ({ onBack }) => {
                             {/* ÁRBOL ORGANIZACIONAL MAESTRO */}
                             <div style={{ ...s.panelBox, marginBottom: '20px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #333', paddingBottom: '10px', marginBottom: '15px' }}>
-                                    <h2 style={{ color: '#fff', fontSize: '1.1rem', margin: 0 }}>🌳 Árbol Organizacional</h2>
+                                    <h2 style={{ color: '#fff', fontSize: '1.1rem', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}><VaultIcon name="tree" size={18} /> Árbol Organizacional</h2>
                                 </div>
                                 {academias.map(aca => {
                                     const logoAca = aca.logoBase64 || aca.logobase64;
@@ -256,7 +268,7 @@ const AdminPage = ({ onBack }) => {
                                         <div key={aca.id} style={{ marginBottom: '10px', borderLeft: '3px solid #d4af37', background: '#0a0a0a', borderRadius: '0 6px 6px 0', overflow: 'hidden' }}>
                                             <div onClick={() => toggleAcademia(aca.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', cursor: 'pointer', background: estaAbierto ? '#141414' : '#0e0e0e' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                    {logoAca ? <img src={logoAca} alt="logo" style={{ width: '30px', height: '30px', objectFit: 'contain', borderRadius: '4px' }} /> : <span style={{ fontSize: '1.2rem' }}>🏢</span>}
+                                                    {logoAca ? <img src={logoAca} alt="logo" style={{ width: '30px', height: '30px', objectFit: 'contain', borderRadius: '4px' }} /> : <VaultIcon name="building" size={22} />}
                                                     <h3 style={{ color: '#fff', fontSize: '0.9rem', margin: 0 }}>{nombreAca}</h3>
                                                 </div>
                                                 <div style={{ color: '#d4af37', fontSize: '0.8rem' }}>{estaAbierto ? '▼' : '►'}</div>
@@ -264,7 +276,7 @@ const AdminPage = ({ onBack }) => {
                                             {estaAbierto && (
                                                 <div style={{ padding: '15px' }}>
                                                     <div style={{ background: '#141414', padding: '12px', borderRadius: '6px', borderLeft: '2px solid #fff', marginBottom: '15px' }}>
-                                                        <h4 style={{ color: '#d4af37', margin: '0 0 10px 0', fontSize: '0.85rem' }}>🏠 SEDE MADRE</h4>
+                                                        <h4 style={{ color: '#d4af37', margin: '0 0 10px 0', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}><VaultIcon name="home" size={14} /> SEDE MADRE</h4>
                                                         <p style={{ color: '#aaa', fontSize: '0.7rem', margin: '5px 0' }}>PROFESORES:</p>
                                                         {profesMadre.map(p => (
                                                             <div key={p.uid} style={s.itemPersonal}>
@@ -290,7 +302,7 @@ const AdminPage = ({ onBack }) => {
                                                         </select>
                                                     </div>
 
-                                                    <div style={{ color: '#d4af37', fontSize: '0.8rem', marginBottom: '10px', borderBottom: '1px solid #d4af3744', paddingBottom: '5px' }}>📍 SEDES AFILIADAS ({sedesAfiliadas.length}):</div>
+                                                    <div style={{ color: '#d4af37', fontSize: '0.8rem', marginBottom: '10px', borderBottom: '1px solid #d4af3744', paddingBottom: '5px', display: 'flex', alignItems: 'center', gap: '6px' }}><VaultIcon name="pin" size={13} /> SEDES AFILIADAS ({sedesAfiliadas.length}):</div>
                                                     {sedesAfiliadas.length > 0 ? sedesAfiliadas.map(se => {
                                                         const personalSede = usuarios.filter(u => u.sedeId === se.id && (u.rol === 'instructor' || u.rol === 'profesor'));
                                                         return (
@@ -329,7 +341,7 @@ const AdminPage = ({ onBack }) => {
                                     <form onSubmit={handleCrearAcademia} style={{ marginBottom: '20px' }}>
                                         <input style={s.formInput} value={nombreAcademia} onChange={(e) => setNombreAcademia(e.target.value)} placeholder="Nombre Academia" />
                                         <label style={s.fileUploadBtn}>
-                                            <span>📁 Subir Logo</span>
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><VaultIcon name="folder" size={14} /> Subir Logo</span>
                                             <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoAcademiaChange} />
                                         </label>
                                         <button type="submit" disabled={creandoAcademia} style={s.btnGoldAction}>{creandoAcademia ? "REGISTRANDO..." : "REGISTRAR"}</button>
@@ -338,7 +350,7 @@ const AdminPage = ({ onBack }) => {
                                     <div style={s.listContainer}>
                                         {academias.map(ac => (
                                             <div key={ac.id} style={s.listItem}>
-                                                <span style={{ fontSize: '0.85rem' }}>🏢 {ac.nombreAcademia || ac.nombre}</span>
+                                                <span style={{ fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}><VaultIcon name="building" size={14} /> {ac.nombreAcademia || ac.nombre}</span>
                                                 <button onClick={() => handleAction(ac.id, 'academias', 'delete')} style={s.btnTextDelete}>Eliminar</button>
                                             </div>
                                         ))}
@@ -420,7 +432,7 @@ const AdminPage = ({ onBack }) => {
                         <div style={s.viewSection}>
                             <div style={s.panelBox}>
                                 <h3 style={{ color: '#fff', fontSize: '1rem', marginBottom: '10px' }}>Herramientas de Base de Datos</h3>
-                                <button onClick={corregirIdsAlumnos} style={s.btnGoldAction}>⚠️ Ejecutar Migración de IDs Errados</button>
+                                <button onClick={corregirIdsAlumnos} style={s.btnGoldAction}><span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><VaultIcon name="alert" size={14} /> Ejecutar Migración de IDs Errados</span></button>
                                 <p style={{ color: '#666', fontSize: '0.75rem', marginTop: '10px' }}>Esta herramienta ejecuta actualizaciones en lote (Batch). Úsala solo si sabes lo que haces.</p>
                             </div>
                         </div>
@@ -439,7 +451,7 @@ const StatCard = ({ label, value, icon, color }) => (
                 <div style={s.statValue}>{value}</div>
                 <div style={s.statLabel}>{label}</div>
             </div>
-            <div style={{ fontSize: '1.8rem', opacity: 0.8 }}>{icon}</div>
+            <div style={{ fontSize: '1.8rem', opacity: 0.8, color }}>{icon}</div>
         </div>
     </div>
 );

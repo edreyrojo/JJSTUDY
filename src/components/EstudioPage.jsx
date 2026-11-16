@@ -4,6 +4,7 @@ import { db } from '../firebase';
 import { doc, setDoc, addDoc, collection } from 'firebase/firestore';
 import { obtenerTecnica } from '../data/vaultIndex';
 import { tieneAccesoVideo, pedirAcceso } from '../utils/accesoVault';
+import VaultIcon from './VaultIcon';
 
 const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos = [], toggleVisto, usuario, styles = {}, getAdjacentVideo }) => {
     // --- ESTADOS ---
@@ -24,7 +25,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
         if (!getAdjacentVideo || !video) return;
         const siguiente = getAdjacentVideo(video, direccion);
         if (!siguiente) {
-            setMensajeAlerta(direccion === 'next' ? "Fin del curso 🥋" : "Inicio del curso 🥋");
+            setMensajeAlerta(direccion === 'next' ? "Fin del curso" : "Inicio del curso");
             setMostrarAlerta(true);
             setTimeout(() => setMostrarAlerta(false), 2000);
             return;
@@ -33,7 +34,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
         const tecnica = obtenerTecnica(siguiente.id);
         if (tecnica && !tieneAccesoVideo(usuario, tecnica)) {
             if (window.confirm(
-                `CONTENIDO BLOQUEADO 🔒\n\n"${tecnica.nombre}" requiere autorización.\nCada curso tiene un video de prueba gratuito; para ver el resto necesitas acceso.\n\n¿Deseas solicitar acceso a "${tecnica.cursoTitulo}" por WhatsApp?`
+                `CONTENIDO BLOQUEADO\n\n"${tecnica.nombre}" requiere autorización.\nCada curso tiene un video de prueba gratuito; para ver el resto necesitas acceso.\n\n¿Deseas solicitar acceso a "${tecnica.cursoTitulo}" por WhatsApp?`
             )) {
                 pedirAcceso(usuario, tecnica.cursoTitulo);
             }
@@ -95,7 +96,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                     }
                 }
             }, { merge: true });
-            setMensajeAlerta("Vault Sincronizado 🛡️");
+            setMensajeAlerta("Vault sincronizado");
             setMostrarAlerta(true);
             setTimeout(() => setMostrarAlerta(false), 2000);
         } catch (err) { 
@@ -122,13 +123,13 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                 uid: usuario?.uid || "anonimo",
                 nombre: usuario?.nombre || "Usuario",
                 email: usuario?.email || "Sin email",
-                mensaje: `⚠️ ERROR DE CARGA EN VIDEO: "${video?.titulo}" (ID: ${video?.id}). El alumno informa que el contenido no es accesible.`,
+                mensaje: `ERROR DE CARGA EN VIDEO: "${video?.titulo}" (ID: ${video?.id}). El alumno informa que el contenido no es accesible.`,
                 fecha: new Date().toLocaleString(),
                 estado: "pendiente",
                 tipo: "video_fail",
                 videoId: video?.id
             });
-            setMensajeAlerta("Reporte enviado a Ngasi 🛡️");
+            setMensajeAlerta("Reporte enviado a Ngasi");
             setMostrarAlerta(true);
             setMostrarReporte(false);
             setTimeout(() => setMostrarAlerta(false), 3000);
@@ -208,7 +209,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                                 cursor: 'pointer'
                             }}
                         >
-                            ←
+                            <VaultIcon name="chevronLeft" size={16} />
                         </button>
 
                         {videoAnterior && (
@@ -224,7 +225,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                                     cursor: 'pointer'
                                 }}
                             >
-                                {puedeAnterior ? '◁' : '🔒'}
+                                {puedeAnterior ? <VaultIcon name="chevronLeft" size={15} /> : <VaultIcon name="lock" size={14} color="#d4af37" />}
                             </button>
                         )}
 
@@ -241,7 +242,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                                     cursor: 'pointer'
                                 }}
                             >
-                                {puedeSiguiente ? '▷' : '🔒'}
+                                {puedeSiguiente ? <VaultIcon name="chevronRight" size={15} /> : <VaultIcon name="lock" size={14} color="#d4af37" />}
                             </button>
                         )}
                     </div>
@@ -271,7 +272,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                                 lineHeight: 1
                             }}
                         >
-                            ⛶
+                            <VaultIcon name="fullscreen" size={16} />
                         </button>
                         <button 
                             onClick={onNavigateToNotes} 
@@ -303,7 +304,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                             onClick={() => toggleVisto(video?.id)}
                             title={isCompletado ? "Lección completada" : "Marcar como vista"}
                         >
-                            👁️
+                            <VaultIcon name="eye" size={19} />
                         </div>
                     </div>
                 </div>
@@ -338,9 +339,9 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                             </span>
                             <button
                                 onClick={() => setPantallaCompleta(false)}
-                                style={{ ...(styles.btnOutline || {}), width: 'auto', padding: '6px 10px', fontSize: '0.7rem', borderColor: '#d4af37', color: '#d4af37', borderRadius: '6px', cursor: 'pointer', flexShrink: 0 }}
+                                style={{ ...(styles.btnOutline || {}), width: 'auto', padding: '6px 10px', fontSize: '0.7rem', borderColor: '#d4af37', color: '#d4af37', borderRadius: '6px', cursor: 'pointer', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '5px' }}
                             >
-                                ✕ SALIR
+                                <VaultIcon name="close" size={12} /> SALIR
                             </button>
                         </div>
                     )}
@@ -372,9 +373,9 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                         <h2 style={{ fontSize: '0.85rem', color: '#d4af37', margin: 0, fontWeight: 'bold', wordBreak: 'break-word', letterSpacing: '0.5px', lineHeight: '1.3' }}>{video?.titulo}</h2>
                         <button
                             onClick={() => setPantallaCompleta(true)}
-                            style={{ marginTop: '6px', background: 'none', border: 'none', color: '#d4af37', fontSize: '0.62rem', cursor: 'pointer', textDecoration: 'underline' }}
+                            style={{ marginTop: '6px', background: 'none', border: 'none', color: '#d4af37', fontSize: '0.62rem', cursor: 'pointer', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                         >
-                            ⛶ Ver en pantalla completa
+                            <VaultIcon name="fullscreen" size={11} /> Ver en pantalla completa
                         </button>
                     </div>
                 )}
@@ -401,7 +402,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                         onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
                         onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                     >
-                        ⏭
+                        <VaultIcon name="skipNext" size={18} />
                     </button>
 
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
@@ -414,9 +415,9 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                         {esMovil && (
                             <button
                                 onClick={abrirEnDrive}
-                                style={{ background: 'none', border: 'none', color: '#8a8a8a', fontSize: '0.62rem', cursor: 'pointer', textDecoration: 'underline' }}
+                                style={{ background: 'none', border: 'none', color: '#8a8a8a', fontSize: '0.62rem', cursor: 'pointer', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                             >
-                                Si los controles no responden, abrir en Drive ↗
+                                Si los controles no responden, abrir en Drive <VaultIcon name="external" size={10} />
                             </button>
                         )}
                     </div>
@@ -464,8 +465,8 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                         const tiempo = tiempoMatch[0];
                         const nombre = marcaCompleta.replace(tiempo, "").replace(/^\s*-\s*/, "").trim() || "Marca";
                         return (
-                            <button key={i} onClick={() => saltarATiempo(tiempo)} style={{ fontSize: '0.65rem', padding: '6px 12px', backgroundColor: '#d4af3711', color: '#d4af37', border: '1px solid #d4af37', borderRadius: '20px', whiteSpace: 'nowrap', cursor: 'pointer' }}>
-                                📍 {tiempo} {nombre}
+                            <button key={i} onClick={() => saltarATiempo(tiempo)} style={{ fontSize: '0.65rem', padding: '6px 12px', backgroundColor: '#d4af3711', color: '#d4af37', border: '1px solid #d4af37', borderRadius: '20px', whiteSpace: 'nowrap', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                <VaultIcon name="pin" size={11} /> {tiempo} {nombre}
                             </button>
                         );
                     })}

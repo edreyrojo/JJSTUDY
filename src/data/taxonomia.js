@@ -36,11 +36,11 @@ const regla = (nombre, alias) => ({
 // DIMENSIONES DE NAVEGACIÓN (lo que ve el usuario en el mapa)
 // ---------------------------------------------------------------------------
 export const DIMENSIONES = [
-  { id: 'AUTORES', nombre: 'AUTORES', icono: '👤', ayuda: 'Por instructor' },
-  { id: 'POSICION', nombre: 'POSICIÓN', icono: '📍', ayuda: 'Dónde ocurre' },
-  { id: 'TIPO', nombre: 'TIPO', icono: '🎯', ayuda: 'Qué se enseña' },
-  { id: 'MODALIDAD', nombre: 'MODALIDAD', icono: '🥋', ayuda: 'GI / NO GI' },
-  { id: 'ETIQUETAS', nombre: 'ETIQUETAS', icono: '🏷️', ayuda: 'Técnicas y sistemas' },
+  { id: 'AUTORES', nombre: 'AUTORES', icono: 'user', ayuda: 'Por instructor' },
+  { id: 'POSICION', nombre: 'POSICIÓN', icono: 'pin', ayuda: 'Dónde ocurre' },
+  { id: 'TIPO', nombre: 'TIPO', icono: 'target', ayuda: 'Qué se enseña' },
+  { id: 'MODALIDAD', nombre: 'MODALIDAD', icono: 'belt', ayuda: 'GI / NO GI' },
+  { id: 'ETIQUETAS', nombre: 'ETIQUETAS', icono: 'tag', ayuda: 'Técnicas y sistemas' },
 ];
 
 export const POSICION_GENERAL = 'GENERAL';

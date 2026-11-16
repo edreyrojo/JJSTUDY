@@ -10,6 +10,7 @@ import {
 } from '../data/vaultIndex';
 import { DIMENSIONES } from '../data/taxonomia';
 import { tieneAccesoVideo, pedirAcceso } from '../utils/accesoVault';
+import VaultIcon from './VaultIcon';
 
 const MAX_NODOS_MAPA = 18;
 const mapStyles = {
@@ -192,7 +193,7 @@ const MapaPage = ({
             return;
         }
         if (window.confirm(
-            `CONTENIDO BLOQUEADO 🔒\n\n"${t.nombre}" requiere autorización.\nCada curso tiene un video de prueba gratuito; para ver el resto necesitas acceso.\n\n¿Deseas solicitar acceso a "${t.cursoTitulo}" por WhatsApp?`
+            `CONTENIDO BLOQUEADO\n\n"${t.nombre}" requiere autorización.\nCada curso tiene un video de prueba gratuito; para ver el resto necesitas acceso.\n\n¿Deseas solicitar acceso a "${t.cursoTitulo}" por WhatsApp?`
         )) {
             pedirAcceso(usuario, t.cursoTitulo);
         }
@@ -297,7 +298,7 @@ const MapaPage = ({
         if (n.type === 'valor') return `${n.count} videos · ${n.cursos} cursos`;
         if (n.type === 'curso') return `${n.autor} · ${n.total} videos${n.count !== n.total ? ` · ${n.count} coinciden` : ''}`;
         if (n.type === 'volumen') return n.progreso.texto;
-        if (n.type === 'parte') return esVideoGratis(n.tecnica) ? '🎁 GRATIS' : n.tecnica.tipo;
+        if (n.type === 'parte') return esVideoGratis(n.tecnica) ? 'GRATIS' : n.tecnica.tipo;
         return '';
     };
 
@@ -342,6 +343,12 @@ const MapaPage = ({
                 title={nodo.nombre}
             >
                 <span style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'center', overflow: 'hidden' }}>
+                    {(vistos.includes(nodo.tecnica?.id) || bloqueado) && (
+                        <span style={{ display: 'flex', gap: '6px', alignItems: 'center', justifyContent: 'center' }}>
+                            {vistos.includes(nodo.tecnica?.id) && <VaultIcon name="check" size={11} color="#4CAF50" />}
+                            {bloqueado && <VaultIcon name="lock" size={11} color="#d4af37" />}
+                        </span>
+                    )}
                     <span style={{
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -350,7 +357,7 @@ const MapaPage = ({
                         WebkitBoxOrient: 'vertical',
                         lineHeight: 1.25,
                     }}>
-                        {vistos.includes(nodo.tecnica?.id) ? '✅ ' : ''}{bloqueado ? '🔒 ' : ''}{nodo.nombre}
+                        {nodo.nombre}
                     </span>
                     <span style={{ fontSize: '0.55rem', color: '#8a8a8a', lineHeight: 1.2 }}>{subtituloNodo(nodo)}</span>
                 </span>
@@ -381,20 +388,19 @@ const MapaPage = ({
                     minHeight: '74px',
                 }}
             >
-                <span style={{ color: visto ? '#4CAF50' : '#d4af37', fontWeight: 'bold', fontSize: '0.88rem', lineHeight: 1.3 }}>
-                    {visto ? '✅ ' : ''}{bloqueado ? '🔒 ' : ''}{nodo.nombre}
+                <span style={{ color: visto ? '#4CAF50' : '#d4af37', fontWeight: 'bold', fontSize: '0.88rem', lineHeight: 1.3, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    {visto && <VaultIcon name="check" size={12} color="#4CAF50" />}
+                    {bloqueado && <VaultIcon name="lock" size={12} color="#d4af37" />}
+                    <span>{nodo.nombre}</span>
                 </span>
                 <span style={{ color: '#777', fontSize: '0.7rem', lineHeight: 1.3 }}>{subtituloNodo(nodo)}</span>
                 {nodo.type === 'parte' && (
                     <span style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '2px' }}>
                         {esVideoGratis(nodo.tecnica) && (
-                            <span style={{ fontSize: '0.58rem', color: '#000', backgroundColor: '#4CAF50', borderRadius: '3px', padding: '2px 5px', fontWeight: 'bold' }}>
-                                🎁 GRATIS
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.58rem', color: '#000', backgroundColor: '#d4af37', borderRadius: '3px', padding: '2px 5px', fontWeight: 'bold' }}>
+                                <VaultIcon name="gift" size={10} color="#000" /> GRATIS
                             </span>
                         )}
-                        <span style={{ fontSize: '0.58rem', color: '#0a0a0a', backgroundColor: '#d4af37', borderRadius: '3px', padding: '2px 5px', fontWeight: 'bold' }}>
-                            {nodo.tecnica.posicion}
-                        </span>
                         {nodo.tecnica.etiquetas.slice(0, 3).map(e => (
                             <span key={e} style={{ fontSize: '0.56rem', color: '#8a8a8a', border: '1px solid #262626', borderRadius: '3px', padding: '1px 5px' }}>{e}</span>
                         ))}
@@ -427,17 +433,19 @@ const MapaPage = ({
                 <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
                     <button onClick={irAtras} title="Regresar" style={{ ...styles.btnOutline, flex: '0 0 42px', height: '42px', padding: 0, fontSize: '1rem', borderRadius: '8px' }}>←</button>
                     {hasSession && (
-                        <button onClick={onContinue} title="Continuar Estudio" style={{ ...styles.btnGold, flex: 1, height: '42px', fontSize: '0.7rem', padding: 0, borderRadius: '8px' }}>
-                            ▶ CONTINUAR
+                        <button onClick={onContinue} title="Continuar Estudio" style={{ ...styles.btnGold, flex: 1, height: '42px', fontSize: '0.7rem', padding: 0, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                            <VaultIcon name="play" size={12} color="#000" /> CONTINUAR
                         </button>
                     )}
-                    <button onClick={onNavigateToNotes} title="Bitácora" style={{ ...styles.btnOutline, flex: '0 0 42px', height: '42px', padding: 0, borderRadius: '8px', borderColor: '#d4af37', color: '#d4af37' }}>
-                        ✎
+                    <button onClick={onNavigateToNotes} title="Bitácora" style={{ ...styles.btnOutline, flex: '0 0 42px', height: '42px', padding: 0, borderRadius: '8px', borderColor: '#d4af37', color: '#d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <VaultIcon name="notes" size={16} />
                     </button>
                 </div>
 
                 <div style={{ position: 'relative', width: '100%' }}>
-                    <span style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)', color: '#d4af37', fontSize: '0.8rem' }}></span>
+                    <span style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)', color: '#d4af37', display: 'flex', alignItems: 'center' }}>
+                        <VaultIcon name="search" size={15} />
+                    </span>
                     <input
                         type="text"
                         placeholder="Buscar técnica o autor..."
@@ -482,7 +490,10 @@ const MapaPage = ({
                                         gap: '8px',
                                     }}
                                 >
-                                    <span>{d.icono} {d.nombre}</span>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <VaultIcon name={d.icono} size={14} />
+                                        <span>{d.nombre}</span>
+                                    </span>
                                     <span style={{ fontSize: '0.62rem', opacity: 0.7 }}>{total}</span>
                                 </button>
                             );
@@ -504,8 +515,9 @@ const MapaPage = ({
                 {/* Toolbar / breadcrumb */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', padding: esMovil ? '8px 10px' : '12px 16px', borderBottom: '1px solid #171717', backgroundColor: '#070707', flexShrink: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flex: 1, minWidth: 0, flexWrap: 'wrap', fontSize: '0.72rem' }}>
-                        <button onClick={() => irADimension(dimension.id)} style={{ background: 'none', border: 'none', color: '#d4af37', cursor: 'pointer', padding: 0, fontWeight: 'bold' }}>
-                            {dimension.icono} {dimension.nombre}
+                        <button onClick={() => irADimension(dimension.id)} style={{ background: 'none', border: 'none', color: '#d4af37', cursor: 'pointer', padding: 0, fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                            <VaultIcon name={dimension.icono} size={13} />
+                            {dimension.nombre}
                         </button>
                         {valor && (
                             <>
@@ -534,8 +546,8 @@ const MapaPage = ({
                     <span style={{ color: '#666', fontSize: '0.68rem' }}>{nav.subtitulo}</span>
 
                     {hayFiltro && (instrSel || volSel) && (
-                        <button onClick={() => { resetNavegacion(); setAutorSel(null); }} style={{ background: '#1a1508', border: '1px solid #4a3c12', color: '#d4af37', borderRadius: '999px', padding: '4px 9px', fontSize: '0.62rem', cursor: 'pointer' }}>
-                            ✕ quitar filtro
+                        <button onClick={() => { resetNavegacion(); setAutorSel(null); }} style={{ background: '#1a1508', border: '1px solid #4a3c12', color: '#d4af37', borderRadius: '999px', padding: '4px 9px', fontSize: '0.62rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <VaultIcon name="close" size={10} /> quitar filtro
                         </button>
                     )}
 
@@ -568,13 +580,17 @@ const MapaPage = ({
                                     onClick={() => abrirTecnica(t)}
                                     style={{ textAlign: 'left', background: '#0a0a0a', border: `1px solid ${vistos.includes(t.id) ? '#2e5c2e' : '#222'}`, borderRadius: '8px', padding: '11px 13px', color: '#fff', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '5px' }}
                                 >
-                                    <span style={{ color: vistos.includes(t.id) ? '#4CAF50' : '#d4af37', fontWeight: 'bold', fontSize: '0.85rem' }}>
-                                        {vistos.includes(t.id) ? '✅ ' : ''}{tieneAccesoVideo(usuario, t) ? '' : '🔒 '}{t.nombre}
+                                    <span style={{ color: vistos.includes(t.id) ? '#4CAF50' : '#d4af37', fontWeight: 'bold', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        {vistos.includes(t.id) && <VaultIcon name="check" size={12} color="#4CAF50" />}
+                                        {!tieneAccesoVideo(usuario, t) && <VaultIcon name="lock" size={12} color="#d4af37" />}
+                                        <span>{t.nombre}</span>
                                     </span>
                                     <span style={{ color: '#777', fontSize: '0.68rem' }}>{t.cursoTitulo} • {t.volumenNombre}</span>
                                     <span style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
                                         {esVideoGratis(t) && (
-                                            <span style={{ fontSize: '0.58rem', background: '#4CAF50', color: '#000', borderRadius: '3px', padding: '1px 5px', fontWeight: 'bold' }}>🎁 GRATIS</span>
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.58rem', background: '#d4af37', color: '#000', borderRadius: '3px', padding: '1px 5px', fontWeight: 'bold' }}>
+                                                <VaultIcon name="gift" size={10} color="#000" /> GRATIS
+                                            </span>
                                         )}
                                         <span style={{ fontSize: '0.58rem', background: '#d4af37', color: '#000', borderRadius: '3px', padding: '1px 5px', fontWeight: 'bold' }}>{t.posicion}</span>
                                         <span style={{ fontSize: '0.58rem', color: '#d4af37', border: '1px solid #3a3320', borderRadius: '3px', padding: '1px 5px' }}>{t.tipo}</span>
@@ -596,13 +612,17 @@ const MapaPage = ({
                                     onClick={() => abrirTecnica(t)}
                                     style={{ textAlign: 'left', background: '#0a0a0a', border: `1px solid ${vistos.includes(t.id) ? '#2e5c2e' : '#222'}`, borderRadius: '8px', padding: '11px 13px', color: '#fff', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '5px' }}
                                 >
-                                    <span style={{ color: vistos.includes(t.id) ? '#4CAF50' : '#d4af37', fontWeight: 'bold', fontSize: '0.84rem', lineHeight: 1.3 }}>
-                                        {vistos.includes(t.id) ? '✅ ' : ''}{tieneAccesoVideo(usuario, t) ? '' : '🔒 '}{t.nombre}
+                                    <span style={{ color: vistos.includes(t.id) ? '#4CAF50' : '#d4af37', fontWeight: 'bold', fontSize: '0.84rem', lineHeight: 1.3, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        {vistos.includes(t.id) && <VaultIcon name="check" size={12} color="#4CAF50" />}
+                                        {!tieneAccesoVideo(usuario, t) && <VaultIcon name="lock" size={12} color="#d4af37" />}
+                                        <span>{t.nombre}</span>
                                     </span>
                                     <span style={{ color: '#777', fontSize: '0.66rem' }}>{t.cursoTitulo} • {t.volumenNombre}</span>
                                     <span style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
                                         {esVideoGratis(t) && (
-                                            <span style={{ fontSize: '0.58rem', background: '#4CAF50', color: '#000', borderRadius: '3px', padding: '1px 5px', fontWeight: 'bold' }}>🎁 GRATIS</span>
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.58rem', background: '#d4af37', color: '#000', borderRadius: '3px', padding: '1px 5px', fontWeight: 'bold' }}>
+                                                <VaultIcon name="gift" size={10} color="#000" /> GRATIS
+                                            </span>
                                         )}
                                         <span style={{ fontSize: '0.58rem', background: '#d4af37', color: '#000', borderRadius: '3px', padding: '1px 5px', fontWeight: 'bold' }}>{t.posicion}</span>
                                         <span style={{ fontSize: '0.58rem', color: '#d4af37', border: '1px solid #3a3320', borderRadius: '3px', padding: '1px 5px' }}>{t.tipo}</span>
@@ -664,7 +684,7 @@ const MapaPage = ({
                     <div style={{ flex: 1, overflowY: 'auto', padding: '14px' }}>
                         {nav.nodos.length === 0 ? (
                             <div style={{ textAlign: 'center', marginTop: '50px', color: '#777' }}>
-                                <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🥋</div>
+                                <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'center' }}><VaultIcon name="bookOpen" size={40} color="#d4af37" /></div>
                                 <p>No hay videos con este filtro.</p>
                                 {hayFiltro && <button onClick={() => { resetNavegacion(); setAutorSel(null); }} style={{ ...styles.btnOutline, width: 'auto', padding: '8px 14px', borderColor: '#d4af37', color: '#d4af37', borderRadius: '6px', cursor: 'pointer' }}>Quitar filtro</button>}
                             </div>
