@@ -12,6 +12,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
     const [tiempoActivo, setTiempoActivo] = useState(video?.startTime || 0);
     const [nombreMarcador, setNombreMarcador] = useState("");
     const [esMovil, setEsMovil] = useState(window.innerWidth < 768);
+    const [pantallaCompleta, setPantallaCompleta] = useState(false);
     const [mostrarAlerta, setMostrarAlerta] = useState(false);
     const [mensajeAlerta, setMensajeAlerta] = useState("");
     
@@ -143,6 +144,19 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
 
     const isCompletado = vistos.includes(video?.id);
 
+    // En móvil usamos 16:9 (la forma real del video) y quitamos la barra
+    // superior de Drive con rm=minimal. Antes se forzaba 4:3 + minHeight,
+    // lo que dejaba una franja negra encima del video que tapaba los controles.
+    const paramsDrive = [];
+    if (esMovil) paramsDrive.push('rm=minimal');
+    if (tiempoActivo) paramsDrive.push(`t=${tiempoActivo}`);
+    const driveSrc = `https://drive.google.com/file/d/${video?.id}/preview${paramsDrive.length ? `?${paramsDrive.join('&')}` : ''}`;
+
+    const abrirEnDrive = () => {
+        if (!video?.id) return;
+        window.open(`https://drive.google.com/file/d/${video.id}/view`, '_blank', 'noopener,noreferrer');
+    };
+
     return (
         <div style={{ 
             display: 'flex', 
@@ -242,6 +256,23 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
 
                     {/* HERRAMIENTAS DERECHAS */}
                     <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 }}>
+                        <button
+                            onClick={() => setPantallaCompleta(v => !v)}
+                            title={pantallaCompleta ? 'Salir de pantalla completa' : 'Pantalla completa'}
+                            aria-label="Pantalla completa"
+                            style={{
+                                background: 'none',
+                                border: '1px solid #d4af37',
+                                color: '#d4af37',
+                                borderRadius: '4px',
+                                fontSize: esMovil ? '1rem' : '0.9rem',
+                                padding: '4px 8px',
+                                cursor: 'pointer',
+                                lineHeight: 1
+                            }}
+                        >
+                            ⛶
+                        </button>
                         <button 
                             onClick={onNavigateToNotes} 
                             style={{ 
@@ -277,23 +308,61 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                     </div>
                 </div>
 
-                {/* REPRODUCTOR DE VIDEO OPTIMIZADO CON ESPACIO SUFICIENTE PARA CONTROLES MÓVILES */}
-                <div style={{ 
-                    width: '100%', 
-                    aspectRatio: esMovil ? '4/3' : '16/9', 
-                    minHeight: esMovil ? '280px' : 'auto',
-                    backgroundColor: '#000', 
-                    position: 'relative', 
+                {/* REPRODUCTOR: 16:9 en móvil para que el video no quede dentro de una caja 4:3 con franjas negras */}
+                <div style={{
+                    position: pantallaCompleta ? 'fixed' : 'relative',
+                    inset: pantallaCompleta ? 0 : undefined,
+                    zIndex: pantallaCompleta ? 9990 : 'auto',
+                    width: '100%',
+                    aspectRatio: pantallaCompleta ? undefined : '16 / 9',
+                    backgroundColor: '#000',
+                    display: 'flex',
+                    flexDirection: 'column',
                     flexShrink: 0,
-                    marginBottom: '8px'
+                    marginBottom: pantallaCompleta ? 0 : '8px',
+                    overflow: 'hidden'
                 }}>
-                    <iframe
-                        key={`${video?.id}-${tiempoActivo}`}
-                        src={`https://drive.google.com/file/d/${video?.id}/preview${tiempoActivo ? `?t=${tiempoActivo}` : ''}`}
-                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
-                        allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-                        allowFullScreen
-                    ></iframe>
+                    {pantallaCompleta && (
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '10px',
+                            padding: 'calc(env(safe-area-inset-top, 0px) + 8px) 12px 8px',
+                            backgroundColor: '#0a0a0a',
+                            borderBottom: '1px solid #222',
+                            flexShrink: 0
+                        }}>
+                            <span style={{ color: '#d4af37', fontSize: '0.8rem', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {video?.titulo}
+                            </span>
+                            <button
+                                onClick={() => setPantallaCompleta(false)}
+                                style={{ ...(styles.btnOutline || {}), width: 'auto', padding: '6px 10px', fontSize: '0.7rem', borderColor: '#d4af37', color: '#d4af37', borderRadius: '6px', cursor: 'pointer', flexShrink: 0 }}
+                            >
+                                ✕ SALIR
+                            </button>
+                        </div>
+                    )}
+
+                    <div style={{
+                        position: pantallaCompleta ? 'relative' : 'absolute',
+                        top: pantallaCompleta ? undefined : 0,
+                        left: pantallaCompleta ? undefined : 0,
+                        flex: pantallaCompleta ? 1 : undefined,
+                        minHeight: 0,
+                        width: '100%',
+                        height: pantallaCompleta ? undefined : '100%'
+                    }}>
+                        <iframe
+                            key={`${video?.id}-${tiempoActivo}`}
+                            src={driveSrc}
+                            title={video?.titulo || 'Reproductor de video'}
+                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+                            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                            allowFullScreen
+                        ></iframe>
+                    </div>
                 </div>
 
                 {/* TÍTULO EN MÓVIL (COMPACTO, JUSTO DEBAJO DEL VIDEO) */}
@@ -301,6 +370,12 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                     <div style={{ padding: '8px 15px 4px 15px', textAlign: 'center', backgroundColor: '#070707' }}>
                         <span style={{ fontSize: '0.5rem', color: '#d4af37', letterSpacing: '2px', display: 'block', marginBottom: '2px', fontWeight: 'bold' }}>MODO ESTUDIO</span>
                         <h2 style={{ fontSize: '0.85rem', color: '#d4af37', margin: 0, fontWeight: 'bold', wordBreak: 'break-word', letterSpacing: '0.5px', lineHeight: '1.3' }}>{video?.titulo}</h2>
+                        <button
+                            onClick={() => setPantallaCompleta(true)}
+                            style={{ marginTop: '6px', background: 'none', border: 'none', color: '#d4af37', fontSize: '0.62rem', cursor: 'pointer', textDecoration: 'underline' }}
+                        >
+                            ⛶ Ver en pantalla completa
+                        </button>
                     </div>
                 )}
 
@@ -329,12 +404,22 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                         ⏭
                     </button>
 
-                    <button
-                        onClick={() => setMostrarReporte(true)}
-                        style={{ background: 'none', border: 'none', color: '#d4af37', opacity: 0.8, fontSize: '0.65rem', cursor: 'pointer', textDecoration: 'underline' }}
-                    >
-                        ¿Problemas con el video? Reportar fallo técnico
-                    </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                        <button
+                            onClick={() => setMostrarReporte(true)}
+                            style={{ background: 'none', border: 'none', color: '#d4af37', opacity: 0.8, fontSize: '0.65rem', cursor: 'pointer', textDecoration: 'underline' }}
+                        >
+                            ¿Problemas con el video? Reportar fallo técnico
+                        </button>
+                        {esMovil && (
+                            <button
+                                onClick={abrirEnDrive}
+                                style={{ background: 'none', border: 'none', color: '#8a8a8a', fontSize: '0.62rem', cursor: 'pointer', textDecoration: 'underline' }}
+                            >
+                                Si los controles no responden, abrir en Drive ↗
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
 
