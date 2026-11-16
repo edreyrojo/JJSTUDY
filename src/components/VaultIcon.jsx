@@ -282,6 +282,18 @@ const ICONS = {
       <rect x="3" y="13" width="8" height="8" rx="1" />
     </>
   ),
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <polyline points="12 7 12 12 15 14" />
+    </>
+  ),
+  copy: (
+    <>
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+    </>
+  ),
 };
 
 const VaultIcon = ({
