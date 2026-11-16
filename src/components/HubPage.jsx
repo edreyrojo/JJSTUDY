@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, doc, getDoc, query, orderBy, limit, getDocs, updateDoc, where } from 'firebase/firestore';
+import { collection, addDoc, doc, query, orderBy, limit, getDocs, updateDoc, where } from 'firebase/firestore';
 import Swal from 'sweetalert2';
+import VaultIcon from './VaultIcon';
 
 const HubPage = ({
     onNavigate,
@@ -12,33 +13,48 @@ const HubPage = ({
     usuario,
     styles = {}
 }) => {
-    // 🛡️ BLINDAJE: Si no existe el usuario, mostramos pantalla de carga
-    if (!usuario) {
-        return (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#d4af37', fontSize: '1.5rem', backgroundColor: '#0a0a0a' }}>
-                <p style={{ animation: 'pulse-rojo 2s infinite' }}>Conectando al tatami digital...</p>
-            </div>
-        );
-    }
-
-    // Estados Originales
     const [showSoporte, setShowSoporte] = useState(false);
-    const [mensajeSoporte, setMensajeSoporte] = useState("");
+    const [mensajeSoporte, setMensajeSoporte] = useState('');
     const [enviando, setEnviando] = useState(false);
     const [showTutoriales, setShowTutoriales] = useState(false);
     const [fondoAcademia, setFondoAcademia] = useState(null);
-
-    // Estados para las Notificaciones/Anuncios
     const [anuncioReciente, setAnuncioReciente] = useState(null);
     const [hayNotificacion, setHayNotificacion] = useState(false);
     const [showAnuncio, setShowAnuncio] = useState(false);
+    const [ancho, setAncho] = useState(window.innerWidth);
+
+    useEffect(() => {
+        const handleResize = () => setAncho(window.innerWidth);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    const esMovil = ancho < 768;
+    const esTablet = ancho >= 768 && ancho < 1100;
+    const esStaff = ['admin', 'profesor', 'instructor'].includes(userRole);
+    const esAdmin = userRole === 'admin';
+    const esMaestro = ['admin', 'profesor'].includes(userRole);
 
     const coloresCinturon = {
         'Blanco': '#FFFFFF', 'Azul': '#2196F3', 'Morado': '#9C27B0',
         'Café': '#795548', 'Negro': '#212121'
     };
 
-    // --- NUEVA FUNCIÓN: Confirmación de Cierre de Sesión Seguro ---
+    const notificar = (texto, icon = 'success') => {
+        Swal.fire({
+            text: texto,
+            icon,
+            background: '#0a0a0a',
+            color: '#fff',
+            confirmButtonColor: '#d4af37',
+            iconColor: '#d4af37',
+            border: '1px solid #d4af37',
+            customClass: {
+                popup: 'gold-border-alert'
+            }
+        });
+    };
+
     const handleConfirmarLogout = () => {
         Swal.fire({
             title: '¿CERRAR SESIÓN?',
@@ -62,15 +78,19 @@ const HubPage = ({
         });
     };
 
-    // Efecto para cargar Fondo de Academia
     useEffect(() => {
+        const teamId = usuario?.teamId;
+        const academiaId = usuario?.academiaId;
+        const uid = usuario?.uid;
+        if (!uid) return;
+
         const fetchFondoApp = async () => {
-            const IMAGEN_POR_DEFECTO = "https://images.unsplash.com/photo-1564415315949-26bf26eb4e3e?q=80&w=1000&auto=format&fit=crop";
+            const IMAGEN_POR_DEFECTO = 'https://images.unsplash.com/photo-1564415315949-26bf26eb4e3e?q=80&w=1000&auto=format&fit=crop';
 
             try {
-                if (usuario?.teamId || usuario?.uid) {
-                    const idBusquedaSede = usuario.teamId || usuario.uid;
-                    const qSede = query(collection(db, "sedes"), where("teamId", "==", idBusquedaSede));
+                if (teamId || uid) {
+                    const idBusquedaSede = teamId || uid;
+                    const qSede = query(collection(db, 'sedes'), where('teamId', '==', idBusquedaSede));
                     const sedeSnap = await getDocs(qSede);
 
                     if (!sedeSnap.empty) {
@@ -78,14 +98,14 @@ const HubPage = ({
                         const imagen = data.avatarSede || data.logoBase64 || data.logobase64;
                         if (imagen) {
                             setFondoAcademia(imagen);
-                            return; 
+                            return;
                         }
                     }
                 }
 
-                if (usuario?.academiaId || usuario?.uid) {
-                    const idBusquedaAcademia = usuario.academiaId || usuario.uid;
-                    const qAcademia = query(collection(db, "academias"), where("academiaId", "==", idBusquedaAcademia));
+                if (academiaId || uid) {
+                    const idBusquedaAcademia = academiaId || uid;
+                    const qAcademia = query(collection(db, 'academias'), where('academiaId', '==', idBusquedaAcademia));
                     const academiaSnap = await getDocs(qAcademia);
 
                     if (!academiaSnap.empty) {
@@ -100,21 +120,18 @@ const HubPage = ({
 
                 setFondoAcademia(IMAGEN_POR_DEFECTO);
             } catch (error) {
-                console.error("ERROR CRÍTICO en la carga de datos:", error);
+                console.error('Error en la carga del fondo:', error);
                 setFondoAcademia(IMAGEN_POR_DEFECTO);
             }
         };
 
-        if (usuario) {
-            fetchFondoApp();
-        }
+        fetchFondoApp();
     }, [usuario?.teamId, usuario?.academiaId, usuario?.uid]);
 
-    // Efecto para buscar el último anuncio
     useEffect(() => {
         const fetchUltimoAnuncio = async () => {
             try {
-                const q = query(collection(db, "anuncios"), orderBy("fecha", "desc"), limit(1));
+                const q = query(collection(db, 'anuncios'), orderBy('fecha', 'desc'), limit(1));
                 const snap = await getDocs(q);
 
                 if (!snap.empty) {
@@ -129,16 +146,16 @@ const HubPage = ({
                     }
                 }
             } catch (error) {
-                console.error("Error al buscar anuncios:", error);
+                console.error('Error al buscar anuncios:', error);
             }
         };
 
         if (usuario?.uid) {
             fetchUltimoAnuncio();
         }
-    }, [usuario]);
+    }, [usuario?.uid, usuario?.ultimoAnuncioVisto]);
 
-    const handleAbrirAnuncio = (e) => {
+    const handleAbrirAnuncio = async (e) => {
         e.stopPropagation();
         setShowAnuncio(true);
         setHayNotificacion(false);
@@ -149,12 +166,12 @@ const HubPage = ({
 
         if (usuario?.uid && anuncioReciente?.id !== usuario?.ultimoAnuncioVisto) {
             try {
-                const userRef = doc(db, "usuarios", usuario.uid);
-                updateDoc(userRef, {
+                const userRef = doc(db, 'usuarios', usuario.uid);
+                await updateDoc(userRef, {
                     ultimoAnuncioVisto: anuncioReciente.id
                 });
             } catch (error) {
-                console.error("No se pudo actualizar el estado de lectura:", error);
+                console.error('No se pudo actualizar el estado de lectura:', error);
             }
         }
     };
@@ -163,46 +180,72 @@ const HubPage = ({
         if (!mensajeSoporte.trim()) return;
         setEnviando(true);
         try {
-            await addDoc(collection(db, "soporte"), {
-                uid: usuario?.uid || "anonimo",
-                nombre: usuario?.nombre || "Usuario sin nombre",
-                email: usuario?.email || "Sin email",
+            await addDoc(collection(db, 'soporte'), {
+                uid: usuario?.uid || 'anonimo',
+                nombre: usuario?.nombre || 'Usuario sin nombre',
+                email: usuario?.email || 'Sin email',
                 mensaje: mensajeSoporte,
                 fecha: new Date().toLocaleString(),
-                estado: "pendiente",
+                estado: 'pendiente',
                 rolAlMomento: userRole
             });
-            alert("Mensaje enviado a Ngasi. Revisaré el sistema pronto. 🛡️");
-            setMensajeSoporte("");
+            notificar('Mensaje enviado a Ngasi. Revisaré el sistema pronto.');
+            setMensajeSoporte('');
             setShowSoporte(false);
         } catch (error) {
-            console.error("Error soporte:", error);
-            alert("No se pudo enviar el reporte.");
+            console.error('Error soporte:', error);
+            notificar('No se pudo enviar el reporte.', 'error');
         } finally {
             setEnviando(false);
         }
     };
 
+    if (!usuario) {
+        return (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#d4af37', fontSize: '1.2rem', backgroundColor: '#0a0a0a', padding: '20px', textAlign: 'center' }}>
+                <p style={{ letterSpacing: '1px' }}>Conectando al tatami digital...</p>
+            </div>
+        );
+    }
+
     const tienePerfil = usuario?.fotoBase64 && usuario?.fotoBase64.length > 0;
     const grados = usuario?.grados || 0;
     const cinturon = usuario?.cinturon || 'Blanco';
 
-    // --- LÓGICA DE DISTRIBUCIÓN RADIAL MATEMÁTICA ---
-    const herramientasDial = [
-        { id: 'mapa', label: 'MAPA', icon: <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>, route: 'mapa' },
-        { id: 'notas', label: 'BITÁCORA', icon: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></>, route: 'notas_hub' },
-        { id: 'buscar', label: 'BUSCAR', icon: <><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></>, route: 'busqueda' },
-        { id: 'timer', label: 'TIMER', icon: <><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></>, route: 'timer' },
-        { id: 'planeador', label: 'CLASES', icon: <><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></>, route: 'planeador' },
-        { id: 'instalar', label: 'INSTALAR', icon: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></>, route: 'instalar' },
-        { id: 'micuenta', label: 'MI CUENTA', icon: <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></>, route: 'mi_cuenta' }
+    const herramientasGenerales = [
+        { id: 'mapa', label: 'MAPA', description: 'Explora posiciones, autores y cursos', route: 'mapa', icon: 'map' },
+        { id: 'notas', label: 'BITÁCORA', description: 'Repasa tus apuntes técnicos', route: 'notas_hub', icon: 'notebook' },
+        { id: 'buscar', label: 'BUSCAR', description: 'Por nombre, posición o etiqueta', route: 'busqueda', icon: 'search' },
+        { id: 'timer', label: 'TIMER', description: 'Rounds, descansos y control', route: 'timer', icon: 'timer' },
+        { id: 'instalar', label: 'INSTALAR', description: 'Acceso directo en tu dispositivo', route: 'instalar', icon: 'download' },
+        { id: 'micuenta', label: 'MI PERFIL', description: 'Datos, cinturón y contacto', route: 'mi_cuenta', icon: 'user' }
     ];
 
-    if (['admin', 'profesor', 'instructor'].includes(userRole)) {
-        herramientasDial.push({ id: 'dojo', label: 'DOJO', icon: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></>, route: 'alumnos' });
-    }
+    const herramientasGestion = esStaff ? [
+        { id: 'planeador', label: 'PLANEADOR', description: 'Diseña tus sesiones y contenidos', route: 'planeador', icon: 'clipboard' },
+        { id: 'dojo', label: 'DOJO', description: 'Alumnos, pagos y sedes', route: 'alumnos', icon: 'dojo' }
+    ] : [];
 
-    const radioDial = 105; 
+    const herramientasDial = [...herramientasGenerales, ...herramientasGestion];
+    const tamanoRadial = esMovil
+        ? Math.max(240, Math.min(340, ancho - 40))
+        : esTablet ? 360 : 420;
+    const radioDial = esMovil ? tamanoRadial * 0.35 : esTablet ? 128 : 155;
+    const tamanoBoton = esMovil
+        ? (tamanoRadial <= 280 ? 52 : tamanoRadial <= 320 ? 58 : 62)
+        : esTablet ? 82 : 92;
+    const tamanoIcono = esMovil
+        ? (tamanoRadial <= 280 ? 15 : 17)
+        : esTablet ? 20 : 22;
+    const tamanoLetra = esMovil
+        ? (tamanoRadial <= 280 ? '0.38rem' : '0.44rem')
+        : esTablet ? '0.52rem' : '0.56rem';
+    const tamanoCentro = esMovil
+        ? (tamanoRadial <= 280 ? 60 : 70)
+        : esTablet ? 88 : 98;
+    const insetAnillo = esMovil
+        ? `${Math.round(tamanoRadial * 0.2)}px`
+        : esTablet ? '60px' : '70px';
     const angleStep = (2 * Math.PI) / herramientasDial.length;
 
     const contenedorEstilos = {
@@ -223,7 +266,7 @@ const HubPage = ({
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
-        backgroundAttachment: 'fixed',
+        backgroundAttachment: esMovil ? 'scroll' : 'fixed',
         overflowX: 'hidden',
         boxSizing: 'border-box'
     };
@@ -231,10 +274,10 @@ const HubPage = ({
     return (
         <div style={contenedorEstilos}>
             <style>{`
-                @keyframes pulse-rojo {
-                    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 50, 50, 0.7); }
-                    70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(255, 50, 50, 0); }
-                    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 50, 50, 0); }
+                @keyframes pulse-gold {
+                    0% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.7); }
+                    70% { box-shadow: 0 0 0 10px rgba(212, 175, 55, 0); }
+                    100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0); }
                 }
                 @keyframes heartbeat-gold {
                     0% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 15px rgba(212,175,55,0.4); }
@@ -262,16 +305,24 @@ const HubPage = ({
                     backdrop-filter: blur(6px);
                     box-sizing: border-box;
                 }
-                .user-profile-card-circular:hover {
-                    transform: scale(1.06);
+                .user-profile-card-circular:hover,
+                .user-profile-card-circular:focus-visible {
+                    transform: scale(1.05);
                     box-shadow: 0 0 20px rgba(212, 175, 55, 0.5);
+                    outline: none;
                 }
 
                 .radial-hub-container {
                     position: relative;
-                    width: 300px;
-                    height: 300px;
-                    margin: 15px auto 10px auto;
+                    margin: 18px auto 10px auto;
+                    flex-shrink: 0;
+                }
+
+                .radial-ring {
+                    position: absolute;
+                    border: 1px dashed rgba(212, 175, 55, 0.16);
+                    border-radius: 50%;
+                    pointer-events: none;
                 }
 
                 .center-hub-node {
@@ -279,8 +330,8 @@ const HubPage = ({
                     top: 50%;
                     left: 50%;
                     transform: translate(-50%, -50%);
-                    width: 90px;
-                    height: 90px;
+                    width: 98px;
+                    height: 98px;
                     border-radius: 50%;
                     background: radial-gradient(circle, #222 0%, #0a0a0a 100%);
                     border: 2px solid #d4af37;
@@ -288,10 +339,11 @@ const HubPage = ({
                     flex-direction: column;
                     align-items: center;
                     justify-content: center;
+                    gap: 3px;
                     z-index: 20;
-                    cursor: pointer;
-                    transition: all 0.3s;
+                    transition: all 0.3s ease;
                     color: #d4af37;
+                    text-align: center;
                 }
                 .center-hub-node.active-session {
                     animation: heartbeat-gold 2s infinite;
@@ -299,12 +351,15 @@ const HubPage = ({
                 }
                 .center-hub-node.active-session:hover {
                     animation: none;
-                    transform: translate(-50%, -50%) scale(1.1);
+                    transform: translate(-50%, -50%) scale(1.08);
                     background-color: #d4af37;
                     color: #000;
+                    cursor: pointer;
                 }
-                .center-hub-node:hover svg {
-                    stroke: #000;
+                .center-hub-node span {
+                    font-size: 0.55rem;
+                    font-weight: bold;
+                    letter-spacing: 1px;
                 }
 
                 .dial-btn-wrapper {
@@ -317,104 +372,201 @@ const HubPage = ({
                 .dial-btn {
                     position: absolute;
                     transform: translate(-50%, -50%);
-                    width: 60px;
-                    height: 60px;
-                    border-radius: 30px;
-                    background-color: rgba(15, 15, 15, 0.95);
+                    width: 92px;
+                    height: 92px;
+                    border-radius: 50%;
+                    background-color: rgba(15, 15, 15, 0.96);
                     border: 1px solid #d4af37;
                     color: #d4af37;
                     display: flex;
+                    flex-direction: column;
                     align-items: center;
                     justify-content: center;
+                    gap: 5px;
                     cursor: pointer;
                     overflow: hidden;
-                    transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+                    transition: transform 0.2s ease, background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
                     box-shadow: 0 4px 10px rgba(0,0,0,0.6);
                     backdrop-filter: blur(4px);
+                    padding: 6px;
                 }
-
-                .dial-btn:hover, .dial-btn:focus {
-                    width: 145px;
+                .dial-btn:hover,
+                .dial-btn:focus-visible {
                     background-color: #d4af37;
                     color: #000;
-                    z-index: 50;
+                    transform: translate(-50%, -50%) scale(1.06);
                     box-shadow: 0 0 20px rgba(212, 175, 55, 0.5);
+                    outline: none;
                 }
-
+                .dial-btn:active {
+                    transform: translate(-50%, -50%) scale(0.98);
+                }
                 .dial-btn svg {
                     flex-shrink: 0;
-                    transition: stroke 0.3s;
                 }
-                .dial-btn:hover svg {
-                    stroke: #000;
-                }
-
                 .dial-label {
-                    max-width: 0;
-                    opacity: 0;
-                    overflow: hidden;
-                    white-space: nowrap;
-                    font-size: 0.75rem;
+                    font-size: 0.56rem;
                     font-weight: bold;
-                    letter-spacing: 1px;
-                    transition: max-width 0.3s ease, opacity 0.3s ease;
+                    letter-spacing: 0.5px;
+                    line-height: 1.1;
+                    text-align: center;
+                    max-width: 100%;
                 }
 
-                .dial-btn:hover .dial-label {
-                    max-width: 100px;
-                    opacity: 1;
-                    margin-left: 8px;
-                }
-
-                .secondary-actions {
+                .hub-mobile-card {
                     display: flex;
-                    flex-direction: column;
-                    gap: 12px;
+                    align-items: center;
+                    gap: 9px;
+                    min-height: 64px;
+                    padding: 10px;
+                    background-color: rgba(15, 15, 15, 0.96);
+                    border: 1px solid #333;
+                    border-radius: 10px;
+                    color: #d4af37;
+                    text-align: left;
+                    cursor: pointer;
+                    transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.15s ease;
+                    box-sizing: border-box;
+                }
+                .hub-mobile-card:hover,
+                .hub-mobile-card:focus-visible {
+                    border-color: #d4af37;
+                    background-color: rgba(212, 175, 55, 0.08);
+                    outline: none;
+                }
+                .hub-mobile-card:active {
+                    transform: scale(0.98);
+                }
+                .hub-mobile-icon {
+                    width: 34px;
+                    height: 34px;
+                    border-radius: 8px;
+                    background-color: #d4af37;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    flex-shrink: 0;
+                }
+                .hub-mobile-label {
+                    display: block;
+                    font-size: 0.66rem;
+                    font-weight: bold;
+                    letter-spacing: 0.5px;
+                    line-height: 1.15;
+                }
+                .hub-mobile-sub {
+                    display: block;
+                    font-size: 0.55rem;
+                    color: #888;
+                    line-height: 1.2;
+                    margin-top: 2px;
+                }
+
+                .hub-actions {
+                    display: flex;
+                    flex-wrap: wrap;
+                    justify-content: center;
+                    gap: 8px;
                     width: 100%;
-                    max-width: 320px;
-                    position: relative;
-                    z-index: 10;
-                    margin-top: 40px;
+                    max-width: 420px;
+                    margin: 18px auto 0;
+                }
+                .hub-action {
+                    flex: 1 1 140px;
+                    min-width: 140px;
+                    max-width: 200px;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 6px;
+                    padding: 9px 12px;
+                    background-color: rgba(0, 0, 0, 0.78);
+                    border: 1px solid #333;
+                    color: #d4af37;
+                    border-radius: 8px;
+                    font-size: 0.67rem;
+                    font-weight: bold;
+                    letter-spacing: 0.4px;
+                    cursor: pointer;
+                    transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.15s ease;
+                    box-sizing: border-box;
+                }
+                .hub-action:hover,
+                .hub-action:focus-visible {
+                    border-color: #d4af37;
+                    background-color: rgba(212, 175, 55, 0.08);
+                    outline: none;
+                }
+                .hub-action:active {
+                    transform: scale(0.98);
+                }
+                .hub-action-logout {
+                    border-color: #3a2a2a;
                 }
 
                 @media (max-width: 480px) {
-                    .radial-hub-container {
-                        width: 260px;
-                        height: 260px;
+                    .user-profile-card-circular {
+                        width: 112px;
+                        height: 112px;
                     }
-                    .secondary-actions {
-                        margin-top: 30px;
+                    .hub-action {
+                        font-size: 0.62rem;
+                        padding: 8px 10px;
                     }
                 }
             `}</style>
 
-            <h1 style={{ ...styles.goldTitle, marginTop: '5px', marginBottom: '0', fontSize: '1.3rem', position: 'relative', zIndex: 10, textAlign: 'center' }}>
+            <h1 style={{ ...styles.goldTitle, marginTop: '5px', marginBottom: '0', fontSize: esMovil ? '1.15rem' : '1.35rem', position: 'relative', zIndex: 10, textAlign: 'center' }}>
                 LA FORTUNA VAULT
             </h1>
+            <p style={{ color: '#777', fontSize: '0.58rem', letterSpacing: '2px', margin: '4px 0 0 0', textAlign: 'center', textTransform: 'uppercase' }}>
+                Hub de estudio y gestión
+            </p>
 
-            {/* --- PANEL DE USUARIO CIRCULAR CENTRADO --- */}
-            <div className="user-profile-card-circular" onClick={() => onNavigate('mi_cuenta')}>
+            {/* PERFIL CIRCULAR */}
+            <div
+                className="user-profile-card-circular"
+                onClick={() => onNavigate('mi_cuenta')}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onNavigate('mi_cuenta');
+                    }
+                }}
+                title="Mi perfil"
+            >
                 {(hayNotificacion || anuncioReciente) && (
-                    <div
+                    <button
+                        type="button"
                         onClick={handleAbrirAnuncio}
                         style={{
-                            position: 'absolute', top: '-2px', right: '-2px',
-                            backgroundColor: hayNotificacion ? '#ff3333' : '#222',
-                            border: `2px solid ${hayNotificacion ? '#ffcccc' : '#d4af37'}`,
-                            borderRadius: '50%', width: '28px', height: '28px',
-                            display: 'flex', justifyContent: 'center', alignItems: 'center',
-                            cursor: 'pointer', zIndex: 101,
-                            animation: hayNotificacion ? 'pulse-rojo 2s infinite' : 'none',
-                            boxShadow: '0 2px 5px rgba(0,0,0,0.5)'
+                            position: 'absolute',
+                            top: '-2px',
+                            right: '-2px',
+                            backgroundColor: hayNotificacion ? '#d4af37' : '#222',
+                            border: `2px solid ${hayNotificacion ? '#f0d67a' : '#d4af37'}`,
+                            borderRadius: '50%',
+                            width: '28px',
+                            height: '28px',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            cursor: 'pointer',
+                            zIndex: 101,
+                            animation: hayNotificacion ? 'pulse-gold 2s infinite' : 'none',
+                            boxShadow: '0 2px 5px rgba(0,0,0,0.5)',
+                            padding: 0
                         }}
-                        title="Anuncio Reciente"
+                        title="Anuncio reciente"
+                        aria-label="Abrir anuncio reciente"
                     >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={hayNotificacion ? "#fff" : "#d4af37"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                        </svg>
-                        {hayNotificacion && <div style={{ position: 'absolute', top: 0, right: 0, width: '7px', height: '7px', backgroundColor: '#fff', borderRadius: '50%' }} />}
-                    </div>
+                        <VaultIcon name="bell" size={13} color={hayNotificacion ? '#000' : '#d4af37'} />
+                        {hayNotificacion && (
+                            <span style={{ position: 'absolute', top: 1, right: 1, width: '6px', height: '6px', backgroundColor: '#000', borderRadius: '50%' }} />
+                        )}
+                    </button>
                 )}
 
                 {tienePerfil ? (
@@ -425,44 +577,47 @@ const HubPage = ({
                             backgroundPosition: 'center', border: '1.5px solid #d4af37', marginBottom: '2px',
                             boxShadow: '0 2px 8px rgba(0,0,0,0.5)'
                         }} />
-                        <p style={{ color: '#fff', fontSize: '0.62rem', fontWeight: 'bold', margin: '0 0 2px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '95px', textAlign: 'center' }}>
+                        <p style={{ color: '#fff', fontSize: '0.6rem', fontWeight: 'bold', margin: '0 0 2px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '92px', textAlign: 'center' }}>
                             {usuario?.nombre || 'Guerrero'}
                         </p>
-                        <div style={{ height: '5px', width: '70px', backgroundColor: coloresCinturon[cinturon], borderRadius: '2px', display: 'flex', justifyContent: 'flex-end', border: '1px solid #111' }}>
+                        <div style={{ height: '5px', width: '68px', backgroundColor: coloresCinturon[cinturon], borderRadius: '2px', display: 'flex', justifyContent: 'flex-end', border: '1px solid #111' }}>
                             <div style={{ height: '100%', width: '20px', backgroundColor: cinturon === 'Negro' ? '#D32F2F' : '#111', display: 'flex', justifyContent: 'space-evenly' }}>
                                 {[...Array(4)].map((_, i) => <div key={i} style={{ height: '100%', width: '2px', backgroundColor: i < grados ? '#FFF' : 'transparent' }} />)}
                             </div>
                         </div>
+                        <span style={{ fontSize: '0.42rem', color: '#d4af37', letterSpacing: '1px', marginTop: '3px' }}>MI PERFIL</span>
                     </>
                 ) : (
-                    <div style={{ textAlign: 'center', padding: '2px' }}>
-                        <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+                    <div style={{ textAlign: 'center', padding: '2px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+                        <VaultIcon name="user" size={30} color="#d4af37" />
                         <p style={{ color: '#d4af37', fontSize: '0.55rem', fontWeight: 'bold', margin: 0 }}>MI PERFIL</p>
                     </div>
                 )}
             </div>
 
-            {/* --- NÚCLEO RADIAL DE HERRAMIENTAS --- */}
-            <div className="radial-hub-container">
-                <div 
-                    className={`center-hub-node ${hasSession ? 'active-session' : ''}`} 
+            {/* HERRAMIENTAS: MENÚ RADIAL EN MÓVIL, TABLET Y PC */}
+            <div
+                className="radial-hub-container"
+                style={{ width: `${tamanoRadial}px`, height: `${tamanoRadial}px` }}
+            >
+                <div
+                    className="radial-ring"
+                    style={{ inset: insetAnillo }}
+                />
+
+                <div
+                    className={`center-hub-node ${hasSession ? 'active-session' : ''}`}
                     onClick={hasSession ? onContinue : undefined}
-                    title={hasSession ? "Continuar Estudio" : "La Fortuna Vault"}
+                    style={{ width: tamanoCentro, height: tamanoCentro, cursor: hasSession ? 'pointer' : 'default' }}
+                    title={hasSession ? 'Continuar estudio' : 'La Fortuna Vault'}
                 >
-                    {hasSession ? (
-                        <>
-                            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <polygon points="5 3 19 12 5 21 5 3"></polygon> 
-                            </svg>
-                            <span style={{ fontSize: '0.6rem', fontWeight: 'bold', marginTop: '3px', letterSpacing: '1px' }}>CONTINUAR</span>
-                        </>
-                    ) : (
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-                            <path d="M2 12h20"></path>
-                        </svg>
-                    )}
+                    <VaultIcon
+                        name={hasSession ? 'play' : 'shield'}
+                        size={hasSession ? Math.round(tamanoCentro * 0.28) : Math.round(tamanoCentro * 0.32)}
+                    />
+                    <span style={{ fontSize: esMovil ? (tamanoRadial <= 280 ? '0.4rem' : '0.46rem') : '0.55rem' }}>
+                        {hasSession ? 'CONTINUAR' : 'VAULT'}
+                    </span>
                 </div>
 
                 {herramientasDial.map((herramienta, index) => {
@@ -471,56 +626,63 @@ const HubPage = ({
                     const coordY = Math.sin(angulo) * radioDial;
 
                     return (
-                        <div 
+                        <div
                             key={herramienta.id}
                             className="dial-btn-wrapper"
                             style={{ transform: `translate(${coordX}px, ${coordY}px)` }}
                         >
-                            <button 
-                                className="dial-btn" 
+                            <button
+                                type="button"
+                                className="dial-btn"
                                 onClick={() => onNavigate(herramienta.route)}
-                                title={herramienta.label}
+                                title={herramienta.description}
+                                aria-label={`${herramienta.label}: ${herramienta.description}`}
+                                style={{
+                                    width: tamanoBoton,
+                                    height: tamanoBoton,
+                                    borderRadius: '50%',
+                                    gap: esMovil ? 2 : 5,
+                                    padding: esMovil ? 3 : 6
+                                }}
                             >
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    {herramienta.icon}
-                                </svg>
-                                <span className="dial-label">{herramienta.label}</span>
+                                <VaultIcon name={herramienta.icon} size={tamanoIcono} />
+                                <span className="dial-label" style={{ fontSize: tamanoLetra }}>{herramienta.label}</span>
                             </button>
                         </div>
                     );
                 })}
             </div>
 
-            {/* --- ACCIONES SECUNDARIAS INFERIORES --- */}
-            <div className="secondary-actions">
-                <div style={{ display: 'flex', gap: '10px' }}>
-                    <button style={{ ...styles.hubBtn, flex: 1, padding: '10px', border: '1px solid #ff4444', color: '#ff4444', backgroundColor: 'rgba(0,0,0,0.8)', fontSize: '0.75rem', borderRadius: '8px' }} onClick={() => setShowSoporte(true)}>
-                        SOPORTE
-                    </button>
-                    <button style={{ ...styles.hubBtn, flex: 1, padding: '10px', border: '1px solid #4CAF50', color: '#4CAF50', backgroundColor: 'rgba(0,0,0,0.8)', fontSize: '0.75rem', borderRadius: '8px' }} onClick={() => setShowTutoriales(true)}>
-                        TUTORIALES
-                    </button>
-                </div>
-
-                {userRole === 'admin' && (
-                    <button style={{ ...styles.hubBtn, padding: '10px', backgroundColor: 'rgba(26,26,26,0.9)', border: '1px solid #d4af37', color: '#d4af37', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.75rem' }} onClick={() => onNavigate('admin')}>
-                        CONTROL DE ACCESOS
+            {/* ACCIONES SECUNDARIAS */}
+            <div className="hub-actions">
+                <button type="button" className="hub-action" onClick={() => setShowSoporte(true)}>
+                    <VaultIcon name="support" size={14} /> SOPORTE
+                </button>
+                <button type="button" className="hub-action" onClick={() => setShowTutoriales(true)}>
+                    <VaultIcon name="tutorial" size={14} /> TUTORIALES
+                </button>
+                {esMaestro && (
+                    <button type="button" className="hub-action" onClick={() => onNavigate('panel_maestro')} title="Panel Maestro">
+                        <VaultIcon name="dashboard" size={14} /> PANEL MAESTRO
                     </button>
                 )}
-
-                {/* Botón de cierre de sesión actualizado con confirmación por SweetAlert2 */}
-                <button onClick={handleConfirmarLogout} style={{ ...styles.btnOutline, padding: '10px', backgroundColor: 'rgba(0,0,0,0.6)', fontSize: '0.75rem' }}>
-                    CERRAR SESIÓN
+                {esAdmin && (
+                    <button type="button" className="hub-action" onClick={() => onNavigate('admin')} title="Control de accesos y usuarios">
+                        <VaultIcon name="access" size={14} /> CONTROL DE ACCESOS
+                    </button>
+                )}
+                <button type="button" className="hub-action hub-action-logout" onClick={handleConfirmarLogout}>
+                    <VaultIcon name="logout" size={14} /> CERRAR SESIÓN
                 </button>
             </div>
 
-            {/* --- MODALES CONSERVADOS --- */}
+            {/* MODAL DE ANUNCIO */}
             {showAnuncio && anuncioReciente && (
-                <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10001, padding: '20px', boxSizing: 'border-box' }}>
-                    <div style={{ backgroundColor: '#0a0a0a', border: '1px solid #d4af37', padding: '25px', borderRadius: '12px', width: '100%', maxWidth: '400px' }}>
+                <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10001, padding: '16px', boxSizing: 'border-box' }}>
+                    <div style={{ backgroundColor: '#0a0a0a', border: '1px solid #d4af37', padding: esMovil ? '20px' : '25px', borderRadius: '12px', width: '100%', maxWidth: '400px', maxHeight: '90vh', overflowY: 'auto', boxSizing: 'border-box' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
-                            <span style={{ fontSize: '1.5rem' }}>📢</span>
-                            <h3 style={{ color: '#d4af37', margin: 0 }}>{anuncioReciente.titulo || "Nueva Actualización"}</h3>
+                            <VaultIcon name="megaphone" size={22} color="#d4af37" />
+                            <h3 style={{ color: '#d4af37', margin: 0 }}>{anuncioReciente.titulo || 'Nueva actualización'}</h3>
                         </div>
                         <p style={{ color: '#ccc', fontSize: '0.9rem', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{anuncioReciente.mensaje}</p>
                         <p style={{ color: '#666', fontSize: '0.7rem', textAlign: 'right' }}>Publicado por Ngasi: {anuncioReciente.fecha}</p>
@@ -529,30 +691,60 @@ const HubPage = ({
                 </div>
             )}
 
+            {/* MODAL DE SOPORTE */}
             {showSoporte && (
-                <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10001, padding: '20px', boxSizing: 'border-box' }}>
-                    <div style={{ backgroundColor: '#111', border: '1px solid #ff4444', padding: '25px', borderRadius: '12px', width: '100%', maxWidth: '400px', textAlign: 'center' }}>
-                        <h3 style={{ color: '#ff4444', marginTop: 0 }}>CONTACTAR A SOPORTE</h3>
-                        <textarea value={mensajeSoporte} onChange={(e) => setMensajeSoporte(e.target.value)} placeholder="Escribe tu mensaje aquí..." style={{ width: '100%', height: '120px', backgroundColor: '#000', color: '#fff', border: '1px solid #333', borderRadius: '6px', padding: '10px', fontSize: '0.9rem', outline: 'none', resize: 'none', marginBottom: '20px' }} />
+                <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10001, padding: '16px', boxSizing: 'border-box' }}>
+                    <div style={{ backgroundColor: '#111', border: '1px solid #d4af37', padding: esMovil ? '20px' : '25px', borderRadius: '12px', width: '100%', maxWidth: '420px', maxHeight: '90vh', overflowY: 'auto', textAlign: 'center', boxSizing: 'border-box' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '14px' }}>
+                            <VaultIcon name="support" size={20} color="#d4af37" />
+                            <h3 style={{ color: '#d4af37', margin: 0 }}>CONTACTAR A SOPORTE</h3>
+                        </div>
+                        <textarea
+                            value={mensajeSoporte}
+                            onChange={(e) => setMensajeSoporte(e.target.value)}
+                            placeholder="Escribe tu mensaje aquí..."
+                            style={{ width: '100%', height: '120px', backgroundColor: '#000', color: '#fff', border: '1px solid #333', borderRadius: '6px', padding: '10px', fontSize: '0.9rem', outline: 'none', resize: 'none', marginBottom: '20px', boxSizing: 'border-box' }}
+                            onFocus={(e) => e.target.style.borderColor = '#d4af37'}
+                            onBlur={(e) => e.target.style.borderColor = '#333'}
+                        />
                         <div style={{ display: 'flex', gap: '10px' }}>
-                            <button onClick={() => setShowSoporte(false)} style={{ ...styles.btnOutline, flex: 1, borderColor: '#444', color: '#666' }}>CANCELAR</button>
-                            <button onClick={handleEnviarSoporte} disabled={enviando || !mensajeSoporte.trim()} style={{ ...styles.btnGold, flex: 1, backgroundColor: enviando ? '#444' : '#ff4444', color: '#fff' }}>{enviando ? 'ENVIANDO...' : 'ENVIAR'}</button>
+                            <button onClick={() => setShowSoporte(false)} style={{ ...styles.btnOutline, flex: 1, borderColor: '#444', color: '#888' }}>CANCELAR</button>
+                            <button
+                                onClick={handleEnviarSoporte}
+                                disabled={enviando || !mensajeSoporte.trim()}
+                                style={{ ...styles.btnGold, flex: 1, backgroundColor: enviando ? '#b8962d' : '#d4af37', color: '#000', opacity: (enviando || !mensajeSoporte.trim()) ? 0.6 : 1, cursor: (enviando || !mensajeSoporte.trim()) ? 'not-allowed' : 'pointer' }}
+                            >
+                                {enviando ? 'ENVIANDO...' : 'ENVIAR'}
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
 
+            {/* MODAL DE TUTORIALES */}
             {showTutoriales && (
-                <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10001, padding: '20px', boxSizing: 'border-box' }}>
-                    <div style={{ backgroundColor: '#111', border: '1px solid #4CAF50', padding: '25px', borderRadius: '12px', width: '100%', maxWidth: '450px' }}>
-                        <h3 style={{ color: '#4CAF50', marginTop: 0, textAlign: 'center' }}>TUTORIALES DE LA APP</h3>
+                <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10001, padding: '16px', boxSizing: 'border-box' }}>
+                    <div style={{ backgroundColor: '#111', border: '1px solid #d4af37', padding: esMovil ? '20px' : '25px', borderRadius: '12px', width: '100%', maxWidth: '450px', maxHeight: '90vh', overflowY: 'auto', boxSizing: 'border-box' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '16px' }}>
+                            <VaultIcon name="tutorial" size={20} color="#d4af37" />
+                            <h3 style={{ color: '#d4af37', margin: 0 }}>TUTORIALES DE LA APP</h3>
+                        </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <button onClick={() => window.open('TU_LINK_AQUI', '_blank')} style={{ backgroundColor: '#000', color: '#fff', border: '1px solid #333', padding: '15px', borderRadius: '8px', textAlign: 'left', cursor: 'pointer' }}>
-                                <div style={{ color: '#4CAF50', fontWeight: 'bold', fontSize: '0.8rem' }}>1. Introducción al Vault</div>
-                                <div style={{ fontSize: '0.7rem', color: '#555' }}>Conceptos básicos y navegación.</div>
+                            <button
+                                onClick={() => window.open('TU_LINK_AQUI', '_blank')}
+                                className="hub-mobile-card"
+                                style={{ width: '100%', justifyContent: 'flex-start' }}
+                            >
+                                <span className="hub-mobile-icon">
+                                    <VaultIcon name="play" size={14} color="#000" />
+                                </span>
+                                <span style={{ minWidth: 0 }}>
+                                    <span className="hub-mobile-label">1. Introducción al Vault</span>
+                                    <span className="hub-mobile-sub">Conceptos básicos y navegación.</span>
+                                </span>
                             </button>
                         </div>
-                        <button onClick={() => setShowTutoriales(false)} style={{ ...styles.btnOutline, width: '100%', marginTop: '20px', borderColor: '#4CAF50', color: '#4CAF50' }}>CERRAR</button>
+                        <button onClick={() => setShowTutoriales(false)} style={{ ...styles.btnOutline, width: '100%', marginTop: '20px', borderColor: '#d4af37', color: '#d4af37' }}>CERRAR</button>
                     </div>
                 </div>
             )}

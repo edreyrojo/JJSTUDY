@@ -192,6 +192,96 @@ const ICONS = {
     </>
   ),
   circle: <circle cx="12" cy="12" r="9" />,
+  map: (
+    <>
+      <path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2V6z" />
+      <path d="M9 4v14M15 6v14" />
+      <path d="M12 12s2.5-2 2.5-3.7a2.5 2.5 0 0 0-5 0C9.5 10 12 12 12 12z" />
+      <circle cx="12" cy="8.3" r="0.9" />
+    </>
+  ),
+  notebook: (
+    <>
+      <path d="M6 3h12a2 2 0 0 1 2 2v15a1 1 0 0 1-1 1H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
+      <path d="M8 3v18" />
+      <path d="M12 8h5M12 12h5M12 16h3" />
+      <path d="M16 3v6l-2-1-2 1V3" />
+    </>
+  ),
+  timer: (
+    <>
+      <circle cx="12" cy="13" r="8" />
+      <path d="M12 9v4l2.5 2.5" />
+      <path d="M9 2h6" />
+      <path d="M12 2v3" />
+      <path d="M19 5l1.5 1.5" />
+    </>
+  ),
+  clipboard: (
+    <>
+      <rect x="5" y="4" width="14" height="17" rx="2" />
+      <path d="M9 4V2h6v2" />
+      <path d="M8 9h2M13 9h3M8 13h2M13 13h3M8 17h2M13 17h3" />
+    </>
+  ),
+  dojo: (
+    <>
+      <path d="M3 9l9-5 9 5" />
+      <path d="M5 9v11h14V9" />
+      <path d="M3 9h18" />
+      <circle cx="12" cy="12.5" r="2" />
+      <path d="M9 20v-1.5a3 3 0 0 1 6 0V20" />
+    </>
+  ),
+  support: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="3.5" />
+      <path d="M5.6 5.6l3.9 3.9M14.5 14.5l3.9 3.9M18.4 5.6l-3.9 3.9M9.5 14.5l-3.9 3.9" />
+    </>
+  ),
+  tutorial: (
+    <>
+      <path d="M2 8l10-4 10 4-10 4L2 8z" />
+      <path d="M6 10v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5" />
+      <path d="M22 8v6" />
+    </>
+  ),
+  access: (
+    <>
+      <path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z" />
+      <circle cx="12" cy="11" r="2" />
+      <path d="M12 13v3" />
+    </>
+  ),
+  logout: (
+    <>
+      <path d="M9 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4" />
+      <path d="M16 17l5-5-5-5" />
+      <path d="M21 12H9" />
+    </>
+  ),
+  bell: (
+    <>
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </>
+  ),
+  download: (
+    <>
+      <path d="M12 3v12" />
+      <polyline points="7 10 12 15 17 10" />
+      <path d="M5 21h14" />
+    </>
+  ),
+  dashboard: (
+    <>
+      <rect x="3" y="3" width="8" height="8" rx="1" />
+      <rect x="13" y="3" width="8" height="5" rx="1" />
+      <rect x="13" y="10" width="8" height="11" rx="1" />
+      <rect x="3" y="13" width="8" height="8" rx="1" />
+    </>
+  ),
 };
 
 const VaultIcon = ({
