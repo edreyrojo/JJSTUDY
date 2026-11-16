@@ -185,6 +185,12 @@ const ICONS = {
       <path d="M3 6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6z" />
     </>
   ),
+  camera: (
+    <>
+      <path d="M4 7h3l2-2h6l2 2h3v13H4z" />
+      <circle cx="12" cy="13" r="4" />
+    </>
+  ),
   circle: <circle cx="12" cy="12" r="9" />,
 };
 
