@@ -90,8 +90,13 @@ const AdminPage = ({ onBack }) => {
         return () => { unsubUsuarios(); unsubTickets(); unsubAcademias(); unsubSedes(); };
     }, []);
 
+    const usuariosPendientes = useMemo(() => usuarios.filter(u => !u.validado).length, [usuarios]);
+
     const usuariosFiltrados = useMemo(() => {
-        return usuarios.filter(u => u.nombre?.toLowerCase().includes(filtroUser.toLowerCase()) || u.email?.toLowerCase().includes(filtroUser.toLowerCase()));
+        return usuarios
+            .filter(u => u.nombre?.toLowerCase().includes(filtroUser.toLowerCase()) || u.email?.toLowerCase().includes(filtroUser.toLowerCase()))
+            // Los pendientes de autorización aparecen primero
+            .sort((a, b) => Number(!!a.validado) - Number(!!b.validado));
     }, [usuarios, filtroUser]);
 
     const [logoAcademiaBase64, setLogoAcademiaBase64] = useState('');
@@ -193,13 +198,16 @@ const AdminPage = ({ onBack }) => {
             {/* Estadísticas Compactas */}
             <section style={s.statsGrid}>
                 <StatCard label="Usuarios" value={usuarios.length} icon={Icons.User} color="#d4af37" />
+                <StatCard label="Pendientes" value={usuariosPendientes} icon={Icons.Check} color={usuariosPendientes > 0 ? "#ff9800" : "#4CAF50"} />
                 <StatCard label="Academias" value={academias.length} icon={Icons.Building} color="#2196F3" />
                 <StatCard label="Sedes" value={sedes.length} icon={Icons.MapPin} color="#4CAF50" />
             </section>
 
             {/* Pestañas Reducidas y Compactas */}
             <div style={s.tabContainer}>
-                <button onClick={() => setTabActiva('usuarios')} style={tabActiva === 'usuarios' ? s.tabActive : s.tabInactive}>{Icons.User} Usuarios</button>
+                <button onClick={() => setTabActiva('usuarios')} style={tabActiva === 'usuarios' ? s.tabActive : s.tabInactive}>
+                    {Icons.User} Usuarios {usuariosPendientes > 0 && <span style={s.badge}>{usuariosPendientes}</span>}
+                </button>
                 <button onClick={() => setTabActiva('estructuras')} style={tabActiva === 'estructuras' ? s.tabActive : s.tabInactive}>{Icons.Building} Estructuras</button>
                 <button onClick={() => setTabActiva('anuncios')} style={tabActiva === 'anuncios' ? s.tabActive : s.tabInactive}>{Icons.Megaphone} Anuncios</button>
                 <button onClick={() => setTabActiva('tickets')} style={tabActiva === 'tickets' ? s.tabActiveInfo : s.tabInactive}>

@@ -1,27 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { db, auth } from '../firebase';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import Swal from 'sweetalert2';
-
-const notify = (mensaje, tipo = 'success') => {
-    Swal.fire({
-        text: mensaje,
-        icon: tipo,
-        background: '#0a0a0a',
-        color: '#fff',
-        confirmButtonColor: '#d4af37',
-        iconColor: tipo === 'success' ? '#4CAF50' : '#ff4444',
-        customClass: {
-            popup: 'gold-border-alert'
-        }
-    });
-};
 
 const LoginPage = ({
     onLogin,
     onBack,
     onRegister,
+    onGoogleLogin,
     email = "",
     setEmail,
     password = "",
@@ -48,66 +31,15 @@ const LoginPage = ({
         console.error("ERROR: LoginPage no recibió las funciones setPassword o setEmail desde App.jsx");
     }
 
-    // --- LÓGICA DE GOOGLE AUTH CON ENLACE Y MIGRACIÓN DE PROGRESO ---
+    // --- LÓGICA DE GOOGLE AUTH (delegada a App.jsx) ---
     const handleGoogleLogin = async () => {
+        if (typeof onGoogleLogin !== 'function') {
+            console.error("LoginPage: falta la prop onGoogleLogin desde App.jsx");
+            return;
+        }
         setCargandoGoogle(true);
-        const provider = new GoogleAuthProvider();
         try {
-            const result = await signInWithPopup(auth, provider);
-            const user = result.user;
-
-            const userRef = doc(db, "usuarios", user.uid);
-            const userSnap = await getDoc(userRef);
-
-            if (!userSnap.exists()) {
-                // Buscamos si ya existe una cuenta previa registrada con el mismo correo electrónico
-                const q = query(collection(db, "usuarios"), where("email", "==", user.email));
-                const querySnapshot = await getDocs(q);
-
-                if (!querySnapshot.empty) {
-                    // ¡Cuenta previa encontrada! Enlazamos y migramos el progreso al nuevo UID de Google
-                    const docAntiguo = querySnapshot.docs[0];
-                    const datosViejos = docAntiguo.data();
-
-                    await setDoc(userRef, {
-                        ...datosViejos,
-                        uid: user.uid, // Actualizamos al UID actual de Google
-                        fechaUltimoAcceso: new Date().toISOString()
-                    });
-
-                    notify("¡Cuenta sincronizada con éxito! Se recuperó tu progreso anterior.");
-                } else {
-                    // Usuario totalmente nuevo por Google
-                    const ADMIN_MAESTRO = "zamna.ed@gmail.com";
-                    const isAdmin = user.email === ADMIN_MAESTRO;
-
-                    await setDoc(userRef, {
-                        uid: user.uid,
-                        email: user.email,
-                        nombre: user.displayName || user.email.split('@')[0],
-                        rol: isAdmin ? 'admin' : 'alumno',
-                        validado: isAdmin ? true : false,
-                        fechaRegistro: new Date().toISOString(),
-                        vistos: []
-                    });
-
-                    if (isAdmin) {
-                        notify("¡Bienvenido Maestro! Acceso total concedido.");
-                    } else {
-                        notify("Registro con Google exitoso. Espera a que el profesor valide tu perfil.");
-                    }
-                }
-            } else {
-                notify("¡Bienvenido de vuelta!");
-            }
-
-            if (typeof onLogin === 'function') {
-                onLogin();
-            }
-
-        } catch (err) {
-            console.error("Error en Google Auth:", err);
-            notify("No se pudo iniciar sesión con Google: " + err.message, "error");
+            await onGoogleLogin();
         } finally {
             setCargandoGoogle(false);
         }

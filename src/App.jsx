@@ -52,6 +52,33 @@ import OnboardingModal from './components/OnboardingModal';
 
 import Swal from 'sweetalert2';
 
+const ADMIN_EMAIL = "zamna.ed@gmail.com";
+
+// Traduce los errores de Firebase a mensajes claros para el usuario
+const describirErrorAuth = (err) => {
+  switch (err?.code) {
+    case 'auth/popup-closed-by-user':
+    case 'auth/cancelled-popup-request':
+      return "Cerraste la ventana de Google antes de completar el acceso.";
+    case 'auth/popup-blocked':
+      return "El navegador bloqueó la ventana de Google. Permite las ventanas emergentes e intenta de nuevo.";
+    case 'auth/account-exists-with-different-credential':
+      return "Ya existe una cuenta con este correo registrada con contraseña. Inicia sesión con tu correo y contraseña.";
+    case 'auth/network-request-failed':
+      return "Sin conexión. Revisa tu internet e intenta de nuevo.";
+    case 'auth/too-many-requests':
+      return "Demasiados intentos. Espera un momento e intenta de nuevo.";
+    case 'auth/invalid-credential':
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+      return "Correo o contraseña incorrectos.";
+    case 'permission-denied':
+      return "Firestore rechazó la operación por permisos. Avisa al profesor/administrador.";
+    default:
+      return err?.message || "Ocurrió un error inesperado.";
+  }
+};
+
 // Actualiza tu función notify
 const notify = (mensaje, tipo = 'success') => {
   Swal.fire({
@@ -247,75 +274,95 @@ export default function App() {
       const user = userCredential.user;
       const userDoc = await getDoc(doc(db, "usuarios", user.uid));
 
-      if (userDoc.exists()) {
-        const data = userDoc.data();
-        if (data.validado) {
-          setUserRole(data.rol);
-          setVistos(data.vistos || []);
-          setPage('hub');
-        } else {
-          notify("Tu cuenta aún no ha sido validada por el profesor.");
-          handleLogout();
-        }
+      if (!userDoc.exists()) {
+        setError("No encontramos tu solicitud de acceso. Regístrate primero o entra con Google.");
+        await auth.signOut();
+        return;
       }
+
+      const data = userDoc.data();
+      if (!data.validado) {
+        // onAuthStateChanged ya muestra la pantalla "SOLICITUD ENVIADA"
+        notify("Tu cuenta aún no ha sido validada por el profesor.");
+        return;
+      }
+
+      setUserRole(data.rol || 'alumno');
+      setVistos(data.vistos || []);
     } catch (err) {
-      setError("Credenciales incorrectas o usuario no encontrado.");
+      console.error("Error en login con email:", err);
+      setError("No se pudo iniciar sesión: " + describirErrorAuth(err));
     }
   };
 
-  // --- NUEVA FUNCIÓN: INICIO DE SESIÓN CON GOOGLE (CON FUSIÓN DE CUENTAS) ---
+  // --- INICIO DE SESIÓN CON GOOGLE (REGISTRO + FUSIÓN DE CUENTAS) ---
   const handleGoogleLogin = async () => {
+    setError('');
+    const provider = new GoogleAuthProvider();
+
     try {
-      setError('');
-      const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
+      const isAdmin = user.email === ADMIN_EMAIL;
 
       const userRef = doc(db, "usuarios", user.uid);
       const userSnap = await getDoc(userRef);
 
-      const isAdmin = user.email === "zamna.ed@gmail.com";
+      if (userSnap.exists()) {
+        notify("¡Bienvenido de vuelta!");
+        return;
+      }
 
-      if (!userSnap.exists()) {
-        // Verificamos si ya existía un registro previo con el mismo correo por contraseña
+      // Buscamos una cuenta previa con el mismo correo para recuperar su progreso.
+      // Si las reglas no permiten la consulta, NO bloqueamos el registro:
+      // el usuario nuevo debe poder crear su solicitud de todos modos.
+      let datosPrevios = null;
+      try {
         const q = query(collection(db, "usuarios"), where("email", "==", user.email));
         const querySnapshot = await getDocs(q);
-
         if (!querySnapshot.empty) {
-          // Si ya existía, migramos sus datos al nuevo documento con el UID de Google para no perder progreso
-          const oldDoc = querySnapshot.docs[0];
-          const oldData = oldDoc.data();
-
-          await setDoc(userRef, {
-            ...oldData,
-            uid: user.uid,
-            validado: isAdmin || oldData.validado,
-            fechaActualizacionGoogle: new Date().toISOString()
-          });
-
-          notify("¡Cuenta vinculada con éxito a Google!");
-        } else {
-          // Usuario totalmente nuevo mediante Google
-          await setDoc(userRef, {
-            uid: user.uid,
-            email: user.email,
-            nombre: user.displayName || 'Guerrero de Google',
-            rol: isAdmin ? 'admin' : 'alumno',
-            validado: isAdmin,
-            fechaRegistro: new Date().toISOString(),
-            necesitaOnboarding: true
-          });
-
-          if (isAdmin) {
-            notify("¡Bienvenido, Ngasi! Acceso total concedido vía Google.");
-          } else {
-            notify("Registro con Google exitoso. Espera validación del profesor.");
-          }
+          datosPrevios = querySnapshot.docs[0].data();
         }
+      } catch (lookupErr) {
+        console.warn("No se pudo buscar una cuenta previa por correo:", lookupErr);
+      }
+
+      const rolPrevio = datosPrevios?.rol;
+      const rolFinal = isAdmin
+        ? 'admin'
+        : (['profesor', 'instructor'].includes(rolPrevio) ? rolPrevio : 'alumno');
+
+      // La cuenta nace PENDIENTE (o queda pendiente si venía de otro método).
+      // El maestro la autoriza desde AdminPage → AUTORIZAR.
+      await setDoc(userRef, {
+        ...(datosPrevios || {}),
+        uid: user.uid,
+        email: user.email,
+        nombre: datosPrevios?.nombre || user.displayName || user.email.split('@')[0],
+        rol: rolFinal,
+        validado: isAdmin,
+        fechaRegistro: datosPrevios?.fechaRegistro || new Date().toISOString(),
+        fechaUltimoAcceso: new Date().toISOString()
+      });
+
+      if (isAdmin) {
+        notify("¡Bienvenido, Ngasi! Acceso total concedido vía Google.");
+      } else if (datosPrevios) {
+        notify("Recuperamos tu progreso anterior. Tu cuenta queda pendiente de validación del profesor.");
+      } else {
+        notify("Registro con Google exitoso. Espera a que el profesor valide tu perfil.");
       }
     } catch (err) {
       console.error("Error en Google Login:", err);
-      setError("No se pudo iniciar sesión con Google: " + err.message);
+      const mensaje = "No se pudo iniciar sesión con Google: " + describirErrorAuth(err);
+      setError(mensaje);
+      notify(mensaje, "error");
+
+      // Si Google autenticó pero Firestore falló, cerramos la sesión para no
+      // dejar al usuario a medias (autenticado pero sin perfil).
+      if (auth.currentUser && err?.code === 'permission-denied') {
+        try { await auth.signOut(); } catch (e) { /* noop */ }
+      }
     }
   };
 
