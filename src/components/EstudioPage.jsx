@@ -2,22 +2,8 @@ import React, { useState, useEffect } from 'react';
 // IMPORTANTE: Importaciones para Firestore
 import { db } from '../firebase';
 import { doc, setDoc, addDoc, collection } from 'firebase/firestore';
-import Swal from 'sweetalert2';
-
-const notify = (mensaje, tipo = 'success') => {
-    Swal.fire({
-        text: mensaje,
-        icon: tipo, // 'success', 'error', 'warning', 'info'
-        background: '#0a0a0a',
-        color: '#fff',
-        confirmButtonColor: '#d4af37',
-        iconColor: tipo === 'success' ? '#4CAF50' : '#ff4444',
-        border: '1px solid #d4af37',
-        customClass: {
-            popup: 'gold-border-alert'
-        }
-    });
-};
+import { obtenerTecnica } from '../data/vaultIndex';
+import { tieneAccesoVideo, pedirAcceso } from '../utils/accesoVault';
 
 const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos = [], toggleVisto, usuario, styles = {}, getAdjacentVideo }) => {
     // --- ESTADOS ---
@@ -36,14 +22,32 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
     const navegarVideo = (direccion) => {
         if (!getAdjacentVideo || !video) return;
         const siguiente = getAdjacentVideo(video, direccion);
-        if (siguiente) {
-            onSelectVideo(siguiente);
-        } else {
+        if (!siguiente) {
             setMensajeAlerta(direccion === 'next' ? "Fin del curso 🥋" : "Inicio del curso 🥋");
             setMostrarAlerta(true);
             setTimeout(() => setMostrarAlerta(false), 2000);
+            return;
         }
+
+        const tecnica = obtenerTecnica(siguiente.id);
+        if (tecnica && !tieneAccesoVideo(usuario, tecnica)) {
+            if (window.confirm(
+                `CONTENIDO BLOQUEADO 🔒\n\n"${tecnica.nombre}" requiere autorización.\nCada curso tiene un video de prueba gratuito; para ver el resto necesitas acceso.\n\n¿Deseas solicitar acceso a "${tecnica.cursoTitulo}" por WhatsApp?`
+            )) {
+                pedirAcceso(usuario, tecnica.cursoTitulo);
+            }
+            return;
+        }
+
+        onSelectVideo(siguiente);
     };
+
+    const videoAnterior = getAdjacentVideo && video ? getAdjacentVideo(video, 'prev') : null;
+    const videoSiguiente = getAdjacentVideo && video ? getAdjacentVideo(video, 'next') : null;
+    const tecnicaAnterior = videoAnterior ? obtenerTecnica(videoAnterior.id) : null;
+    const tecnicaSiguiente = videoSiguiente ? obtenerTecnica(videoSiguiente.id) : null;
+    const puedeAnterior = !tecnicaAnterior || tieneAccesoVideo(usuario, tecnicaAnterior);
+    const puedeSiguiente = !tecnicaSiguiente || tieneAccesoVideo(usuario, tecnicaSiguiente);
 
     // --- EFECTOS ---
     useEffect(() => {
@@ -193,7 +197,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                             ←
                         </button>
 
-                        {getAdjacentVideo(video, 'prev') && (
+                        {videoAnterior && (
                             <button
                                 onClick={() => navegarVideo('prev')}
                                 style={{ 
@@ -206,11 +210,11 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                                     cursor: 'pointer'
                                 }}
                             >
-                                ◁
+                                {puedeAnterior ? '◁' : '🔒'}
                             </button>
                         )}
 
-                        {getAdjacentVideo(video, 'next') && (
+                        {videoSiguiente && (
                             <button
                                 onClick={() => navegarVideo('next')}
                                 style={{ 
@@ -223,7 +227,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                                     cursor: 'pointer'
                                 }}
                             >
-                                ▷
+                                {puedeSiguiente ? '▷' : '🔒'}
                             </button>
                         )}
                     </div>

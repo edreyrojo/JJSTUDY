@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 // 1. Conexión principal
 import { auth, db } from './firebase';
@@ -8,7 +8,6 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   onAuthStateChanged,
-  signOut,
   GoogleAuthProvider,
   signInWithPopup
 } from 'firebase/auth';
@@ -23,11 +22,7 @@ import {
   where,
   getDocs,
   updateDoc,
-  onSnapshot,
-  orderBy,   // <-- VITAL para que Notas no se quede cargando
-  deleteDoc, // <-- VITAL para borrar notas
-  addDoc,
-  arrayUnion
+  onSnapshot
 } from 'firebase/firestore';
 
 // 4. Tus otros archivos (Componentes y Páginas)
@@ -44,6 +39,8 @@ import LoginPage from './components/LoginPage';
 import HubPage from './components/HubPage';
 import InstalacionModal from './components/InstalacionModal';
 import { getAdjacentVideo } from './utils/videoHelpers';
+import { obtenerTecnica } from './data/vaultIndex';
+import { tieneAccesoVideo, pedirAcceso } from './utils/accesoVault';
 import TimerPage from './components/TimerPage';
 
 // --- NUEVOS COMPONENTES INTEGRADOS ---
@@ -122,7 +119,7 @@ export default function App() {
   const [cargando, setCargando] = React.useState(true);
   const [page, setPage] = useState('login');
   const [userRole, setUserRole] = useState('usuario');
-  const [categoriaSel, setCategoriaSel] = useState('DEFENSAS');
+  const [categoriaSel, setCategoriaSel] = useState('AUTORES');
   const [autorSel, setAutorSel] = useState(null);
   const [instrSel, setInstrSel] = useState(null);
   const [volSel, setVolSel] = useState(null);
@@ -361,13 +358,35 @@ export default function App() {
       // Si Google autenticó pero Firestore falló, cerramos la sesión para no
       // dejar al usuario a medias (autenticado pero sin perfil).
       if (auth.currentUser && err?.code === 'permission-denied') {
-        try { await auth.signOut(); } catch (e) { /* noop */ }
+        try { await auth.signOut(); } catch { /* noop */ }
       }
     }
   };
 
-  const toggleVisto = async (id) => {
-    if (!id) return;
+  // --- CONTROL CENTRAL DE ACCESO A VIDEOS ---
+  // Cualquier ruta (mapa, búsqueda, notas o "siguiente" dentro del estudio)
+  // pasa por aquí. Así el candado no se puede saltar.
+  const handleSelectVideo = (v) => {
+    if (!v) return;
+    const tecnica = obtenerTecnica(v.id);
+    if (tecnica && !tieneAccesoVideo(usuario, tecnica)) {
+      if (window.confirm(
+        `CONTENIDO BLOQUEADO 🔒\n\n"${tecnica.nombre}" requiere autorización.\nCada curso tiene un video de prueba gratuito; para ver el resto necesitas acceso.\n\n¿Deseas solicitar acceso a "${tecnica.cursoTitulo}" por WhatsApp?`
+      )) {
+        pedirAcceso(usuario, tecnica.cursoTitulo);
+      }
+      return;
+    }
+    setVideoActual(v);
+    localStorage.setItem('lafortuna_last_video', JSON.stringify(v));
+    setPage('estudio');
+  };
+
+  const handleContinue = () => {
+    if (videoActual) handleSelectVideo(videoActual);
+  };
+
+  const toggleVisto = async (id) => {    if (!id) return;
 
     const nuevaLista = vistos.includes(id)
       ? vistos.filter(v => v !== id)
@@ -462,7 +481,7 @@ export default function App() {
                 else if (p === 'onboarding') setShowOnboarding(true);
                 else setPage(p);
               }}
-              onContinue={() => setPage('estudio')}
+              onContinue={handleContinue}
               hasSession={!!videoActual}
               userRole={userRole}
               onLogout={handleLogout}
@@ -489,8 +508,8 @@ export default function App() {
           autorSel={autorSel} setAutorSel={setAutorSel}
           instrSel={instrSel} setInstrSel={setInstrSel}
           volSel={volSel} setVolSel={setVolSel}
-          onSelectVideo={(v) => { setVideoActual(v); localStorage.setItem('lafortuna_last_video', JSON.stringify(v)); setPage('estudio'); }}
-          onNavigateToNotes={() => setPage('notas_hub')} onContinue={() => setPage('estudio')} hasSession={!!videoActual} />;
+          onSelectVideo={handleSelectVideo}
+          onNavigateToNotes={() => setPage('notas_hub')} onContinue={handleContinue} hasSession={!!videoActual} />;
 
       case 'estudio':
         return (
@@ -503,10 +522,7 @@ export default function App() {
             getAdjacentVideo={getAdjacentVideo}
             usuario={usuario}
             onNavigateToNotes={() => setPage('notas_hub')}
-            onSelectVideo={(v) => {
-              setVideoActual(v);
-              localStorage.setItem('lafortuna_last_video', JSON.stringify(v));
-            }}
+            onSelectVideo={handleSelectVideo}
           />
         );
 
@@ -515,7 +531,7 @@ export default function App() {
           <NotasHubPage
             onBack={() => setPage('hub')}
             eliminarNota={handleEliminarNota}
-            onNavigateToVideo={(v) => { setVideoActual(v); setPage('estudio'); }}
+            onNavigateToVideo={handleSelectVideo}
             usuario={usuario}
             styles={styles}
           />
@@ -525,10 +541,9 @@ export default function App() {
         return (
           <BusquedaPage
             onBack={() => setPage('hub')}
-            onSelectVideo={(v) => {
-              setVideoActual(v);
-              setPage('estudio');
-            }}
+            onSelectVideo={handleSelectVideo}
+            usuario={usuario}
+            vistos={vistos}
             styles={styles}
           />
         );

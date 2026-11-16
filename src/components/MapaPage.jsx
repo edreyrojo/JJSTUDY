@@ -1,48 +1,48 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { DB_INSTRUCCIONALES } from '../data/instruccionales';
-import Swal from 'sweetalert2';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import {
+    FACETAS,
+    ESTADISTICAS,
+    buscarTecnicas,
+    cursosParaFiltro,
+    tecnicasParaFiltro,
+    obtenerCurso,
+    esVideoGratis,
+} from '../data/vaultIndex';
+import { DIMENSIONES } from '../data/taxonomia';
+import { tieneAccesoVideo, pedirAcceso } from '../utils/accesoVault';
 
-const notify = (mensaje, tipo = 'success') => {
-    Swal.fire({
-        text: mensaje,
-        icon: tipo,
-        background: '#0a0a0a',
-        color: '#fff',
-        confirmButtonColor: '#d4af37',
-        iconColor: tipo === 'success' ? '#4CAF50' : '#ff4444',
-        border: '1px solid #d4af37',
-        customClass: {
-            popup: 'gold-border-alert'
-        }
-    });
-};
-
-const SUB_POSICIONES = [
-    'GUARDIA', 'MONTURA', 'TOMA DE ESPALDA', 'CRUZADA',
-    '100 KILOS', 'NORTE SUR', 'RODILLA EN EL ESTOMAGO', 'NORTE-SUR'
-];
-
-const SUB_DEFENSAS = [
-    'ESCAPES MONTADA', 'ESCAPES LATERAL', 'DEFENSA ESPALDA', 'RE-GUARDIA',
-    'DEFENSA LEG LOCKS', 'DEFENSA TRIANGULO', 'DEFENSA ARM BAR', 'DEFENSA STRANGLES'
-];
-
-const EJES_MAESTROS = ['AUTORES', 'POSICIÓN', 'NO GI', 'GI', 'CLA',
-    'SOMETIMIENTOS', 'ESCAPES', 'SWEEPS', 'DERRIBOS',
-    'PASES', 'GUARDIAS', 'SISTEMAS', 'FUNDAMENTOS',
-    'DEFENSA PERSONAL', 'CINTA', 'ORTODOXO', 'NEW SCHOOL'];
-
+const MAX_NODOS_MAPA = 18;
 const mapStyles = {
     layout: { display: 'flex', height: '100vh', width: '100%', backgroundColor: '#050505', overflow: 'hidden', boxSizing: 'border-box' },
     sidebar: { borderRight: '1px solid #222', padding: '20px', backgroundColor: '#0a0a0a', boxSizing: 'border-box' },
-    sideItem: { padding: '12px', cursor: 'pointer', borderRadius: '4px', fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '5px' },
-    // Eliminamos display flex del mapArea para evitar conflictos de centrado y delegamos al absolute de canvas
+    sideItem: { padding: '10px 12px', cursor: 'pointer', borderRadius: '5px', fontSize: '0.8rem', fontWeight: 'bold', border: '1px solid #d4af37' },
     mapArea: { position: 'relative', flex: 1, overflow: 'hidden', touchAction: 'none', cursor: 'grab', boxSizing: 'border-box' },
-    // Canvas centrado de forma absoluta matemática
     canvas: { position: 'absolute', top: '50%', left: '50%', width: '800px', height: '800px', marginLeft: '-400px', marginTop: '-400px', userSelect: 'none', boxSizing: 'border-box' },
     svgLayer: { position: 'absolute', width: '800px', height: '800px', pointerEvents: 'none', overflow: 'visible', left: 0, top: 0 },
-    mainNode: { position: 'absolute', left: '330px', top: '330px', width: '140px', height: '140px', borderRadius: '50%', border: '4px solid #d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#000', zIndex: 5, fontSize: '0.9rem', textAlign: 'center', fontWeight: 'bold', boxShadow: '0 0 20px rgba(212,175,55,0.3)', boxSizing: 'border-box', padding: '10px' },
-    subNodeFloating: { position: 'absolute', width: '110px', height: '110px', borderRadius: '50%', border: '1px solid #d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', textAlign: 'center', backgroundColor: '#111', cursor: 'pointer', zIndex: 6, padding: '10px', boxSizing: 'border-box', transition: 'width 0.3s ease, height 0.3s ease, font-size 0.3s ease, background-color 0.3s ease, left 0.3s ease, top 0.3s ease' },
+    mainNode: { position: 'absolute', left: '330px', top: '330px', width: '140px', height: '140px', borderRadius: '50%', border: '4px solid #d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#000', zIndex: 5, fontSize: '0.82rem', textAlign: 'center', fontWeight: 'bold', boxShadow: '0 0 20px rgba(212,175,55,0.3)', boxSizing: 'border-box', padding: '10px' },
+    subNodeFloating: { position: 'absolute', width: '110px', height: '110px', borderRadius: '50%', border: '1px solid #d4af37', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.72rem', textAlign: 'center', backgroundColor: '#111', cursor: 'pointer', zIndex: 6, padding: '10px', boxSizing: 'border-box', transition: 'width 0.25s ease, height 0.25s ease, font-size 0.25s ease, background-color 0.25s ease, left 0.25s ease, top 0.25s ease' },
+};
+
+const coincideConFiltro = (tecnica, dimension, valor) => {
+    if (!valor) return true;
+    if (dimension === 'AUTORES') return tecnica.autor === valor;
+    if (dimension === 'POSICION') return tecnica.posicion === valor;
+    if (dimension === 'TIPO') return tecnica.tipo === valor;
+    if (dimension === 'MODALIDAD') return tecnica.modalidad === valor;
+    if (dimension === 'ETIQUETAS') return tecnica.etiquetas.includes(valor);
+    return true;
+};
+
+const progresoVolumen = (volumen, vistos) => {
+    const total = volumen?.partes?.length || 0;
+    if (!total) return { total: 0, vistos: 0, completo: false, texto: '0 videos' };
+    const vistosN = volumen.partes.filter(p => vistos.includes(p.id)).length;
+    return {
+        total,
+        vistos: vistosN,
+        completo: vistosN === total,
+        texto: vistosN > 0 ? `${vistosN}/${total} vistos` : `${total} videos`,
+    };
 };
 
 const MapaPage = ({
@@ -52,14 +52,16 @@ const MapaPage = ({
     instrSel, setInstrSel,
     volSel, setVolSel,
     vistos = [],
-    styles
+    styles = {},
 }) => {
-    // 1. ESTADOS
-    const [terminoBusqueda, setTerminoBusqueda] = useState("");
-    const [esMovil, setEsMovil] = useState(window.innerWidth < 768);
+    const [terminoBusqueda, setTerminoBusqueda] = useState('');
+    const [esMovil, setEsMovil] = useState(window.innerWidth < 900);
     const [nodoExpandidoId, setNodoExpandidoId] = useState(null);
+    const [vistaTecnicas, setVistaTecnicas] = useState(false);
+    const [limiteLista, setLimiteLista] = useState(60);
+    const [arrastrando, setArrastrando] = useState(false);
 
-    // Estados para Zoom (Pinch & Wheel) y Pan (Arrastre)
+    // Zoom y pan
     const [scale, setScale] = useState(1);
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const isDraggingRef = useRef(false);
@@ -68,564 +70,609 @@ const MapaPage = ({
     const initialScaleRef = useRef(1);
     const mapAreaRef = useRef(null);
 
-    // 2. ASEGURAR ESTADO INICIAL ACTIVO Y CENTRADO AUTOMÁTICO AL CAMBIAR DE NIVEL
     useEffect(() => {
-        if (!categoriaSel && !autorSel && !instrSel && !volSel) {
+        if (!categoriaSel || !DIMENSIONES.some(d => d.id === categoriaSel)) {
             setCategoriaSel('AUTORES');
         }
-        setPosition({ x: 0, y: 0 });
-        setScale(1);
-        setNodoExpandidoId(null);
-    }, [categoriaSel, autorSel, instrSel, volSel, setCategoriaSel]);
+    }, [categoriaSel, setCategoriaSel]);
 
-    // 3. EL CAZADOR DE TÉCNICAS
-    const todasLasTecnicas = React.useMemo(() => {
-        return Object.keys(DB_INSTRUCCIONALES).flatMap(cursoKey => {
-            const curso = DB_INSTRUCCIONALES[cursoKey];
-            return curso.volumenes.flatMap(vol =>
-                vol.partes.map(parte => {
-                    const sub = (parte.subcategoria || "").trim();
-                    return {
-                        ...parte,
-                        subcategoria: sub,
-                        curso: cursoKey,
-                        tituloCurso: curso.titulo,
-                        volNombre: vol.nombre,
-                        eje: curso.eje || "OTROS",
-                        tags: curso.tags || []
-                    };
-                })
-            );
-        });
+    useEffect(() => {
+        const onResize = () => setEsMovil(window.innerWidth < 900);
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
     }, []);
 
-    // 4. RESULTADOS DE BÚSQUEDA
-    const resultadosBusqueda = terminoBusqueda
-        ? todasLasTecnicas.filter(t =>
-            t.nombre.toLowerCase().includes(terminoBusqueda.toLowerCase()) ||
-            t.tituloCurso.toLowerCase().includes(terminoBusqueda.toLowerCase())
-        ).slice(0, 10)
-        : [];
+    const dimension = DIMENSIONES.find(d => d.id === categoriaSel) || DIMENSIONES[0];
+    const valor = autorSel;
+    const curso = instrSel ? obtenerCurso(instrSel) : null;
 
-    // 5. LÓGICA DE NODOS
-    let nodosAMostrar = [];
-    let tituloCentral = "";
-    const categoriaActiva = categoriaSel || 'AUTORES';
+    // ---------------------------------------------------------------------
+    // Construcción de nodos (memorizada para que el pan/zoom no recalcule)
+    // ---------------------------------------------------------------------
+    const nav = useMemo(() => {
+        let nodos = [];
+        let titulo = dimension.nombre;
+        let subtitulo = '';
+        let nivel = 'dimension';
+        let listaTecnicas = null;
 
-    if (volSel) {
-        nodosAMostrar = volSel?.partes?.map((p, index) => ({
-            nombre: p.nombre, type: 'parte', id: p.id, cursoId: instrSel,
-            indice: index
-        })) || [];
-        tituloCentral = volSel?.nombre || "";
-    } else if (instrSel) {
-        const cursoData = DB_INSTRUCCIONALES[instrSel];
-        nodosAMostrar = cursoData?.volumenes?.map(v => ({ nombre: v.nombre, type: 'volumen', raw: v })) || [];
-        tituloCentral = cursoData?.titulo || instrSel;
-    } else if (autorSel) {
-        nodosAMostrar = Object.keys(DB_INSTRUCCIONALES)
-            .filter(key => DB_INSTRUCCIONALES[key].autor === autorSel)
-            .map(key => ({ nombre: DB_INSTRUCCIONALES[key].titulo, id: key, type: 'curso' }));
-        tituloCentral = autorSel;
-    } else if (categoriaActiva) {
-        tituloCentral = categoriaActiva;
-
-        if (EJES_MAESTROS.includes(categoriaActiva)) {
-            if (categoriaActiva === 'AUTORES') {
-                const autores = [...new Set(Object.values(DB_INSTRUCCIONALES).map(c => c.autor))];
-                nodosAMostrar = autores.map(a => ({ nombre: a, type: 'autor' }));
-            }
-            else if (categoriaActiva === 'POSICIÓN') {
-                nodosAMostrar = SUB_POSICIONES.map(p => ({ nombre: p, type: 'sub_posicion' }));
-            }
-            else {
-                const tagsDelEje = [...new Set(todasLasTecnicas
-                    .filter(t => Array.isArray(t.eje) ? t.eje.includes(categoriaActiva) : t.eje === categoriaActiva)
-                    .flatMap(t => t.tags))];
-
-                nodosAMostrar = tagsDelEje.map(tag => ({ nombre: tag, type: 'tag' }));
-            }
-        }
-        else {
-            const cursosFiltrados = Object.keys(DB_INSTRUCCIONALES).filter(key => {
-                const curso = DB_INSTRUCCIONALES[key];
-                return (
-                    curso.autor === categoriaActiva ||
-                    curso.tags?.includes(categoriaActiva) ||
-                    curso.categorias?.includes(categoriaActiva)
-                );
-            });
-
-            nodosAMostrar = cursosFiltrados.map(key => ({
-                id: key,
-                nombre: DB_INSTRUCCIONALES[key].titulo,
-                type: 'curso'
+        if (volSel) {
+            nivel = 'volumen';
+            const partes = volSel.partes.filter(t => coincideConFiltro(t, dimension.id, valor));
+            nodos = partes.map(t => ({ type: 'parte', nombre: t.nombre, tecnica: t }));
+            titulo = volSel.nombre;
+            subtitulo = `${partes.length} video${partes.length === 1 ? '' : 's'}${valor ? ` · filtrado por ${valor}` : ''}`;
+        } else if (curso) {
+            nivel = 'curso';
+            nodos = curso.volumenes
+                .map(v => {
+                    const coincidencias = v.partes.filter(t => coincideConFiltro(t, dimension.id, valor)).length;
+                    const prog = progresoVolumen(v, vistos);
+                    return { type: 'volumen', nombre: v.nombre, raw: v, count: coincidencias, total: v.total, progreso: prog };
+                })
+                .filter(n => !valor || n.count > 0);
+            const tecnicasCurso = curso.volumenes.flatMap(v => v.partes);
+            const coincidentes = tecnicasCurso.filter(t => coincideConFiltro(t, dimension.id, valor)).length;
+            titulo = curso.titulo;
+            subtitulo = `${curso.autor} · ${coincidentes} de ${curso.total} videos${valor ? ` · filtro: ${valor}` : ''}`;
+        } else if (valor) {
+            nivel = 'valor';
+            const tecnicas = tecnicasParaFiltro(dimension.id, valor);
+            const cursos = cursosParaFiltro(dimension.id, valor);
+            listaTecnicas = tecnicas;
+            nodos = cursos.map(c => ({
+                type: 'curso',
+                id: c.id,
+                nombre: c.titulo,
+                autor: c.autor,
+                count: c.coincidencias,
+                total: c.total,
             }));
+            titulo = valor;
+            subtitulo = `${tecnicas.length} videos · ${cursos.length} cursos`;
+        } else {
+            nivel = 'dimension';
+            const valores = FACETAS[dimension.id] || [];
+            nodos = valores.map(f => ({
+                type: 'valor',
+                nombre: f.valor,
+                valor: f.valor,
+                count: f.videos,
+                cursos: f.cursos,
+            }));
+            titulo = dimension.nombre;
+            subtitulo = dimension.ayuda;
         }
-    }
 
-    // 6. CONTROL DE GESTOS: ZOOM Y PAN CON ADICIÓN NO-PASSIVE
+        return { nodos, titulo, subtitulo, nivel, listaTecnicas };
+    }, [dimension, valor, curso, volSel, vistos]);
+
+    const mostrarTecnicas = nav.nivel === 'valor' && vistaTecnicas;
+    const usarMapa = !mostrarTecnicas && nav.nodos.length > 0 && nav.nodos.length <= MAX_NODOS_MAPA;
+    const hayFiltro = Boolean(valor);
+    const mostrarToggle = nav.nivel === 'valor';
+
+    // Rueda del mouse solo cuando el mapa radial está montado
     useEffect(() => {
         const mapArea = mapAreaRef.current;
         if (!mapArea) return;
-
         const handleWheel = (e) => {
             e.preventDefault();
             const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
             setScale(prev => Math.min(Math.max(prev * zoomFactor, 0.4), 3.5));
         };
-
         mapArea.addEventListener('wheel', handleWheel, { passive: false });
-        return () => {
-            mapArea.removeEventListener('wheel', handleWheel);
-        };
-    }, []);
+        return () => mapArea.removeEventListener('wheel', handleWheel);
+    }, [usarMapa]);
 
+    // ---------------------------------------------------------------------
+    // Búsqueda
+    // ---------------------------------------------------------------------
+    const resultadosBusqueda = useMemo(() => {
+        if (!terminoBusqueda.trim()) return [];
+        return buscarTecnicas(terminoBusqueda).slice(0, 15);
+    }, [terminoBusqueda]);
+
+    // ---------------------------------------------------------------------
+    // Acciones
+    // ---------------------------------------------------------------------
+    const resetNavegacion = () => {
+        setPosition({ x: 0, y: 0 });
+        setScale(1);
+        setNodoExpandidoId(null);
+        setVistaTecnicas(false);
+        setLimiteLista(60);
+        setArrastrando(false);
+    };
+
+    const abrirTecnica = (t) => {
+        if (!t) return;
+        if (tieneAccesoVideo(usuario, t)) {
+            onSelectVideo({ titulo: t.nombre, id: t.id });
+            return;
+        }
+        if (window.confirm(
+            `CONTENIDO BLOQUEADO 🔒\n\n"${t.nombre}" requiere autorización.\nCada curso tiene un video de prueba gratuito; para ver el resto necesitas acceso.\n\n¿Deseas solicitar acceso a "${t.cursoTitulo}" por WhatsApp?`
+        )) {
+            pedirAcceso(usuario, t.cursoTitulo);
+        }
+    };
+
+    const activarNodo = (nodo) => {
+        resetNavegacion();
+        if (nodo.type === 'valor') {
+            setAutorSel(nodo.valor);
+            setInstrSel(null);
+            setVolSel(null);
+        } else if (nodo.type === 'curso') {
+            setInstrSel(nodo.id);
+            setVolSel(null);
+        } else if (nodo.type === 'volumen') {
+            setVolSel(nodo.raw);
+        } else if (nodo.type === 'parte') {
+            abrirTecnica(nodo.tecnica);
+        }
+    };
+
+    const irAtras = () => {
+        resetNavegacion();
+        if (volSel) setVolSel(null);
+        else if (instrSel) setInstrSel(null);
+        else if (autorSel) setAutorSel(null);
+        else if (onBack) onBack();
+    };
+
+    const irADimension = (id) => {
+        resetNavegacion();
+        setCategoriaSel(id);
+        setAutorSel(null);
+        setInstrSel(null);
+        setVolSel(null);
+        setTerminoBusqueda('');
+    };
+
+    // Gestos del mapa
     const handlePointerDown = (e) => {
-        if (e.pointerType === 'touch') return; // Evita conflictos con eventos touch nativos
-        if (e.target.closest('.floating-node') || e.target.closest('button') || e.target.closest('.search-results')) return;
+        if (e.pointerType === 'touch') return;
+        if (e.target.closest('.floating-node') || e.target.closest('button')) return;
         isDraggingRef.current = true;
+        setArrastrando(true);
         dragStartRef.current = { x: e.clientX - position.x, y: e.clientY - position.y };
     };
-
     const handlePointerMove = (e) => {
-        if (e.pointerType === 'touch') return;
-        if (!isDraggingRef.current) return;
-        setPosition({
-            x: e.clientX - dragStartRef.current.x,
-            y: e.clientY - dragStartRef.current.y
-        });
+        if (e.pointerType === 'touch' || !isDraggingRef.current) return;
+        setPosition({ x: e.clientX - dragStartRef.current.x, y: e.clientY - dragStartRef.current.y });
     };
-
     const handlePointerUp = (e) => {
         if (e.pointerType === 'touch') return;
         isDraggingRef.current = false;
+        setArrastrando(false);
     };
-
     const handleTouchStart = (e) => {
         if (e.touches.length === 2) {
-            isDraggingRef.current = false; // Bloquea estrictamente el pan/desplazamiento al hacer zoom con 2 dedos
-            const dist = Math.hypot(
-                e.touches[0].clientX - e.touches[1].clientX,
-                e.touches[0].clientY - e.touches[1].clientY
-            );
-            touchStartDistRef.current = dist;
+            isDraggingRef.current = false;
+            setArrastrando(false);
+            touchStartDistRef.current = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
             initialScaleRef.current = scale;
         } else if (e.touches.length === 1) {
-            if (e.target.closest('.floating-node') || e.target.closest('button') || e.target.closest('.search-results')) return;
+            if (e.target.closest('.floating-node') || e.target.closest('button')) return;
             isDraggingRef.current = true;
+            setArrastrando(true);
             dragStartRef.current = { x: e.touches[0].clientX - position.x, y: e.touches[0].clientY - position.y };
         }
     };
-
     const handleTouchMove = (e) => {
         if (e.touches.length === 2) {
-            isDraggingRef.current = false; // Asegura que nunca se arrastre mientras se hace zoom con dos dedos
+            isDraggingRef.current = false;
             if (touchStartDistRef.current !== null) {
-                const dist = Math.hypot(
-                    e.touches[0].clientX - e.touches[1].clientX,
-                    e.touches[0].clientY - e.touches[1].clientY
-                );
-                const factor = dist / touchStartDistRef.current;
-                setScale(Math.min(Math.max(initialScaleRef.current * factor, 0.4), 3.5));
+                const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                setScale(Math.min(Math.max(initialScaleRef.current * (dist / touchStartDistRef.current), 0.4), 3.5));
             }
         } else if (e.touches.length === 1 && isDraggingRef.current) {
-            setPosition({
-                x: e.touches[0].clientX - dragStartRef.current.x,
-                y: e.touches[0].clientY - dragStartRef.current.y
-            });
+            setPosition({ x: e.touches[0].clientX - dragStartRef.current.x, y: e.touches[0].clientY - dragStartRef.current.y });
         }
     };
-
     const handleTouchEnd = (e) => {
-        if (e.touches.length < 2) {
-            touchStartDistRef.current = null;
-        }
+        if (e.touches.length < 2) touchStartDistRef.current = null;
         if (e.touches.length === 0) {
             isDraggingRef.current = false;
+            setArrastrando(false);
         }
     };
 
-    // 7. INTERACCIÓN Y NAVEGACIÓN
     const handleNodeClick = (nodo, index, e) => {
         e.stopPropagation();
         if (esMovil && nodoExpandidoId !== index) {
             setNodoExpandidoId(index);
             return;
         }
-
         setNodoExpandidoId(null);
-
-        if (nodo.type === 'sub_posicion' || nodo.type === 'tag' || nodo.type === 'autor') {
-            if (nodo.type === 'autor') {
-                setAutorSel(nodo.nombre);
-            } else {
-                setCategoriaSel(nodo.nombre);
-            }
-        }
-        else if (nodo.type === 'curso') {
-            setInstrSel(nodo.id || nodo.nombre);
-        }
-        else if (nodo.type === 'volumen') {
-            setVolSel(nodo.raw);
-        }
-        else if (nodo.type === 'parte') {
-            const cursoId = nodo.cursoId;
-            const esPrimerVideo = nodo.indice === 0;
-            
-            const tieneAcceso = usuario?.rol === 'admin' ||
-                esPrimerVideo ||
-                usuario?.cursos_liberados?.includes(cursoId);
-
-            if (tieneAcceso) {
-                onSelectVideo({ titulo: nodo.nombre, id: nodo.id });
-            } else {
-                if (window.confirm(
-                    `CONTENIDO BLOQUEADO 🔒\n\nEste video requiere autorización. Solo el primer video de cada volumen es gratuito.\n\n¿Deseas enviar un WhatsApp al administrador para solicitar acceso a "${cursoId}"?`
-                )) {
-                    const mensaje = `Hola! Me gustaría solicitar acceso al instruccional: ${cursoId}. Mi correo es: ${usuario?.email || 'Sin correo'}`;
-                    window.open(`https://wa.me/524731632614?text=${encodeURIComponent(mensaje)}`);
-                }
-            }
-        }
+        activarNodo(nodo);
     };
 
-    const irAtras = () => {
-        setNodoExpandidoId(null);
-        setScale(1);
-        setPosition({ x: 0, y: 0 });
-
-        if (volSel) {
-            setVolSel(null);
-        }
-        else if (instrSel) {
-            setInstrSel(null);
-        }
-        else if (autorSel) {
-            setAutorSel(null);
-        }
-        else if (categoriaSel) {
-            if (SUB_POSICIONES.includes(categoriaSel)) {
-                setCategoriaSel('POSICIÓN');
-            }
-            else if (EJES_MAESTROS.includes(categoriaSel)) {
-                if (categoriaSel === 'AUTORES') {
-                    if (onBack) onBack();
-                } else {
-                    setCategoriaSel('AUTORES');
-                }
-            }
-            else {
-                const tecnica = todasLasTecnicas.find(t => t.tags.includes(categoriaSel));
-                if (tecnica) {
-                    const posibleSub = SUB_POSICIONES.find(p => tecnica.tags.includes(p));
-                    setCategoriaSel(posibleSub || (Array.isArray(tecnica.eje) ? tecnica.eje[0] : tecnica.eje));
-                } else {
-                    setCategoriaSel('AUTORES');
-                }
-            }
-        }
-        else {
-            if (onBack) onBack();
-        }
+    // ---------------------------------------------------------------------
+    // Piezas de UI
+    // ---------------------------------------------------------------------
+    const subtituloNodo = (n) => {
+        if (n.type === 'valor') return `${n.count} videos · ${n.cursos} cursos`;
+        if (n.type === 'curso') return `${n.autor} · ${n.total} videos${n.count !== n.total ? ` · ${n.count} coinciden` : ''}`;
+        if (n.type === 'volumen') return n.progreso.texto;
+        if (n.type === 'parte') return esVideoGratis(n.tecnica) ? '🎁 GRATIS' : n.tecnica.tipo;
+        return '';
     };
 
-    useEffect(() => {
-        const handleResize = () => setEsMovil(window.innerWidth < 768);
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
+    const colorNodo = (n) => {
+        if (n.type === 'parte') {
+            if (vistos.includes(n.tecnica.id)) return '#4CAF50';
+            return tieneAccesoVideo(usuario, n.tecnica) ? '#d4af37' : '#777';
+        }
+        if (n.type === 'volumen' && n.progreso?.completo) return '#4CAF50';
+        return '#d4af37';
+    };
 
-    const totalNodos = nodosAMostrar.length;
+    const NodoRadial = ({ nodo, i, total }) => {
+        let radioBase = 260;
+        let radio = radioBase;
+        if (total > 8) radio = (i % 2 === 0) ? 230 : 340;
+        const angle = (i * (360 / Math.max(total, 1))) * (Math.PI / 180);
+        const x = Math.cos(angle) * radio;
+        const y = Math.sin(angle) * radio;
+        const expandido = nodoExpandidoId === i;
+        const size = expandido ? 165 : 108;
+        const color = colorNodo(nodo);
+        const bloqueado = nodo.type === 'parte' && !tieneAccesoVideo(usuario, nodo.tecnica);
+
+        return (
+            <div
+                className="floating-node"
+                onClick={(e) => handleNodeClick(nodo, i, e)}
+                style={{
+                    ...mapStyles.subNodeFloating,
+                    left: `${400 + x - size / 2}px`,
+                    top: `${400 + y - size / 2}px`,
+                    width: `${size}px`,
+                    height: `${size}px`,
+                    borderColor: color,
+                    backgroundColor: expandido ? '#181818' : '#111',
+                    color: vistos.includes(nodo.tecnica?.id) ? '#4CAF50' : '#fff',
+                    fontSize: expandido ? '0.9rem' : '0.7rem',
+                    zIndex: expandido ? 50 : 10,
+                    boxShadow: expandido ? '0 0 30px rgba(212,175,55,0.8)' : '0 4px 15px rgba(0,0,0,0.6)',
+                }}
+                title={nodo.nombre}
+            >
+                <span style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'center', overflow: 'hidden' }}>
+                    <span style={{
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        display: '-webkit-box',
+                        WebkitLineClamp: expandido ? 6 : 3,
+                        WebkitBoxOrient: 'vertical',
+                        lineHeight: 1.25,
+                    }}>
+                        {vistos.includes(nodo.tecnica?.id) ? '✅ ' : ''}{bloqueado ? '🔒 ' : ''}{nodo.nombre}
+                    </span>
+                    <span style={{ fontSize: '0.55rem', color: '#8a8a8a', lineHeight: 1.2 }}>{subtituloNodo(nodo)}</span>
+                </span>
+            </div>
+        );
+    };
+
+    const TarjetaNodo = ({ nodo }) => {
+        const color = colorNodo(nodo);
+        const bloqueado = nodo.type === 'parte' && !tieneAccesoVideo(usuario, nodo.tecnica);
+        const visto = nodo.type === 'parte' && vistos.includes(nodo.tecnica.id);
+        return (
+            <button
+                type="button"
+                onClick={() => activarNodo(nodo)}
+                style={{
+                    textAlign: 'left',
+                    background: '#0a0a0a',
+                    border: `1px solid ${visto ? '#2e5c2e' : '#232323'}`,
+                    borderLeft: `3px solid ${color}`,
+                    borderRadius: '8px',
+                    padding: '12px 14px',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '5px',
+                    minHeight: '74px',
+                }}
+            >
+                <span style={{ color: visto ? '#4CAF50' : '#d4af37', fontWeight: 'bold', fontSize: '0.88rem', lineHeight: 1.3 }}>
+                    {visto ? '✅ ' : ''}{bloqueado ? '🔒 ' : ''}{nodo.nombre}
+                </span>
+                <span style={{ color: '#777', fontSize: '0.7rem', lineHeight: 1.3 }}>{subtituloNodo(nodo)}</span>
+                {nodo.type === 'parte' && (
+                    <span style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '2px' }}>
+                        {esVideoGratis(nodo.tecnica) && (
+                            <span style={{ fontSize: '0.58rem', color: '#000', backgroundColor: '#4CAF50', borderRadius: '3px', padding: '2px 5px', fontWeight: 'bold' }}>
+                                🎁 GRATIS
+                            </span>
+                        )}
+                        <span style={{ fontSize: '0.58rem', color: '#0a0a0a', backgroundColor: '#d4af37', borderRadius: '3px', padding: '2px 5px', fontWeight: 'bold' }}>
+                            {nodo.tecnica.posicion}
+                        </span>
+                        {nodo.tecnica.etiquetas.slice(0, 3).map(e => (
+                            <span key={e} style={{ fontSize: '0.56rem', color: '#8a8a8a', border: '1px solid #262626', borderRadius: '3px', padding: '1px 5px' }}>{e}</span>
+                        ))}
+                    </span>
+                )}
+            </button>
+        );
+    };
+
+    const listaTecnicasVisibles = mostrarTecnicas ? (nav.listaTecnicas || []).slice(0, limiteLista) : [];
 
     return (
         <div style={{ ...mapStyles.layout, flexDirection: esMovil ? 'column' : 'row' }}>
+            {/* SIDEBAR */}
             <aside style={{
                 ...mapStyles.sidebar,
-                width: esMovil ? '100%' : '250px',
+                width: esMovil ? '100%' : '240px',
                 height: esMovil ? 'auto' : '100vh',
                 position: esMovil ? 'relative' : 'fixed',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '10px',
                 zIndex: 100,
-                paddingTop: esMovil ? 'calc(env(safe-area-inset-top, 24px) + 12px)' : '20px',
-                paddingLeft: '15px',
-                paddingRight: '15px',
-                paddingBottom: '15px',
-                borderBottom: esMovil ? '1px solid #222' : 'none',
-                borderRight: esMovil ? 'none' : '1px solid #222',
-                flexShrink: 0
+                paddingTop: esMovil ? 'calc(env(safe-area-inset-top, 0px) + 10px)' : '20px',
+                paddingLeft: '14px',
+                paddingRight: '14px',
+                paddingBottom: '12px',
+                flexShrink: 0,
             }}>
-                {/* FILA 1: NAVEGACIÓN */}
-                <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <button
-                        onClick={irAtras}
-                        title="Regresar"
-                        style={{ 
-                            ...styles.btnOutline, 
-                            flex: '0 0 45px', 
-                            height: '45px',
-                            padding: 0,
-                            fontSize: '1.1rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            borderRadius: '8px'
-                        }}
-                    >
-                        ←
-                    </button>
-
+                <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                    <button onClick={irAtras} title="Regresar" style={{ ...styles.btnOutline, flex: '0 0 42px', height: '42px', padding: 0, fontSize: '1rem', borderRadius: '8px' }}>←</button>
                     {hasSession && (
-                        <button
-                            onClick={onContinue}
-                            title="Continuar Estudio"
-                            style={{
-                                ...styles.btnGold,
-                                flex: 1,
-                                height: '45px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '6px',
-                                fontSize: '0.75rem',
-                                padding: 0,
-                                borderRadius: '8px',
-                                backgroundColor: '#d4af37',
-                                color: '#000'
-                            }}
-                        >
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                            </svg>
-                            <span style={{ fontWeight: 'bold', letterSpacing: '1px' }}>CONTINUAR</span>
+                        <button onClick={onContinue} title="Continuar Estudio" style={{ ...styles.btnGold, flex: 1, height: '42px', fontSize: '0.7rem', padding: 0, borderRadius: '8px' }}>
+                            ▶ CONTINUAR
                         </button>
                     )}
-
-                    <button
-                        onClick={onNavigateToNotes}
-                        title="Bitácora"
-                        style={{
-                            ...styles.btnOutline,
-                            flex: '0 0 45px',
-                            height: '45px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            borderColor: '#d4af37',
-                            color: '#d4af37',
-                            padding: 0,
-                            borderRadius: '8px'
-                        }}
-                    >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                            <polyline points="14 2 14 8 20 8"></polyline>
-                            <line x1="16" y1="13" x2="8" y2="13"></line>
-                            <line x1="16" y1="17" x2="8" y2="17"></line>
-                        </svg>
+                    <button onClick={onNavigateToNotes} title="Bitácora" style={{ ...styles.btnOutline, flex: '0 0 42px', height: '42px', padding: 0, borderRadius: '8px', borderColor: '#d4af37', color: '#d4af37' }}>
+                        ✎
                     </button>
                 </div>
 
-                {/* FILA 2: BÚSQUEDA */}
-                <div style={{ width: '100%', position: 'relative' }}>
-                    <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#d4af37', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                        </svg>
-                    </span>
+                <div style={{ position: 'relative', width: '100%' }}>
+                    <span style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)', color: '#d4af37', fontSize: '0.8rem' }}></span>
                     <input
                         type="text"
                         placeholder="Buscar técnica o autor..."
                         value={terminoBusqueda}
                         onChange={(e) => setTerminoBusqueda(e.target.value)}
-                        style={{
-                            width: '100%',
-                            padding: '12px 12px 12px 38px',
-                            backgroundColor: '#111',
-                            border: '1px solid #d4af37',
-                            color: '#fff',
-                            borderRadius: '6px',
-                            fontSize: '0.85rem',
-                            outline: 'none',
-                            boxSizing: 'border-box'
-                        }}
+                        style={{ width: '100%', padding: '10px 10px 10px 32px', backgroundColor: '#111', border: '1px solid #d4af37', color: '#fff', borderRadius: '6px', fontSize: '0.8rem', outline: 'none', boxSizing: 'border-box' }}
                     />
                 </div>
 
-                {/* FILA 3: CATEGORÍAS */}
-                <div style={{ marginTop: esMovil ? '2px' : '15px' }}>
-                    {!esMovil && <h3 style={{ color: '#d4af37', marginBottom: '12px', fontSize: '0.85rem', letterSpacing: '1px' }}>EJES MAESTROS</h3>}
-
+                <div style={{ marginTop: esMovil ? 0 : '4px' }}>
+                    {!esMovil && <h3 style={{ color: '#d4af37', margin: '0 0 8px', fontSize: '0.72rem', letterSpacing: '1.5px' }}>DIMENSIONES</h3>}
                     <div style={{
                         display: 'flex',
                         flexDirection: esMovil ? 'row' : 'column',
-                        gap: '8px',
-                        maxHeight: esMovil ? 'auto' : '65vh',
+                        gap: '7px',
                         overflowX: esMovil ? 'auto' : 'hidden',
                         overflowY: esMovil ? 'hidden' : 'auto',
-                        paddingBottom: esMovil ? '8px' : '0',
-                        paddingRight: '5px',
+                        maxHeight: esMovil ? 'auto' : '52vh',
+                        paddingBottom: esMovil ? '4px' : '0',
                         scrollbarWidth: 'none',
-                        msOverflowStyle: 'none',
-                        WebkitOverflowScrolling: 'touch'
                     }}>
-                        {EJES_MAESTROS.map(cat => {
-                            const estaActivo = categoriaSel === cat ||
-                                (cat === 'POSICIÓN' && SUB_POSICIONES.includes(categoriaSel)) ||
-                                (cat === 'ESCAPES' && SUB_DEFENSAS.includes(categoriaSel));
-
+                        {DIMENSIONES.map(d => {
+                            const activa = dimension.id === d.id;
+                            const total = (FACETAS[d.id] || []).length;
                             return (
-                                <div
-                                    key={cat}
-                                    onClick={() => {
-                                        setCategoriaSel(cat);
-                                        setAutorSel(null);
-                                        setInstrSel(null);
-                                        setVolSel(null);
-                                        setTerminoBusqueda("");
-                                    }}
+                                <button
+                                    key={d.id}
+                                    type="button"
+                                    onClick={() => irADimension(d.id)}
                                     style={{
                                         ...mapStyles.sideItem,
-                                        backgroundColor: estaActivo ? '#d4af37' : '#111',
-                                        color: estaActivo ? '#000' : '#fff',
-                                        border: '1px solid #d4af37',
+                                        backgroundColor: activa ? '#d4af37' : '#111',
+                                        color: activa ? '#000' : '#fff',
                                         whiteSpace: 'nowrap',
-                                        padding: esMovil ? '8px 14px' : '10px 12px',
-                                        borderRadius: esMovil ? '20px' : '5px',
-                                        fontSize: esMovil ? '0.7rem' : '0.8rem',
-                                        cursor: 'pointer',
-                                        flexShrink: 0
+                                        padding: esMovil ? '7px 12px' : '9px 11px',
+                                        fontSize: esMovil ? '0.68rem' : '0.75rem',
+                                        flexShrink: 0,
+                                        textAlign: 'left',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        gap: '8px',
                                     }}
                                 >
-                                    {cat}
-                                </div>
+                                    <span>{d.icono} {d.nombre}</span>
+                                    <span style={{ fontSize: '0.62rem', opacity: 0.7 }}>{total}</span>
+                                </button>
                             );
                         })}
                     </div>
                 </div>
+
+                {!esMovil && (
+                    <div style={{ marginTop: 'auto', borderTop: '1px solid #1e1e1e', paddingTop: '10px', color: '#555', fontSize: '0.65rem', lineHeight: 1.5 }}>
+                        <div>{ESTADISTICAS.videos} videos · {ESTADISTICAS.cursos} cursos</div>
+                        <div>{ESTADISTICAS.posiciones} posiciones · {ESTADISTICAS.etiquetas} etiquetas</div>
+                        <div style={{ color: '#3f3f3f', marginTop: '4px' }}>Rueda: zoom · Arrastra: mover</div>
+                    </div>
+                )}
             </aside>
 
-            {/* ÁREA PRINCIPAL DEL MAPA RADIAL */}
-            <main 
-                ref={mapAreaRef}
-                style={{
-                    ...mapStyles.mapArea,
-                    marginLeft: esMovil ? '0px' : '250px' // Respeta el menú fijo en PC
-                }}
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-            >
-                {terminoBusqueda ? (
-                    <div className="search-results" style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', zIndex: 10, width: '90%', maxWidth: '500px', maxHeight: '80vh', overflowY: 'auto', padding: '20px', backgroundColor: 'rgba(10,10,10,0.95)', border: '1px solid #d4af37', borderRadius: '12px' }}>
-                        <h2 style={{ color: '#d4af37', textAlign: 'center', marginBottom: '20px', fontSize: '1.1rem' }}>RESULTADOS DE BÚSQUEDA</h2>
-                        {resultadosBusqueda.length === 0 ? (
-                            <p style={{ color: '#aaa', textAlign: 'center' }}>No se encontraron técnicas.</p>
-                        ) : (
-                            resultadosBusqueda.map((t, i) => (
-                                <div key={i} onClick={() => onSelectVideo({ titulo: t.nombre, id: t.id })} style={{ padding: '12px', backgroundColor: '#0a0a0a', border: `1px solid ${vistos?.includes(t.id) ? '#4CAF50' : '#333'}`, margin: '8px 0', borderRadius: '8px', cursor: 'pointer' }}>
-                                    <div style={{ color: vistos?.includes(t.id) ? '#4CAF50' : '#d4af37', fontWeight: 'bold', fontSize: '0.85rem' }}>{vistos?.includes(t.id) ? '✅ ' : ''}{t.nombre}</div>
-                                    <div style={{ fontSize: '0.65rem', color: '#886' }}>{t.curso} • {t.volNombre}</div>
-                                </div>
-                            ))
+            {/* ÁREA PRINCIPAL */}
+            <main style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', marginLeft: esMovil ? 0 : '240px' }}>
+                {/* Toolbar / breadcrumb */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', padding: esMovil ? '8px 10px' : '12px 16px', borderBottom: '1px solid #171717', backgroundColor: '#070707', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flex: 1, minWidth: 0, flexWrap: 'wrap', fontSize: '0.72rem' }}>
+                        <button onClick={() => irADimension(dimension.id)} style={{ background: 'none', border: 'none', color: '#d4af37', cursor: 'pointer', padding: 0, fontWeight: 'bold' }}>
+                            {dimension.icono} {dimension.nombre}
+                        </button>
+                        {valor && (
+                            <>
+                                <span style={{ color: '#444' }}>›</span>
+                                <button onClick={() => { resetNavegacion(); setInstrSel(null); setVolSel(null); }} style={{ background: 'none', border: 'none', color: '#d4af37', cursor: 'pointer', padding: 0 }}>
+                                    {valor}
+                                </button>
+                            </>
+                        )}
+                        {curso && (
+                            <>
+                                <span style={{ color: '#444' }}>›</span>
+                                <button onClick={() => { resetNavegacion(); setVolSel(null); }} style={{ background: 'none', border: 'none', color: '#d4af37', cursor: 'pointer', padding: 0, maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {curso.titulo}
+                                </button>
+                            </>
+                        )}
+                        {volSel && (
+                            <>
+                                <span style={{ color: '#444' }}>›</span>
+                                <span style={{ color: '#aaa' }}>{volSel.nombre}</span>
+                            </>
                         )}
                     </div>
-                ) : (
-                    <div style={{
-                        ...mapStyles.canvas,
-                        transform: `translate(${position.x}px, ${position.y}px) scale(${esMovil ? scale * 0.48 : scale})`,
-                        transformOrigin: 'center center',
-                        transition: isDraggingRef.current ? 'none' : 'transform 0.1s ease-out'
-                    }}>
-                        {/* CAPA DE LÍNEAS SVG CON CONEXIÓN EXACTA DE CENTROS (400, 400) */}
-                        <svg style={mapStyles.svgLayer}>
-                            {nodosAMostrar.map((n, i) => {
-                                const total = totalNodos;
-                                let radioBase = 260;
-                                let radio = radioBase;
-                                if (total > 12) {
-                                    radio = (i % 2 === 0) ? radioBase : radioBase + 120;
-                                }
-                                const angle = (i * (360 / total)) * (Math.PI / 180);
-                                const x = Math.cos(angle) * radio;
-                                const y = Math.sin(angle) * radio;
 
-                                return (
-                                    <line 
-                                        key={i} 
-                                        x1="400" 
-                                        y1="400" 
-                                        x2={400 + x} 
-                                        y2={400 + y} 
-                                        stroke={vistos?.includes(n.id) ? '#4CAF50' : '#d4af37'} 
-                                        strokeWidth="2" 
-                                        opacity="0.35" 
-                                    />
-                                );
-                            })}
-                        </svg>
+                    <span style={{ color: '#666', fontSize: '0.68rem' }}>{nav.subtitulo}</span>
 
-                        {/* NODO CENTRAL ABSOLUTAMENTE CENTRADO EN (400, 400) */}
-                        <div style={mapStyles.mainNode}>{tituloCentral}</div>
+                    {hayFiltro && (instrSel || volSel) && (
+                        <button onClick={() => { resetNavegacion(); setAutorSel(null); }} style={{ background: '#1a1508', border: '1px solid #4a3c12', color: '#d4af37', borderRadius: '999px', padding: '4px 9px', fontSize: '0.62rem', cursor: 'pointer' }}>
+                            ✕ quitar filtro
+                        </button>
+                    )}
 
-                        {/* NODOS EXTERIORES ORBITALES */}
-                        {nodosAMostrar.map((n, i) => {
-                            const total = totalNodos;
-                            let radioBase = 260;
-                            let radio = radioBase;
+                    {mostrarToggle && (
+                        <div style={{ display: 'flex', border: '1px solid #2a2a2a', borderRadius: '7px', overflow: 'hidden' }}>
+                            <button onClick={() => setVistaTecnicas(false)} style={{ background: !vistaTecnicas ? '#d4af37' : '#0d0d0d', color: !vistaTecnicas ? '#000' : '#999', border: 'none', padding: '6px 10px', fontSize: '0.65rem', cursor: 'pointer', fontWeight: 'bold' }}>
+                                CURSOS ({nav.nodos.length})
+                            </button>
+                            <button onClick={() => setVistaTecnicas(true)} style={{ background: vistaTecnicas ? '#d4af37' : '#0d0d0d', color: vistaTecnicas ? '#000' : '#999', border: 'none', padding: '6px 10px', fontSize: '0.65rem', cursor: 'pointer', fontWeight: 'bold' }}>
+                                TÉCNICAS ({(nav.listaTecnicas || []).length})
+                            </button>
+                        </div>
+                    )}
+                </div>
 
-                            if (total > 12) {
-                                radio = (i % 2 === 0) ? radioBase : radioBase + 120;
-                            }
-
-                            const angle = (i * (360 / total)) * (Math.PI / 180);
-                            const x = Math.cos(angle) * radio;
-                            const y = Math.sin(angle) * radio;
-
-                            const visto = n.type === 'parte' ? vistos?.includes(n.id) : n.raw?.partes?.every(p => vistos?.includes(p.id));
-                            const estaExpandido = nodoExpandidoId === i;
-                            const nodeSize = estaExpandido ? 170 : 110;
-                            const halfSize = nodeSize / 2;
-
-                            return (
-                                <div key={i}
-                                    onClick={(e) => handleNodeClick(n, i, e)}
-                                    className="floating-node"
-                                    style={{
-                                        ...mapStyles.subNodeFloating,
-                                        left: `${400 + x - halfSize}px`,
-                                        top: `${400 + y - halfSize}px`,
-                                        borderColor: visto ? '#4CAF50' : '#d4af37',
-                                        backgroundColor: estaExpandido ? '#181818' : '#111',
-                                        color: visto ? '#4CAF50' : '#fff',
-                                        fontSize: estaExpandido ? '1.05rem' : '0.82rem',
-                                        width: `${nodeSize}px`,
-                                        height: `${nodeSize}px`,
-                                        zIndex: estaExpandido ? 50 : 10,
-                                        boxShadow: estaExpandido ? '0 0 30px rgba(212,175,55,0.8)' : '0 4px 15px rgba(0,0,0,0.6)'
-                                    }}
-                                    title={n.nombre}
+                {/* CONTENIDO */}
+                {terminoBusqueda.trim() ? (
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '14px' }}>
+                        <div style={{ color: '#d4af37', fontSize: '0.8rem', letterSpacing: '1px', marginBottom: '10px' }}>
+                            RESULTADOS ({resultadosBusqueda.length}{resultadosBusqueda.length === 15 ? '+' : ''})
+                        </div>
+                        {resultadosBusqueda.length === 0 && (
+                            <p style={{ color: '#777', textAlign: 'center', marginTop: '50px' }}>No se encontraron técnicas.</p>
+                        )}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))', gap: '8px' }}>
+                            {resultadosBusqueda.map((t, i) => (
+                                <button
+                                    key={`${t.id}-${i}`}
+                                    type="button"
+                                    onClick={() => abrirTecnica(t)}
+                                    style={{ textAlign: 'left', background: '#0a0a0a', border: `1px solid ${vistos.includes(t.id) ? '#2e5c2e' : '#222'}`, borderRadius: '8px', padding: '11px 13px', color: '#fff', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '5px' }}
                                 >
-                                    <span style={{ 
-                                        overflow: 'hidden', 
-                                        textOverflow: 'ellipsis', 
-                                        display: '-webkit-box', 
-                                        WebkitLineClamp: estaExpandido ? 6 : 3, 
-                                        WebkitBoxOrient: 'vertical',
-                                        padding: '4px',
-                                        lineHeight: '1.3'
-                                    }}>
-                                        {visto ? '✅ ' : ''}{n.nombre}
+                                    <span style={{ color: vistos.includes(t.id) ? '#4CAF50' : '#d4af37', fontWeight: 'bold', fontSize: '0.85rem' }}>
+                                        {vistos.includes(t.id) ? '✅ ' : ''}{tieneAccesoVideo(usuario, t) ? '' : '🔒 '}{t.nombre}
                                     </span>
-                                </div>
-                            );
-                        })}
+                                    <span style={{ color: '#777', fontSize: '0.68rem' }}>{t.cursoTitulo} • {t.volumenNombre}</span>
+                                    <span style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                                        {esVideoGratis(t) && (
+                                            <span style={{ fontSize: '0.58rem', background: '#4CAF50', color: '#000', borderRadius: '3px', padding: '1px 5px', fontWeight: 'bold' }}>🎁 GRATIS</span>
+                                        )}
+                                        <span style={{ fontSize: '0.58rem', background: '#d4af37', color: '#000', borderRadius: '3px', padding: '1px 5px', fontWeight: 'bold' }}>{t.posicion}</span>
+                                        <span style={{ fontSize: '0.58rem', color: '#d4af37', border: '1px solid #3a3320', borderRadius: '3px', padding: '1px 5px' }}>{t.tipo}</span>
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                ) : mostrarTecnicas ? (
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '14px' }}>
+                        <div style={{ color: '#666', fontSize: '0.7rem', marginBottom: '10px' }}>
+                            {nav.listaTecnicas.length} técnicas en {valor} · ordenadas por curso y volumen
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '8px' }}>
+                            {listaTecnicasVisibles.map((t, i) => (
+                                <button
+                                    key={`${t.id}-${i}`}
+                                    type="button"
+                                    onClick={() => abrirTecnica(t)}
+                                    style={{ textAlign: 'left', background: '#0a0a0a', border: `1px solid ${vistos.includes(t.id) ? '#2e5c2e' : '#222'}`, borderRadius: '8px', padding: '11px 13px', color: '#fff', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '5px' }}
+                                >
+                                    <span style={{ color: vistos.includes(t.id) ? '#4CAF50' : '#d4af37', fontWeight: 'bold', fontSize: '0.84rem', lineHeight: 1.3 }}>
+                                        {vistos.includes(t.id) ? '✅ ' : ''}{tieneAccesoVideo(usuario, t) ? '' : '🔒 '}{t.nombre}
+                                    </span>
+                                    <span style={{ color: '#777', fontSize: '0.66rem' }}>{t.cursoTitulo} • {t.volumenNombre}</span>
+                                    <span style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                                        {esVideoGratis(t) && (
+                                            <span style={{ fontSize: '0.58rem', background: '#4CAF50', color: '#000', borderRadius: '3px', padding: '1px 5px', fontWeight: 'bold' }}>🎁 GRATIS</span>
+                                        )}
+                                        <span style={{ fontSize: '0.58rem', background: '#d4af37', color: '#000', borderRadius: '3px', padding: '1px 5px', fontWeight: 'bold' }}>{t.posicion}</span>
+                                        <span style={{ fontSize: '0.58rem', color: '#d4af37', border: '1px solid #3a3320', borderRadius: '3px', padding: '1px 5px' }}>{t.tipo}</span>
+                                        {t.etiquetas.slice(0, 3).map(e => (
+                                            <span key={e} style={{ fontSize: '0.56rem', color: '#8a8a8a', border: '1px solid #262626', borderRadius: '3px', padding: '1px 5px' }}>{e}</span>
+                                        ))}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                        {nav.listaTecnicas.length > listaTecnicasVisibles.length && (
+                            <button onClick={() => setLimiteLista(l => l + 60)} style={{ ...styles.btnOutline, width: '100%', marginTop: '10px', padding: '11px', borderColor: '#d4af37', color: '#d4af37', borderRadius: '8px', cursor: 'pointer' }}>
+                                CARGAR 60 MÁS ({nav.listaTecnicas.length - listaTecnicasVisibles.length} restantes)
+                            </button>
+                        )}
+                    </div>
+                ) : usarMapa ? (
+                    <div
+                        ref={mapAreaRef}
+                        style={mapStyles.mapArea}
+                        onPointerDown={handlePointerDown}
+                        onPointerMove={handlePointerMove}
+                        onPointerUp={handlePointerUp}
+                        onTouchStart={handleTouchStart}
+                        onTouchMove={handleTouchMove}
+                        onTouchEnd={handleTouchEnd}
+                    >
+                        <div style={{
+                            ...mapStyles.canvas,
+                            transform: `translate(${position.x}px, ${position.y}px) scale(${esMovil ? scale * 0.48 : scale})`,
+                            transformOrigin: 'center center',
+                            transition: arrastrando ? 'none' : 'transform 0.1s ease-out',
+                        }}>
+                            <svg style={mapStyles.svgLayer}>
+                                {nav.nodos.map((n, i) => {
+                                    const total = nav.nodos.length;
+                                    const radio = total > 8 ? (i % 2 === 0 ? 230 : 340) : 260;
+                                    const angle = (i * (360 / total)) * (Math.PI / 180);
+                                    return (
+                                        <line
+                                            key={i}
+                                            x1="400" y1="400"
+                                            x2={400 + Math.cos(angle) * radio}
+                                            y2={400 + Math.sin(angle) * radio}
+                                            stroke={colorNodo(n)}
+                                            strokeWidth="2"
+                                            opacity="0.3"
+                                        />
+                                    );
+                                })}
+                            </svg>
+                            <div style={mapStyles.mainNode}>
+                                <span style={{ overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', lineHeight: 1.2 }}>{nav.titulo}</span>
+                            </div>
+                            {nav.nodos.map((n, i) => <NodoRadial key={i} nodo={n} i={i} total={nav.nodos.length} />)}
+                        </div>
+                    </div>
+                ) : (
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '14px' }}>
+                        {nav.nodos.length === 0 ? (
+                            <div style={{ textAlign: 'center', marginTop: '50px', color: '#777' }}>
+                                <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🥋</div>
+                                <p>No hay videos con este filtro.</p>
+                                {hayFiltro && <button onClick={() => { resetNavegacion(); setAutorSel(null); }} style={{ ...styles.btnOutline, width: 'auto', padding: '8px 14px', borderColor: '#d4af37', color: '#d4af37', borderRadius: '6px', cursor: 'pointer' }}>Quitar filtro</button>}
+                            </div>
+                        ) : (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))', gap: '8px' }}>
+                                {nav.nodos.map((n, i) => <TarjetaNodo key={i} nodo={n} />)}
+                            </div>
+                        )}
                     </div>
                 )}
             </main>

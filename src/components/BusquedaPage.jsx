@@ -1,316 +1,297 @@
 import React, { useState, useEffect, useMemo } from 'react';
-// Importamos la base de datos desde su ubicación
-import { DB_INSTRUCCIONALES } from '../data/instruccionales';
+import { buscarTecnicas, FACETAS, ESTADISTICAS, esVideoGratis } from '../data/vaultIndex';
+import { tieneAccesoVideo, pedirAcceso } from '../utils/accesoVault';
 
-const BusquedaPage = ({ onBack, onSelectVideo, styles }) => {
-    const [termino, setTermino] = useState("");
-    const [filtroActivo, setFiltroActivo] = useState("TODOS");
-    
-    // 📱 Detección móvil
-    const [esMovil, setEsMovil] = useState(window.innerWidth < 768);
+const FILTROS_VACIOS = { posicion: null, tipo: null, modalidad: null, autor: null, etiqueta: null };
+
+const Chip = ({ activo, onClick, children, count, tono = 'gold' }) => (
+    <button
+        type="button"
+        onClick={onClick}
+        style={{
+            padding: '5px 10px',
+            borderRadius: '999px',
+            border: `1px solid ${activo ? (tono === 'green' ? '#4CAF50' : '#d4af37') : '#2a2a2a'}`,
+            backgroundColor: activo ? (tono === 'green' ? '#4CAF50' : '#d4af37') : '#0d0d0d',
+            color: activo ? '#000' : '#bbb',
+            fontSize: '0.7rem',
+            fontWeight: activo ? 'bold' : 'normal',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '5px',
+        }}
+    >
+        {children}
+        {typeof count === 'number' && (
+            <span style={{ opacity: 0.65, fontSize: '0.62rem' }}>{count}</span>
+        )}
+    </button>
+);
+
+const SeccionFiltro = ({ titulo, children, abierta = true }) => (
+    <div style={{ marginBottom: '16px' }}>
+        <div style={{ color: '#d4af37', fontSize: '0.65rem', letterSpacing: '1.5px', marginBottom: '8px', textTransform: 'uppercase' }}>
+            {titulo}
+        </div>
+        {abierta && <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>{children}</div>}
+    </div>
+);
+
+const BusquedaPage = ({ onBack, onSelectVideo, styles, usuario, vistos = [] }) => {
+    const [termino, setTermino] = useState('');
+    const [filtros, setFiltros] = useState(FILTROS_VACIOS);
+    const [limite, setLimite] = useState(60);
+    const [esMovil, setEsMovil] = useState(window.innerWidth < 900);
+    const [filtrosAbiertos, setFiltrosAbiertos] = useState(window.innerWidth >= 900);
+    const [verTodasEtiquetas, setVerTodasEtiquetas] = useState(false);
 
     useEffect(() => {
-        const handleResize = () => setEsMovil(window.innerWidth < 768);
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
+        const onResize = () => {
+            const movil = window.innerWidth < 900;
+            setEsMovil(movil);
+        };
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
     }, []);
 
-    // Aplanamos la DB para buscar en todos los videos de todos los cursos (Optimizado con useMemo)
-    const todasLasTecnicas = useMemo(() => {
-        if (!DB_INSTRUCCIONALES) return [];
+    const resultados = useMemo(() => buscarTecnicas(termino, filtros), [termino, filtros]);
+    const visibles = useMemo(() => resultados.slice(0, limite), [resultados, limite]);
 
-        return Object.keys(DB_INSTRUCCIONALES).flatMap(cursoKey =>
-            (DB_INSTRUCCIONALES[cursoKey]?.volumenes || []).flatMap(vol =>
-                (vol.partes || []).map(parte => {
-                    let sub = parte.subcategoria || "";
-                    const nombreOriginal = parte.nombre || "Técnica sin nombre";
-                    const n = nombreOriginal.toLowerCase();
-                    const cursoNom = cursoKey.toLowerCase();
+    const activos = Object.entries(filtros).filter(([, v]) => v);
 
-                    if (!sub) {
-                        const esCursoDefensa = cursoNom.includes('pillars of defense') || cursoNom.includes('escapes');
+    const alternarFiltro = (campo, valor) => {
+        setFiltros(prev => ({ ...prev, [campo]: prev[campo] === valor ? null : valor }));
+        setLimite(60);
+    };
 
-                        if (n.includes('escape') || n.includes('defensa') || n.includes('defense') || n.includes('counter') || esCursoDefensa) {
-                            if (n.includes('mount') || n.includes('montada')) sub = "ESCAPES MONTADA";
-                            else if (n.includes('side') || n.includes('lateral')) sub = "ESCAPES LATERAL";
-                            else if (n.includes('back') || n.includes('espalda')) sub = "DEFENSA ESPALDA";
-                            else if (n.includes('leg lock') || n.includes('heel hook')) sub = "DEFENSA LEG LOCKS";
-                            else if (n.includes('triang')) sub = "DEFENSA TRIANGULO";
-                            else if (n.includes('arm bar') || n.includes('armbar') || n.includes('joint lock') || n.includes('armlock')) sub = "DEFENSA ARM BAR";
-                            else if (n.includes('darce') || n.includes('guillotine') || n.includes('choke') || n.includes('strangle')) sub = "DEFENSA STRANGLES";
-                            else sub = "RE-GUARDIA";
-                        }
-                        else if (n.includes('takedown') || n.includes('take down') || n.includes('standing') || n.includes('derribo') || cursoNom.includes('feet to floor')) {
-                            sub = "DERRIBOS";
-                        }
-                        else if (n.includes('side control') || n.includes('lateral') || n.includes('100 kilos')) sub = "CONTROL LATERAL";
-                        else if (n.includes('half guard') || n.includes('media guardia') || n.includes('z-guard')) sub = "MEDIA GUARDIA";
-                        else if (n.includes('closed guard') || n.includes('guardia cerrada')) sub = "GUARDIA CERRADA";
-                        else if (n.includes('mount') || n.includes('montada')) sub = "MONTADA";
-                        else if (n.includes('back') || n.includes('espalda') || n.includes('rear mount')) sub = "ESPALDA";
-                        else if (n.includes('turtle') || n.includes('tortuga')) sub = "TORTUGA";
-                        else if (n.includes('berimbolo') || n.includes('bolo')) sub = "BERIMBOLO";
-                        else if (n.includes('buggy')) sub = "BUGGY CHOKE";
-                        else if (n.includes('crucifix') || n.includes('crucifijo')) sub = "CRUCIFIX";
-                        else if (n.includes('octopus')) sub = "OCTOPUS GUARD";
-                    }
+    const limpiarTodo = () => {
+        setFiltros(FILTROS_VACIOS);
+        setTermino('');
+        setLimite(60);
+    };
 
-                    return { ...parte, nombre: nombreOriginal, subcategoria: sub, curso: cursoKey, volNombre: vol.nombre };
-                })
-            )
-        );
-    }, []);
+    const abrirTecnica = (t) => {
+        if (tieneAccesoVideo(usuario, t)) {
+            onSelectVideo({ titulo: t.nombre, id: t.id });
+            return;
+        }
+        if (window.confirm(
+            `CONTENIDO BLOQUEADO 🔒\n\n"${t.nombre}" requiere autorización.\nCada curso tiene un video de prueba gratuito; para ver el resto necesitas acceso.\n\n¿Deseas solicitar acceso a "${t.cursoTitulo}" por WhatsApp?`
+        )) {
+            pedirAcceso(usuario, t.cursoTitulo);
+        }
+    };
 
-    // Categorías rápidas disponibles
-    const categoriasRapidas = ["TODOS", "ESCAPES MONTADA", "DERRIBOS", "GUARDIA CERRADA", "MONTADA", "ESPALDA", "DEFENSA LEG LOCKS"];
-
-    // Filtrado inteligente optimizado
-    const resultados = useMemo(() => {
-        // Si no hay término de búsqueda ni filtro activo, limitamos la carga inicial a 40 elementos para cero lag
-        const filtradas = todasLasTecnicas.filter(t => {
-            const cumpleTexto = !termino || 
-                                t.nombre.toLowerCase().includes(termino.toLowerCase()) ||
-                                t.curso.toLowerCase().includes(termino.toLowerCase()) ||
-                                t.volNombre.toLowerCase().includes(termino.toLowerCase());
-            
-            const cumpleFiltro = filtroActivo === "TODOS" || t.subcategoria === filtroActivo;
-
-            return cumpleTexto && cumpleFiltro;
-        });
-
-        return filtradas;
-    }, [todasLasTecnicas, termino, filtroActivo]);
-
-    // Resultados renderizables limitados para proteger el DOM de sobrecarga (máximo 60 en pantalla a la vez)
-    const resultadosVisibles = useMemo(() => {
-        return resultados.slice(0, 60);
-    }, [resultados]);
+    const etiquetasVisibles = verTodasEtiquetas ? FACETAS.ETIQUETAS : FACETAS.ETIQUETAS.slice(0, 22);
 
     return (
         <div style={{
-            paddingTop: esMovil ? 'calc(env(safe-area-inset-top, 0px) + 15px)' : '30px',
-            paddingBottom: esMovil ? 'calc(env(safe-area-inset-bottom, 0px) + 15px)' : '30px',
-            paddingLeft: esMovil ? 'calc(env(safe-area-inset-left, 0px) + 15px)' : '30px',
-            paddingRight: esMovil ? 'calc(env(safe-area-inset-right, 0px) + 15px)' : '30px',
-            backgroundColor: '#000',
-            color: '#fff',
-            height: '100vh',
-            boxSizing: 'border-box',
-            display: 'flex',
-            flexDirection: 'column',
-            width: '100%',
-            overflow: 'hidden'
+            paddingTop: esMovil ? 'calc(env(safe-area-inset-top, 0px) + 12px)' : '24px',
+            paddingBottom: esMovil ? 'calc(env(safe-area-inset-bottom, 0px) + 12px)' : '24px',
+            paddingLeft: esMovil ? 'calc(env(safe-area-inset-left, 0px) + 12px)' : '24px',
+            paddingRight: esMovil ? 'calc(env(safe-area-inset-right, 0px) + 12px)' : '24px',
+            backgroundColor: '#000', color: '#fff', height: '100vh', boxSizing: 'border-box',
+            display: 'flex', flexDirection: 'column', width: '100%', overflow: 'hidden',
         }}>
-            
-            {/* Header Adaptable */}
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '15px',
-                width: '100%',
-                gap: '10px',
-                flexShrink: 0
-            }}>
-                <button 
-                    onClick={onBack} 
-                    style={{ 
-                        ...(styles?.btnOutline || {}), 
-                        width: 'auto', 
-                        padding: esMovil ? '10px 15px' : '8px 15px', 
-                        fontSize: esMovil ? '0.9rem' : '0.8rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        boxSizing: 'border-box',
-                        margin: 0,
-                        borderColor: '#d4af37',
-                        color: '#d4af37',
-                        backgroundColor: '#111',
-                        borderRadius: '8px',
-                        cursor: 'pointer'
-                    }}
-                >
-                    ← {esMovil ? '' : ' VOLVER AL HUB'}
+            {/* HEADER */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px', flexShrink: 0 }}>
+                <button onClick={onBack} style={{ ...(styles?.btnOutline || {}), width: 'auto', padding: '9px 14px', fontSize: '0.8rem', borderColor: '#d4af37', color: '#d4af37', borderRadius: '8px', cursor: 'pointer', backgroundColor: '#111' }}>
+                    ← {esMovil ? '' : 'VOLVER'}
                 </button>
-                <h2 style={{ 
-                    color: '#d4af37', 
-                    margin: 0, 
-                    fontSize: esMovil ? '1.1rem' : '1.4rem', 
-                    textTransform: 'uppercase',
-                    textAlign: 'right',
-                    letterSpacing: '1px'
-                }}>
-                    BÚSQUEDA VAULT ({todasLasTecnicas.length})
-                </h2>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <h2 style={{ color: '#d4af37', margin: 0, fontSize: esMovil ? '1rem' : '1.3rem', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                        Búsqueda Vault
+                    </h2>
+                    <div style={{ color: '#666', fontSize: '0.65rem', marginTop: '2px' }}>
+                        {ESTADISTICAS.videos} videos · {ESTADISTICAS.cursos} cursos · {ESTADISTICAS.posiciones} posiciones · {ESTADISTICAS.etiquetas} etiquetas
+                    </div>
+                </div>
+                {esMovil && (
+                    <button onClick={() => setFiltrosAbiertos(v => !v)} style={{ ...(styles?.btnOutline || {}), width: 'auto', padding: '9px 12px', fontSize: '0.72rem', borderColor: filtrosAbiertos ? '#d4af37' : '#333', color: filtrosAbiertos ? '#d4af37' : '#aaa', borderRadius: '8px', backgroundColor: '#111' }}>
+                        {filtrosAbiertos ? 'OCULTAR FILTROS' : `FILTROS${activos.length ? ` (${activos.length})` : ''}`}
+                    </button>
+                )}
             </div>
 
-            {/* Input de Búsqueda con Botón Clear (X) */}
-            <div style={{ position: 'relative', width: '100%', marginBottom: '12px', flexShrink: 0 }}>
-                <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#d4af37', pointerEvents: 'none' }}>
-                    🔍
-                </span>
+            {/* BUSCADOR */}
+            <div style={{ position: 'relative', width: '100%', marginBottom: '10px', flexShrink: 0 }}>
+                <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#d4af37' }}>🔍</span>
                 <input
                     type="text"
-                    placeholder="Escribe para buscar entre más de 1,000 técnicas..."
-                    autoFocus={!esMovil} 
-                    style={{
-                        width: '100%',
-                        padding: esMovil ? '14px 40px 14px 40px' : '14px 40px 14px 40px',
-                        backgroundColor: '#111',
-                        border: '1px solid #d4af37',
-                        color: '#fff',
-                        borderRadius: '8px',
-                        fontSize: '0.95rem',
-                        boxSizing: 'border-box',
-                        outline: 'none'
-                    }}
+                    placeholder="Busca técnica, posición, autor, etiqueta... (ej: darce, media guardia, Gordon)"
                     value={termino}
-                    onChange={(e) => setTermino(e.target.value)}
+                    onChange={(e) => { setTermino(e.target.value); setLimite(60); }}
+                    style={{ width: '100%', padding: '13px 42px 13px 40px', backgroundColor: '#111', border: '1px solid #d4af37', color: '#fff', borderRadius: '8px', fontSize: '0.9rem', boxSizing: 'border-box', outline: 'none' }}
                 />
                 {termino && (
-                    <button
-                        onClick={() => setTermino("")}
-                        style={{
-                            position: 'absolute',
-                            right: '12px',
-                            top: '50%',
-                            transform: 'translateY(-50%)',
-                            background: 'none',
-                            border: 'none',
-                            color: '#888',
-                            fontSize: '1rem',
-                            cursor: 'pointer',
-                            padding: '4px'
-                        }}
-                    >
-                        ✕
-                    </button>
+                    <button onClick={() => { setTermino(''); setLimite(60); }} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#888', fontSize: '1rem', cursor: 'pointer', padding: '6px' }}>✕</button>
                 )}
             </div>
 
-            {/* Barra de Chips de Categorías Rápidas */}
-            <div style={{
-                display: 'flex',
-                gap: '8px',
-                overflowX: 'auto',
-                paddingBottom: '10px',
-                marginBottom: '10px',
-                scrollbarWidth: 'none',
-                msOverflowStyle: 'none',
-                flexShrink: '0'
-            }}>
-                {categoriasRapidas.map((cat) => (
-                    <button
-                        key={cat}
-                        onClick={() => setFiltroActivo(cat)}
-                        style={{
-                            padding: '6px 12px',
-                            borderRadius: '20px',
-                            border: `1px solid ${filtroActivo === cat ? '#d4af37' : '#333'}`,
-                            backgroundColor: filtroActivo === cat ? '#d4af37' : '#0a0a0a',
-                            color: filtroActivo === cat ? '#000' : '#ccc',
-                            fontSize: '0.75rem',
-                            fontWeight: 'bold',
-                            whiteSpace: 'nowrap',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease'
-                        }}
-                    >
-                        {cat}
+            {/* FILTROS ACTIVOS */}
+            {activos.length > 0 && (
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '10px', flexShrink: 0 }}>
+                    <span style={{ color: '#666', fontSize: '0.65rem' }}>FILTROS:</span>
+                    {activos.map(([campo, valor]) => (
+                        <Chip key={campo} activo onClick={() => alternarFiltro(campo, valor)}>
+                            {valor} ✕
+                        </Chip>
+                    ))}
+                    <button onClick={limpiarTodo} style={{ background: 'none', border: 'none', color: '#ff6666', fontSize: '0.68rem', cursor: 'pointer', textDecoration: 'underline' }}>
+                        Limpiar todo
                     </button>
-                ))}
-            </div>
+                </div>
+            )}
 
-            {/* Contador de resultados */}
-            <div style={{ fontSize: '0.75rem', color: '#886', marginBottom: '8px', flexShrink: 0, display: 'flex', justifyContent: 'space-between' }}>
-                <span>{resultados.length} {resultados.length === 1 ? 'técnica encontrada' : 'técnicas encontradas'}</span>
-                {resultados.length > 60 && <span style={{ color: '#d4af37' }}>Mostrando las primeras 60 para optimizar velocidad</span>}
-            </div>
-
-            {/* Contenedor de Resultados Independiente (Scroll Local) */}
-            <div style={{ 
-                flex: 1, 
-                display: 'flex', 
-                flexDirection: 'column', 
-                gap: '10px', 
-                overflowY: 'auto', 
-                paddingBottom: '20px', 
-                width: '100%',
-                minWidth: 0,
-                scrollBehavior: 'smooth'
-            }}>
-                {resultadosVisibles.length > 0 ? (
-                    resultadosVisibles.map((t, i) => (
-                        <div
-                            key={i}
-                            onClick={() => onSelectVideo({ titulo: t.nombre, id: t.id })}
-                            style={{
-                                padding: '14px',
-                                backgroundColor: '#0a0a0a',
-                                border: '1px solid #222',
-                                borderRadius: '8px',
-                                cursor: 'pointer',
-                                transition: 'border-color 0.2s, background-color 0.2s',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '6px',
-                                width: '100%',
-                                boxSizing: 'border-box',
-                                minHeight: 'min-content'
-                            }}
-                            onMouseEnter={(e) => {
-                                if (!esMovil) {
-                                    e.currentTarget.style.borderColor = '#d4af37';
-                                    e.currentTarget.style.backgroundColor = '#151515';
-                                }
-                            }}
-                            onMouseLeave={(e) => {
-                                if (!esMovil) {
-                                    e.currentTarget.style.borderColor = '#222';
-                                    e.currentTarget.style.backgroundColor = '#0a0a0a';
-                                }
-                            }}
-                            onTouchStart={(e) => e.currentTarget.style.borderColor = '#d4af37'}
-                            onTouchEnd={(e) => e.currentTarget.style.borderColor = '#222'}
-                        >
-                            <div style={{ 
-                                color: '#d4af37', 
-                                fontWeight: 'bold',
-                                fontSize: esMovil ? '0.9rem' : '1rem',
-                                lineHeight: '1.3'
-                            }}>
-                                {t.nombre}
-                            </div>
-                            
-                            {/* Chips informativos */}
-                            <div style={{ 
-                                fontSize: esMovil ? '0.7rem' : '0.75rem', 
-                                color: '#888',
-                                display: 'flex',
-                                alignItems: 'center',
-                                flexWrap: 'wrap',
-                                gap: '6px'
-                            }}>
-                                <span style={{ color: '#ccc' }}>{t.curso}</span> 
-                                <span style={{ opacity: 0.5 }}>•</span> 
-                                <span>{t.volNombre}</span>
-                                {t.subcategoria && (
-                                    <>
-                                        <span style={{ opacity: 0.5 }}>•</span>
-                                        <span style={{ color: '#4CAF50', fontWeight: 'bold' }}>{t.subcategoria}</span>
-                                    </>
-                                )}
-                            </div>
+            <div style={{ display: 'flex', gap: '16px', flex: 1, minHeight: 0, flexDirection: esMovil ? 'column' : 'row' }}>
+                {/* PANEL DE FILTROS */}
+                {(filtrosAbiertos || !esMovil) && (
+                    <aside style={{
+                        width: esMovil ? '100%' : '270px',
+                        flexShrink: 0,
+                        overflowY: 'auto',
+                        border: '1px solid #1c1c1c',
+                        borderRadius: '10px',
+                        padding: '14px',
+                        backgroundColor: '#070707',
+                        maxHeight: esMovil ? '38vh' : '100%',
+                        boxSizing: 'border-box',
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                            <span style={{ color: '#fff', fontSize: '0.8rem', fontWeight: 'bold', letterSpacing: '1px' }}>FILTROS</span>
+                            {activos.length > 0 && <button onClick={limpiarTodo} style={{ background: 'none', border: 'none', color: '#ff6666', fontSize: '0.65rem', cursor: 'pointer' }}>LIMPIAR</button>}
                         </div>
-                    ))
-                ) : (
-                    <div style={{ color: '#666', textAlign: 'center', marginTop: '40px', padding: '0 20px' }}>
-                        <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>🥋</div>
-                        <p style={{ fontSize: '1.1rem', marginBottom: '8px', color: '#888' }}>No se encontraron técnicas</p>
-                        <p style={{ fontSize: '0.85rem', color: '#555' }}>Intenta cambiando el filtro superior o buscando con otro término.</p>
-                    </div>
+
+                        <SeccionFiltro titulo="Posición">
+                            {FACETAS.POSICION.map(f => (
+                                <Chip key={f.valor} activo={filtros.posicion === f.valor} count={f.videos} onClick={() => alternarFiltro('posicion', f.valor)}>
+                                    {f.valor}
+                                </Chip>
+                            ))}
+                        </SeccionFiltro>
+
+                        <SeccionFiltro titulo="Tipo">
+                            {FACETAS.TIPO.map(f => (
+                                <Chip key={f.valor} activo={filtros.tipo === f.valor} count={f.videos} onClick={() => alternarFiltro('tipo', f.valor)}>
+                                    {f.valor}
+                                </Chip>
+                            ))}
+                        </SeccionFiltro>
+
+                        <SeccionFiltro titulo="Modalidad">
+                            {FACETAS.MODALIDAD.map(f => (
+                                <Chip key={f.valor} activo={filtros.modalidad === f.valor} count={f.videos} onClick={() => alternarFiltro('modalidad', f.valor)} tono="green">
+                                    {f.valor}
+                                </Chip>
+                            ))}
+                        </SeccionFiltro>
+
+                        <SeccionFiltro titulo="Autor">
+                            {FACETAS.AUTORES.map(f => (
+                                <Chip key={f.valor} activo={filtros.autor === f.valor} count={f.videos} onClick={() => alternarFiltro('autor', f.valor)}>
+                                    {f.valor}
+                                </Chip>
+                            ))}
+                        </SeccionFiltro>
+
+                        <SeccionFiltro titulo="Etiquetas">
+                            {etiquetasVisibles.map(f => (
+                                <Chip key={f.valor} activo={filtros.etiqueta === f.valor} count={f.videos} onClick={() => alternarFiltro('etiqueta', f.valor)}>
+                                    {f.valor}
+                                </Chip>
+                            ))}
+                            {FACETAS.ETIQUETAS.length > 22 && (
+                                <button onClick={() => setVerTodasEtiquetas(v => !v)} style={{ background: 'none', border: 'none', color: '#d4af37', fontSize: '0.68rem', cursor: 'pointer', textDecoration: 'underline' }}>
+                                    {verTodasEtiquetas ? 'Ver menos' : `Ver todas (${FACETAS.ETIQUETAS.length})`}
+                                </button>
+                            )}
+                        </SeccionFiltro>
+                    </aside>
                 )}
+
+                {/* RESULTADOS */}
+                <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexShrink: 0 }}>
+                        <span style={{ color: '#888', fontSize: '0.72rem' }}>
+                            {resultados.length} {resultados.length === 1 ? 'técnica' : 'técnicas'}
+                            {resultados.length > visibles.length ? ` · mostrando ${visibles.length}` : ''}
+                        </span>
+                        {termino && <span style={{ color: '#555', fontSize: '0.68rem' }}>“{termino}”</span>}
+                    </div>
+
+                    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px', paddingBottom: '16px' }}>
+                        {visibles.length === 0 && (
+                            <div style={{ textAlign: 'center', marginTop: '50px', color: '#666' }}>
+                                <div style={{ fontSize: '2.4rem', marginBottom: '8px' }}>🥋</div>
+                                <p style={{ color: '#999', margin: '0 0 6px' }}>No se encontraron técnicas</p>
+                                <p style={{ fontSize: '0.8rem', color: '#555' }}>Prueba con otra palabra o quita algún filtro.</p>
+                            </div>
+                        )}
+
+                        {visibles.map((t, i) => {
+                            const visto = vistos.includes(t.id);
+                            const bloqueado = !tieneAccesoVideo(usuario, t);
+                            return (
+                                <button
+                                    key={`${t.id}-${i}`}
+                                    type="button"
+                                    onClick={() => abrirTecnica(t)}
+                                    style={{
+                                        textAlign: 'left',
+                                        width: '100%',
+                                        padding: '12px 14px',
+                                        backgroundColor: '#0a0a0a',
+                                        border: `1px solid ${visto ? '#2e5c2e' : '#1f1f1f'}`,
+                                        borderRadius: '8px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '6px',
+                                        flexShrink: 0,
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+                                        <span style={{ color: visto ? '#4CAF50' : '#d4af37', fontWeight: 'bold', fontSize: esMovil ? '0.88rem' : '0.95rem', lineHeight: 1.3 }}>
+                                            {visto ? '✅ ' : ''}{bloqueado ? '🔒 ' : ''}{t.nombre}
+                                        </span>
+                                        <span style={{ color: '#555', fontSize: '0.62rem', whiteSpace: 'nowrap', paddingTop: '3px' }}>
+                                            {t.modalidad}
+                                        </span>
+                                    </div>
+
+                                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '5px', fontSize: '0.68rem', color: '#777' }}>
+                                        <span style={{ color: '#bbb' }}>{t.cursoTitulo}</span>
+                                        <span style={{ opacity: 0.4 }}>•</span>
+                                        <span>{t.volumenNombre}</span>
+                                    </div>
+
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                                        {esVideoGratis(t) && (
+                                            <span style={{ fontSize: '0.62rem', color: '#000', backgroundColor: '#4CAF50', borderRadius: '3px', padding: '2px 6px', fontWeight: 'bold' }}>🎁 GRATIS</span>
+                                        )}
+                                        <span style={{ fontSize: '0.62rem', color: '#0a0a0a', backgroundColor: '#d4af37', borderRadius: '3px', padding: '2px 6px', fontWeight: 'bold' }}>{t.posicion}</span>
+                                        <span style={{ fontSize: '0.62rem', color: '#d4af37', border: '1px solid #3a3320', borderRadius: '3px', padding: '2px 6px' }}>{t.tipo}</span>
+                                        {t.etiquetas.slice(0, 4).map(e => (
+                                            <span key={e} style={{ fontSize: '0.6rem', color: '#8a8a8a', border: '1px solid #262626', borderRadius: '3px', padding: '2px 6px' }}>{e}</span>
+                                        ))}
+                                        {t.etiquetas.length > 4 && <span style={{ fontSize: '0.6rem', color: '#555' }}>+{t.etiquetas.length - 4}</span>}
+                                    </div>
+                                </button>
+                            );
+                        })}
+
+                        {resultados.length > visibles.length && (
+                            <button
+                                onClick={() => setLimite(l => l + 60)}
+                                style={{ ...(styles?.btnOutline || {}), width: '100%', padding: '12px', borderColor: '#d4af37', color: '#d4af37', backgroundColor: '#0d0d0d', borderRadius: '8px', cursor: 'pointer', flexShrink: 0 }}
+                            >
+                                CARGAR 60 MÁS ({resultados.length - visibles.length} restantes)
+                            </button>
+                        )}
+                    </div>
+                </main>
             </div>
         </div>
     );
