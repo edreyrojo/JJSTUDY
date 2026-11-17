@@ -53,6 +53,9 @@ const MapaPage = ({
     instrSel, setInstrSel,
     volSel, setVolSel,
     vistos = [],
+    rutasLiberadas = [],
+    accesoRutas,
+    onOpenRutas,
     styles = {},
 }) => {
     const [terminoBusqueda, setTerminoBusqueda] = useState('');
@@ -86,6 +89,7 @@ const MapaPage = ({
     const dimension = DIMENSIONES.find(d => d.id === categoriaSel) || DIMENSIONES[0];
     const valor = autorSel;
     const curso = instrSel ? obtenerCurso(instrSel) : null;
+    const tieneAcceso = (tecnica) => tieneAccesoVideo(usuario, tecnica, accesoRutas);
 
     // ---------------------------------------------------------------------
     // Construcción de nodos (memorizada para que el pan/zoom no recalcule)
@@ -188,7 +192,7 @@ const MapaPage = ({
 
     const abrirTecnica = (t) => {
         if (!t) return;
-        if (tieneAccesoVideo(usuario, t)) {
+        if (tieneAcceso(t)) {
             onSelectVideo({ titulo: t.nombre, id: t.id });
             return;
         }
@@ -305,7 +309,7 @@ const MapaPage = ({
     const colorNodo = (n) => {
         if (n.type === 'parte') {
             if (vistos.includes(n.tecnica.id)) return '#4CAF50';
-            return tieneAccesoVideo(usuario, n.tecnica) ? '#d4af37' : '#777';
+            return tieneAcceso(n.tecnica) ? '#d4af37' : '#777';
         }
         if (n.type === 'volumen' && n.progreso?.completo) return '#4CAF50';
         return '#d4af37';
@@ -321,7 +325,7 @@ const MapaPage = ({
         const expandido = nodoExpandidoId === i;
         const size = expandido ? 165 : 108;
         const color = colorNodo(nodo);
-        const bloqueado = nodo.type === 'parte' && !tieneAccesoVideo(usuario, nodo.tecnica);
+        const bloqueado = nodo.type === 'parte' && !tieneAcceso(nodo.tecnica);
 
         return (
             <div
@@ -367,7 +371,7 @@ const MapaPage = ({
 
     const TarjetaNodo = ({ nodo }) => {
         const color = colorNodo(nodo);
-        const bloqueado = nodo.type === 'parte' && !tieneAccesoVideo(usuario, nodo.tecnica);
+        const bloqueado = nodo.type === 'parte' && !tieneAcceso(nodo.tecnica);
         const visto = nodo.type === 'parte' && vistos.includes(nodo.tecnica.id);
         return (
             <button
@@ -512,6 +516,43 @@ const MapaPage = ({
 
             {/* ÁREA PRINCIPAL */}
             <main style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', marginLeft: esMovil ? 0 : '240px' }}>
+                {rutasLiberadas.length > 0 && (
+                    <button
+                        type="button"
+                        onClick={onOpenRutas}
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: '9px', width: '100%', textAlign: 'left',
+                            background: 'linear-gradient(135deg, rgba(212,175,55,0.12), #070707 70%)',
+                            border: 'none', borderBottom: '1px solid rgba(212,175,55,0.3)', padding: esMovil ? '9px 12px' : '10px 16px',
+                            cursor: 'pointer', color: '#fff', flexShrink: 0
+                        }}
+                    >
+                        <span style={{
+                            width: '30px', height: '30px', flexShrink: 0, borderRadius: '8px', display: 'flex',
+                            alignItems: 'center', justifyContent: 'center', background: 'rgba(212,175,55,0.12)',
+                            border: '1px solid rgba(212,175,55,0.35)', color: '#d4af37'
+                        }}>
+                            <VaultIcon name="route" size={15} />
+                        </span>
+                        <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                            <span style={{ color: '#d4af37', fontSize: '0.56rem', fontWeight: 800, letterSpacing: '0.8px' }}>
+                                RUTAS LIBERADAS · {rutasLiberadas.length}
+                            </span>
+                            <span style={{
+                                color: '#8a8a8a', fontSize: '0.56rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                            }}>
+                                {rutasLiberadas.map((r) => r.nombre).filter(Boolean).slice(0, 3).join(' · ')}
+                            </span>
+                        </span>
+                        <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#d4af37',
+                            fontSize: '0.54rem', fontWeight: 800, flexShrink: 0
+                        }}>
+                            ABRIR <VaultIcon name="chevronRight" size={12} />
+                        </span>
+                    </button>
+                )}
+
                 {/* Toolbar / breadcrumb */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', padding: esMovil ? '8px 10px' : '12px 16px', borderBottom: '1px solid #171717', backgroundColor: '#070707', flexShrink: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flex: 1, minWidth: 0, flexWrap: 'wrap', fontSize: '0.72rem' }}>
@@ -582,7 +623,7 @@ const MapaPage = ({
                                 >
                                     <span style={{ color: vistos.includes(t.id) ? '#4CAF50' : '#d4af37', fontWeight: 'bold', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
                                         {vistos.includes(t.id) && <VaultIcon name="check" size={12} color="#4CAF50" />}
-                                        {!tieneAccesoVideo(usuario, t) && <VaultIcon name="lock" size={12} color="#d4af37" />}
+                                        {!tieneAcceso(t) && <VaultIcon name="lock" size={12} color="#d4af37" />}
                                         <span>{t.nombre}</span>
                                     </span>
                                     <span style={{ color: '#777', fontSize: '0.68rem' }}>{t.cursoTitulo} • {t.volumenNombre}</span>
@@ -614,7 +655,7 @@ const MapaPage = ({
                                 >
                                     <span style={{ color: vistos.includes(t.id) ? '#4CAF50' : '#d4af37', fontWeight: 'bold', fontSize: '0.84rem', lineHeight: 1.3, display: 'flex', alignItems: 'center', gap: '5px' }}>
                                         {vistos.includes(t.id) && <VaultIcon name="check" size={12} color="#4CAF50" />}
-                                        {!tieneAccesoVideo(usuario, t) && <VaultIcon name="lock" size={12} color="#d4af37" />}
+                                        {!tieneAcceso(t) && <VaultIcon name="lock" size={12} color="#d4af37" />}
                                         <span>{t.nombre}</span>
                                     </span>
                                     <span style={{ color: '#777', fontSize: '0.66rem' }}>{t.cursoTitulo} • {t.volumenNombre}</span>

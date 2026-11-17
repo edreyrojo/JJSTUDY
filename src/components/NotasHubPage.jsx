@@ -45,7 +45,7 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles = {} }) => {
             const esObjeto = typeof data === 'object' && data !== null;
             const videoId = esObjeto && data.videoId ? data.videoId : id;
             const tecnica = obtenerTecnica(videoId);
-            set.add(tecnica?.cursoTitulo || SIN_CURSO);
+            set.add((esObjeto && data.cursoTitulo) || tecnica?.cursoTitulo || SIN_CURSO);
         });
         return [...set].sort((a, b) => {
             if (a === SIN_CURSO) return 1;
@@ -77,14 +77,14 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles = {} }) => {
                 videoId,
                 timestamp: esObjeto && data.timestamp ? data.timestamp : (!isNaN(parseInt(id)) ? parseInt(id) : 0),
                 tecnica,
-                cursoTitulo: tecnica?.cursoTitulo || '',
+                cursoTitulo: (esObjeto && data.cursoTitulo) || tecnica?.cursoTitulo || '',
                 volumenNombre: tecnica?.volumenNombre || '',
                 posicion: tecnica?.posicion || '',
                 tipo: tecnica?.tipo || '',
                 modalidad: tecnica?.modalidad || '',
                 marca: match ? match[0] : '',
                 segs,
-                cursoClave: tecnica?.cursoTitulo || SIN_CURSO
+                cursoClave: (esObjeto && data.cursoTitulo) || tecnica?.cursoTitulo || SIN_CURSO
             };
         });
 

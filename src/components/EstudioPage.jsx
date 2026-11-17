@@ -6,7 +6,7 @@ import { obtenerTecnica } from '../data/vaultIndex';
 import { tieneAccesoVideo, pedirAcceso } from '../utils/accesoVault';
 import VaultIcon from './VaultIcon';
 
-const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos = [], toggleVisto, usuario, styles = {}, getAdjacentVideo }) => {
+const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos = [], toggleVisto, usuario, styles = {}, getAdjacentVideo, accesoRutas }) => {
     // --- ESTADOS ---
     const [nota, setNota] = useState("");
     const [timestamp, setTimestamp] = useState("");
@@ -32,7 +32,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
         }
 
         const tecnica = obtenerTecnica(siguiente.id);
-        if (tecnica && !tieneAccesoVideo(usuario, tecnica)) {
+        if (tecnica && !tieneAccesoVideo(usuario, tecnica, accesoRutas)) {
             if (window.confirm(
                 `CONTENIDO BLOQUEADO\n\n"${tecnica.nombre}" requiere autorización.\nCada curso tiene un video de prueba gratuito; para ver el resto necesitas acceso.\n\n¿Deseas solicitar acceso a "${tecnica.cursoTitulo}" por WhatsApp?`
             )) {
@@ -48,8 +48,8 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
     const videoSiguiente = getAdjacentVideo && video ? getAdjacentVideo(video, 'next') : null;
     const tecnicaAnterior = videoAnterior ? obtenerTecnica(videoAnterior.id) : null;
     const tecnicaSiguiente = videoSiguiente ? obtenerTecnica(videoSiguiente.id) : null;
-    const puedeAnterior = !tecnicaAnterior || tieneAccesoVideo(usuario, tecnicaAnterior);
-    const puedeSiguiente = !tecnicaSiguiente || tieneAccesoVideo(usuario, tecnicaSiguiente);
+    const puedeAnterior = !tecnicaAnterior || tieneAccesoVideo(usuario, tecnicaAnterior, accesoRutas);
+    const puedeSiguiente = !tecnicaSiguiente || tieneAccesoVideo(usuario, tecnicaSiguiente, accesoRutas);
 
     // --- EFECTOS ---
     useEffect(() => {
@@ -91,6 +91,8 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                     [video.id]: {
                         texto: nota,
                         titulo: video.titulo,
+                        cursoTitulo: video.cursoTitulo || '',
+                        fuente: video.fuente || 'drive',
                         fecha: new Date().toLocaleString(),
                         videoId: video.id
                     }
@@ -146,16 +148,25 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
     const isCompletado = vistos.includes(video?.id);
 
     // En móvil usamos 16:9 (la forma real del video) y quitamos la barra
-    // superior de Drive con rm=minimal. Antes se forzaba 4:3 + minHeight,
-    // lo que dejaba una franja negra encima del video que tapaba los controles.
+    // superior de Drive con rm=minimal. Los videos indexados de YouTube usan
+    // su propio embed para no mezclar fuentes.
+    const fuente = video?.fuente === 'youtube' ? 'youtube' : 'drive';
+    const driveId = video?.driveId || video?.id;
+    const youtubeId = video?.youtubeId || '';
     const paramsDrive = [];
     if (esMovil) paramsDrive.push('rm=minimal');
     if (tiempoActivo) paramsDrive.push(`t=${tiempoActivo}`);
-    const driveSrc = `https://drive.google.com/file/d/${video?.id}/preview${paramsDrive.length ? `?${paramsDrive.join('&')}` : ''}`;
+    const driveSrc = `https://drive.google.com/file/d/${driveId}/preview${paramsDrive.length ? `?${paramsDrive.join('&')}` : ''}`;
+    const youtubeSrc = `https://www.youtube.com/embed/${youtubeId}?rel=0&modestbranding=1&playsinline=1${tiempoActivo ? `&start=${tiempoActivo}` : ''}`;
+    const videoSrc = fuente === 'youtube' ? youtubeSrc : driveSrc;
 
-    const abrirEnDrive = () => {
-        if (!video?.id) return;
-        window.open(`https://drive.google.com/file/d/${video.id}/view`, '_blank', 'noopener,noreferrer');
+    const abrirFuente = () => {
+        if (fuente === 'youtube') {
+            if (youtubeId) window.open(`https://www.youtube.com/watch?v=${youtubeId}`, '_blank', 'noopener,noreferrer');
+            return;
+        }
+        if (!driveId) return;
+        window.open(`https://drive.google.com/file/d/${driveId}/view`, '_blank', 'noopener,noreferrer');
     };
 
     return (
@@ -356,8 +367,8 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                         height: pantallaCompleta ? undefined : '100%'
                     }}>
                         <iframe
-                            key={`${video?.id}-${tiempoActivo}`}
-                            src={driveSrc}
+                            key={`${fuente}-${video?.id}-${tiempoActivo}`}
+                            src={videoSrc}
                             title={video?.titulo || 'Reproductor de video'}
                             style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
                             allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
@@ -414,10 +425,10 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                         </button>
                         {esMovil && (
                             <button
-                                onClick={abrirEnDrive}
+                                onClick={abrirFuente}
                                 style={{ background: 'none', border: 'none', color: '#8a8a8a', fontSize: '0.62rem', cursor: 'pointer', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                             >
-                                Si los controles no responden, abrir en Drive <VaultIcon name="external" size={10} />
+                                Si los controles no responden, abrir en {fuente === 'youtube' ? 'YouTube' : 'Drive'} <VaultIcon name="external" size={10} />
                             </button>
                         )}
                     </div>

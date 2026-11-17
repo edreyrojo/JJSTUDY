@@ -214,6 +214,7 @@ const HubPage = ({
 
     const herramientasGenerales = [
         { id: 'mapa', label: 'MAPA', description: 'Explora posiciones, autores y cursos', route: 'mapa', icon: 'map' },
+        { id: 'rutas', label: 'RUTAS', description: 'Tus rutas de aprendizaje liberadas', route: 'rutas_aprendizaje', icon: 'route' },
         { id: 'notas', label: 'BITÁCORA', description: 'Repasa tus apuntes técnicos', route: 'notas_hub', icon: 'notebook' },
         { id: 'buscar', label: 'BUSCAR', description: 'Por nombre, posición o etiqueta', route: 'busqueda', icon: 'search' },
         { id: 'timer', label: 'TIMER', description: 'Rounds, descansos y control', route: 'timer', icon: 'timer' },
@@ -664,6 +665,11 @@ const HubPage = ({
                 {esMaestro && (
                     <button type="button" className="hub-action" onClick={() => onNavigate('panel_maestro')} title="Panel Maestro">
                         <VaultIcon name="dashboard" size={14} /> PANEL MAESTRO
+                    </button>
+                )}
+                {esAdmin && (
+                    <button type="button" className="hub-action" onClick={() => onNavigate('rutas_admin')} title="Construir y liberar rutas de aprendizaje">
+                        <VaultIcon name="settings" size={14} /> CONSTRUCTOR DE RUTAS
                     </button>
                 )}
                 {esAdmin && (

@@ -426,6 +426,47 @@ const ICONS = {
     </>
   ),
   heart: <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8z" />,
+  route: (
+    <>
+      <circle cx="6" cy="6" r="2.5" />
+      <circle cx="18" cy="18" r="2.5" />
+      <path d="M8.5 6h5a3 3 0 0 1 0 6h-3a3 3 0 0 0 0 6h5" />
+    </>
+  ),
+  youtube: (
+    <>
+      <rect x="2.5" y="5.5" width="19" height="13" rx="4" />
+      <polygon points="10 9.2 15.2 12 10 14.8" fill="currentColor" stroke="none" />
+    </>
+  ),
+  drive: <polygon points="9 3 15 3 21 13.5 18 19 6 19 3 13.5 9 3" />,
+  database: (
+    <>
+      <ellipse cx="12" cy="5.5" rx="8" ry="3" />
+      <path d="M4 5.5v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" />
+      <path d="M4 11.5v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" />
+    </>
+  ),
+  layers: (
+    <>
+      <polygon points="12 3 21 8 12 13 3 8 12 3" />
+      <polyline points="3 12.5 12 17.5 21 12.5" />
+      <polyline points="3 17 12 22 21 17" />
+    </>
+  ),
+  graduation: (
+    <>
+      <path d="M2 9l10-4 10 4-10 4L2 9z" />
+      <path d="M6 11v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5" />
+      <line x1="22" y1="9" x2="22" y2="14" />
+    </>
+  ),
+  link: (
+    <>
+      <path d="M10 13.5a4 4 0 0 0 5.7 0l2.6-2.6a4 4 0 0 0-5.7-5.7L11.4 6.4" />
+      <path d="M14 10.5a4 4 0 0 0-5.7 0l-2.6 2.6a4 4 0 0 0 5.7 5.7l1.2-1.2" />
+    </>
+  ),
   wallet: (
     <>
       <rect x="3" y="6" width="18" height="13" rx="3" />

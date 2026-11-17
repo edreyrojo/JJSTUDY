@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { buscarTecnicas, FACETAS, ESTADISTICAS, esVideoGratis } from '../data/vaultIndex';
-import { tieneAccesoVideo, pedirAcceso } from '../utils/accesoVault';
+import { tieneAccesoVideo, pedirAcceso, tieneAccesoVideoDinamico } from '../utils/accesoVault';
+import { normalizarVideoDinamico } from '../utils/rutasAprendizaje';
+import { normalizar } from '../data/taxonomia';
 import VaultIcon from './VaultIcon';
 
 const FILTROS_VACIOS = { posicion: null, tipo: null, modalidad: null, autor: null, etiqueta: null };
@@ -40,7 +42,7 @@ const SeccionFiltro = ({ titulo, children, abierta = true }) => (
     </div>
 );
 
-const BusquedaPage = ({ onBack, onSelectVideo, styles, usuario, vistos = [] }) => {
+const BusquedaPage = ({ onBack, onSelectVideo, styles, usuario, vistos = [], videosIndexados = [], accesoRutas }) => {
     const [termino, setTermino] = useState('');
     const [filtros, setFiltros] = useState(FILTROS_VACIOS);
     const [limite, setLimite] = useState(60);
@@ -60,6 +62,25 @@ const BusquedaPage = ({ onBack, onSelectVideo, styles, usuario, vistos = [] }) =
     const resultados = useMemo(() => buscarTecnicas(termino, filtros), [termino, filtros]);
     const visibles = useMemo(() => resultados.slice(0, limite), [resultados, limite]);
 
+    const dinamicos = useMemo(() => {
+        const tokens = normalizar(termino).split(' ').filter(Boolean);
+        return videosIndexados
+            .map((video) => normalizarVideoDinamico(video))
+            .filter((video) => video.id && tieneAccesoVideoDinamico(usuario, video, accesoRutas))
+            .filter((video) => {
+                if (filtros.posicion && video.posicion !== filtros.posicion) return false;
+                if (filtros.tipo && video.tipo !== filtros.tipo) return false;
+                if (filtros.modalidad && video.modalidad !== filtros.modalidad) return false;
+                if (filtros.autor && video.autor !== filtros.autor) return false;
+                if (filtros.etiqueta && !video.etiquetas.includes(filtros.etiqueta)) return false;
+                if (tokens.length === 0) return true;
+                return tokens.every((token) => video.busca.includes(token));
+            })
+            .slice(0, 30);
+    }, [videosIndexados, usuario, accesoRutas, termino, filtros]);
+
+    const totalResultados = resultados.length + dinamicos.length;
+
     const activos = Object.entries(filtros).filter(([, v]) => v);
 
     const alternarFiltro = (campo, valor) => {
@@ -74,7 +95,7 @@ const BusquedaPage = ({ onBack, onSelectVideo, styles, usuario, vistos = [] }) =
     };
 
     const abrirTecnica = (t) => {
-        if (tieneAccesoVideo(usuario, t)) {
+        if (tieneAccesoVideo(usuario, t, accesoRutas)) {
             onSelectVideo({ titulo: t.nombre, id: t.id });
             return;
         }
@@ -216,14 +237,15 @@ const BusquedaPage = ({ onBack, onSelectVideo, styles, usuario, vistos = [] }) =
                 <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexShrink: 0 }}>
                         <span style={{ color: '#888', fontSize: '0.72rem' }}>
-                            {resultados.length} {resultados.length === 1 ? 'técnica' : 'técnicas'}
-                            {resultados.length > visibles.length ? ` · mostrando ${visibles.length}` : ''}
+                            {totalResultados} {totalResultados === 1 ? 'resultado' : 'resultados'}
+                            {dinamicos.length > 0 ? ` · ${dinamicos.length} de tus rutas` : ''}
+                            {resultados.length > visibles.length ? ` · mostrando ${visibles.length} del Vault` : ''}
                         </span>
                         {termino && <span style={{ color: '#555', fontSize: '0.68rem' }}>“{termino}”</span>}
                     </div>
 
                     <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px', paddingBottom: '16px' }}>
-                        {visibles.length === 0 && (
+                        {totalResultados === 0 && (
                             <div style={{ textAlign: 'center', marginTop: '50px', color: '#666' }}>
                                 <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'center' }}><VaultIcon name="bookOpen" size={40} color="#d4af37" /></div>
                                 <p style={{ color: '#999', margin: '0 0 6px' }}>No se encontraron técnicas</p>
@@ -231,9 +253,61 @@ const BusquedaPage = ({ onBack, onSelectVideo, styles, usuario, vistos = [] }) =
                             </div>
                         )}
 
+                        {dinamicos.length > 0 && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#d4af37', fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.8px', marginTop: '2px' }}>
+                                <VaultIcon name="route" size={12} /> VIDEOS DE TUS RUTAS · {dinamicos.length}
+                            </div>
+                        )}
+
+                        {dinamicos.map((video) => {
+                            const visto = vistos.includes(video.id);
+                            const esYoutube = video.fuente === 'youtube';
+                            return (
+                                <button
+                                    key={`dinamico-${video.id}`}
+                                    type="button"
+                                    onClick={() => onSelectVideo({
+                                        titulo: video.nombre,
+                                        id: video.id,
+                                        fuente: video.fuente,
+                                        driveId: video.driveId,
+                                        youtubeId: video.youtubeId
+                                    })}
+                                    style={{
+                                        textAlign: 'left', width: '100%', padding: '12px 14px',
+                                        backgroundColor: '#0a0a0a', border: `1px solid ${visto ? '#2e5c2e' : 'rgba(212,175,55,0.28)'}`,
+                                        borderRadius: '8px', cursor: 'pointer', display: 'flex', flexDirection: 'column',
+                                        gap: '6px', flexShrink: 0
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+                                        <span style={{ color: visto ? '#4CAF50' : '#d4af37', fontWeight: 'bold', fontSize: esMovil ? '0.88rem' : '0.95rem', lineHeight: 1.3, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                            {visto && <VaultIcon name="check" size={12} color="#4CAF50" />}
+                                            <VaultIcon name={esYoutube ? 'youtube' : 'drive'} size={13} color={esYoutube ? '#ff6b6b' : '#8fa8ff'} />
+                                            <span>{video.nombre}</span>
+                                        </span>
+                                        <span style={{ color: '#555', fontSize: '0.62rem', whiteSpace: 'nowrap', paddingTop: '3px' }}>{video.modalidad}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '5px', fontSize: '0.68rem', color: '#777' }}>
+                                        <span style={{ color: '#bbb' }}>{video.cursoTitulo}</span>
+                                        <span style={{ opacity: 0.4 }}>•</span>
+                                        <span>{video.autor}</span>
+                                        {video.duracion && <><span style={{ opacity: 0.4 }}>•</span><span>{video.duracion}</span></>}
+                                    </div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                                        <span style={{ fontSize: '0.62rem', color: '#0a0a0a', backgroundColor: '#d4af37', borderRadius: '3px', padding: '2px 6px', fontWeight: 'bold' }}>{video.posicion}</span>
+                                        <span style={{ fontSize: '0.62rem', color: '#d4af37', border: '1px solid #3a3320', borderRadius: '3px', padding: '2px 6px' }}>{video.tipo}</span>
+                                        {(video.etiquetas || []).slice(0, 4).map((etiqueta) => (
+                                            <span key={etiqueta} style={{ fontSize: '0.6rem', color: '#8a8a8a', border: '1px solid #262626', borderRadius: '3px', padding: '2px 6px' }}>{etiqueta}</span>
+                                        ))}
+                                    </div>
+                                </button>
+                            );
+                        })}
+
                         {visibles.map((t, i) => {
                             const visto = vistos.includes(t.id);
-                            const bloqueado = !tieneAccesoVideo(usuario, t);
+                            const bloqueado = !tieneAccesoVideo(usuario, t, accesoRutas);
                             return (
                                 <button
                                     key={`${t.id}-${i}`}

@@ -38,9 +38,12 @@ import BusquedaPage from './components/BusquedaPage';
 import LoginPage from './components/LoginPage';
 import HubPage from './components/HubPage';
 import InstalacionModal from './components/InstalacionModal';
+import RutasAdminPage from './components/RutasAdminPage';
+import RutasAprendizajePage from './components/RutasAprendizajePage';
 import { getAdjacentVideo } from './utils/videoHelpers';
 import { obtenerTecnica } from './data/vaultIndex';
-import { tieneAccesoVideo, pedirAcceso } from './utils/accesoVault';
+import { tieneAccesoVideo, tieneAccesoVideoDinamico, pedirAcceso, setAccesoDinamico } from './utils/accesoVault';
+import { adyacenteEnRuta, construirAccesoRutas, mapaVideos, rutasParaUsuario } from './utils/rutasAprendizaje';
 import TimerPage from './components/TimerPage';
 
 // --- NUEVOS COMPONENTES INTEGRADOS ---
@@ -136,6 +139,7 @@ export default function App() {
     return guardado ? JSON.parse(guardado) : null;
   });
   const [academiaIdInput, setAcademiaIdInput] = useState('');
+  const [rutasData, setRutasData] = useState({ rutas: [], videos: [], asignaciones: [] });
 
   // --- 2. EFECTO DE AUTENTICACIÓN (VERSIÓN BLINDADA) ---
   React.useEffect(() => {
@@ -205,6 +209,36 @@ export default function App() {
       if (unsubSnapshot) unsubSnapshot();
     };
   }, []);
+
+  // --- 2.b RUTAS, VIDEOS DINÁMICOS Y ASIGNACIONES ---
+  // Una sola fuente de lectura para que mapa, búsqueda, Hub y reproductor
+  // apliquen el mismo acceso que el constructor del administrador.
+  React.useEffect(() => {
+    if (!usuario?.uid) {
+      setRutasData({ rutas: [], videos: [], asignaciones: [] });
+      return undefined;
+    }
+
+    const manejar = (campo) => (snap) => {
+      setRutasData((prev) => ({
+        ...prev,
+        [campo]: snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+      }));
+    };
+    const silencioso = (error) => {
+      if (error?.code !== 'permission-denied') {
+        console.warn('No se pudo cargar una colección de rutas:', error?.code || error);
+      }
+    };
+
+    const unsubs = [
+      onSnapshot(collection(db, 'rutas'), manejar('rutas'), silencioso),
+      onSnapshot(collection(db, 'videos'), manejar('videos'), silencioso),
+      onSnapshot(collection(db, 'asignacionesRuta'), manejar('asignaciones'), silencioso)
+    ];
+
+    return () => unsubs.forEach((unsub) => unsub());
+  }, [usuario?.uid]);
 
   // --- 3. FUNCIONES DE LÓGICA ---
 
@@ -366,19 +400,67 @@ export default function App() {
   // --- CONTROL CENTRAL DE ACCESO A VIDEOS ---
   // Cualquier ruta (mapa, búsqueda, notas o "siguiente" dentro del estudio)
   // pasa por aquí. Así el candado no se puede saltar.
+  const accesoRutas = React.useMemo(
+    () => construirAccesoRutas(usuario, rutasData),
+    [usuario, rutasData]
+  );
+  const videosPorId = React.useMemo(() => mapaVideos(rutasData.videos), [rutasData.videos]);
+  const rutasLiberadas = React.useMemo(
+    () => rutasParaUsuario(usuario, rutasData.rutas, rutasData.asignaciones),
+    [usuario, rutasData]
+  );
+
+  React.useEffect(() => {
+    setAccesoDinamico(accesoRutas);
+  }, [accesoRutas]);
+
+  const getAdjacent = (video, direction) => {
+    if (video?.rutaId) {
+      return adyacenteEnRuta(video, direction, rutasData.rutas, videosPorId);
+    }
+    return getAdjacentVideo(video, direction);
+  };
+
   const handleSelectVideo = (v) => {
     if (!v) return;
+    const origen = v.origen || (page === 'estudio' ? videoActual?.origen : page) || 'mapa';
     const tecnica = obtenerTecnica(v.id);
-    if (tecnica && !tieneAccesoVideo(usuario, tecnica)) {
-      if (window.confirm(
-        `CONTENIDO BLOQUEADO\n\n"${tecnica.nombre}" requiere autorización.\nCada curso tiene un video de prueba gratuito; para ver el resto necesitas acceso.\n\n¿Deseas solicitar acceso a "${tecnica.cursoTitulo}" por WhatsApp?`
-      )) {
-        pedirAcceso(usuario, tecnica.cursoTitulo);
+
+    if (tecnica) {
+      if (!tieneAccesoVideo(usuario, tecnica, accesoRutas)) {
+        if (window.confirm(
+          `CONTENIDO BLOQUEADO\n\n"${tecnica.nombre}" requiere autorización.\nCada curso tiene un video de prueba gratuito; para ver el resto necesitas acceso.\n\n¿Deseas solicitar acceso a "${tecnica.cursoTitulo}" por WhatsApp?`
+        )) {
+          pedirAcceso(usuario, tecnica.cursoTitulo);
+        }
+        return;
       }
+      const seleccionado = { ...v, origen };
+      setVideoActual(seleccionado);
+      localStorage.setItem('lafortuna_last_video', JSON.stringify(seleccionado));
+      setPage('estudio');
       return;
     }
-    setVideoActual(v);
-    localStorage.setItem('lafortuna_last_video', JSON.stringify(v));
+
+    const dinamico = v.fuente ? v : videosPorId.get(v.id) || null;
+    if (!tieneAccesoVideoDinamico(usuario, dinamico || v, accesoRutas)) {
+      window.alert(
+        `CONTENIDO BLOQUEADO\n\n"${v.titulo || dinamico?.nombre || 'Este video'}" pertenece a una ruta que aún no está liberada para tu cuenta o tu dojo.`
+      );
+      return;
+    }
+
+    const enriquecido = {
+      ...(dinamico || {}),
+      ...v,
+      titulo: v.titulo || dinamico?.nombre || 'Video',
+      fuente: dinamico?.fuente || v.fuente || 'drive',
+      driveId: dinamico?.driveId || v.driveId || '',
+      youtubeId: dinamico?.youtubeId || v.youtubeId || '',
+      origen
+    };
+    setVideoActual(enriquecido);
+    localStorage.setItem('lafortuna_last_video', JSON.stringify(enriquecido));
     setPage('estudio');
   };
 
@@ -508,6 +590,9 @@ export default function App() {
           autorSel={autorSel} setAutorSel={setAutorSel}
           instrSel={instrSel} setInstrSel={setInstrSel}
           volSel={volSel} setVolSel={setVolSel}
+          rutasLiberadas={rutasLiberadas}
+          accesoRutas={accesoRutas}
+          onOpenRutas={() => setPage('rutas_aprendizaje')}
           onSelectVideo={handleSelectVideo}
           onNavigateToNotes={() => setPage('notas_hub')} onContinue={handleContinue} hasSession={!!videoActual} />;
 
@@ -515,12 +600,13 @@ export default function App() {
         return (
           <EstudioPage
             video={videoActual}
-            onBack={() => setPage('mapa')}
+            onBack={() => setPage(videoActual?.origen || 'mapa')}
             vistos={vistos}
             toggleVisto={toggleVisto}
             styles={styles}
-            getAdjacentVideo={getAdjacentVideo}
+            getAdjacentVideo={getAdjacent}
             usuario={usuario}
+            accesoRutas={accesoRutas}
             onNavigateToNotes={() => setPage('notas_hub')}
             onSelectVideo={handleSelectVideo}
           />
@@ -544,6 +630,37 @@ export default function App() {
             onSelectVideo={handleSelectVideo}
             usuario={usuario}
             vistos={vistos}
+            videosIndexados={rutasData.videos}
+            accesoRutas={accesoRutas}
+            styles={styles}
+          />
+        );
+
+      case 'rutas_aprendizaje':
+        return (
+          <RutasAprendizajePage
+            onBack={() => setPage('hub')}
+            usuario={usuario}
+            vistos={vistos}
+            rutas={rutasData.rutas}
+            videos={rutasData.videos}
+            asignaciones={rutasData.asignaciones}
+            onSelectVideo={handleSelectVideo}
+            onOpenBuilder={() => setPage('rutas_admin')}
+            onOpenMapa={() => setPage('mapa')}
+          />
+        );
+
+      case 'rutas_admin':
+        if (userRole === 'admin') {
+          return <RutasAdminPage onBack={() => setPage('hub')} usuario={usuario} />;
+        }
+        return (
+          <HubPage
+            usuario={usuario}
+            onNavigate={setPage}
+            userRole={userRole}
+            onLogout={handleLogout}
             styles={styles}
           />
         );

@@ -257,5 +257,25 @@ service cloud.firestore {
       allow create: if esValidado() && (request.auth.uid == request.resource.data.get('usuarioId', '') || getRol() in ['admin', 'profesor', 'instructor']);
       allow update, delete: if esValidado() && (request.auth.uid == resource.data.get('usuarioId', '') || getRol() in ['admin', 'profesor', 'instructor']);
     }
+
+    // 10. VIDEOS INDEXADOS Y RUTAS DE APRENDIZAJE
+    // Los metadatos son legibles por usuarios autenticados porque el mapa, la
+    // búsqueda y el reproductor los necesitan para resolver una lección. El
+    // acceso real al video se valida en la app con las asignaciones publicadas.
+    // Solo el administrador indexa videos o construye/publica rutas.
+    match /videos/{videoId} {
+      allow read: if isAuthenticated();
+      allow write: if esAdminTotal();
+    }
+
+    match /rutas/{rutaId} {
+      allow read: if isAuthenticated();
+      allow write: if esAdminTotal();
+    }
+
+    match /asignacionesRuta/{asignacionId} {
+      allow read: if isAuthenticated();
+      allow write: if esAdminTotal();
+    }
   }
 }
