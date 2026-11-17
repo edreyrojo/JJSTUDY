@@ -314,8 +314,8 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles = {} }) => {
         <div style={{
             paddingTop: esMovil ? 'calc(env(safe-area-inset-top, 0px) + 14px)' : '30px',
             paddingBottom: esMovil ? 'calc(env(safe-area-inset-bottom, 0px) + 20px)' : '40px',
-            paddingLeft: esMovil ? 'calc(env(safe-area-inset-left, 0px) + 14px)' : esTablet ? '24px' : '40px',
-            paddingRight: esMovil ? 'calc(env(safe-area-inset-right, 0px) + 14px)' : esTablet ? '24px' : '40px',
+            paddingLeft: esMovil ? 'calc(env(safe-area-inset-left, 0px) + 14px)' : esTablet ? '20px' : '24px',
+            paddingRight: esMovil ? 'calc(env(safe-area-inset-right, 0px) + 14px)' : esTablet ? '20px' : '24px',
             minHeight: '100vh',
             backgroundColor: '#000',
             color: '#fff',
@@ -348,7 +348,7 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles = {} }) => {
                 }
             `}</style>
 
-            <div style={{ width: '100%', maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+            <div style={{ width: '100%', maxWidth: '1440px', margin: '0 auto', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                 {/* ENCABEZADO */}
                 <div style={{
                     display: 'grid',

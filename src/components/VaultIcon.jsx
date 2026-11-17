@@ -294,6 +294,53 @@ const ICONS = {
       <path d="M5 15V5a2 2 0 0 1 2-2h10" />
     </>
   ),
+  pause: (
+    <>
+      <rect x="7" y="5" width="3.5" height="14" rx="1" />
+      <rect x="13.5" y="5" width="3.5" height="14" rx="1" />
+    </>
+  ),
+  rotate: (
+    <>
+      <path d="M3 12a9 9 0 1 0 3-6.7" />
+      <polyline points="3 4 3 10 9 10" />
+    </>
+  ),
+  volume: (
+    <>
+      <polygon points="4 9 8 9 12 5 12 19 8 15 4 15" />
+      <path d="M16 8a5 5 0 0 1 0 8" />
+      <path d="M19 5a9 9 0 0 1 0 14" />
+    </>
+  ),
+  mute: (
+    <>
+      <polygon points="4 9 8 9 12 5 12 19 8 15 4 15" />
+      <line x1="16" y1="9" x2="22" y2="15" />
+      <line x1="22" y1="9" x2="16" y2="15" />
+    </>
+  ),
+  trophy: (
+    <>
+      <path d="M8 4h8v5a4 4 0 0 1-8 0V4z" />
+      <path d="M8 6H5a3 3 0 0 0 3 3M16 6h3a3 3 0 0 1-3 3" />
+      <path d="M12 13v4" />
+      <path d="M8 21h8M9 17h6" />
+    </>
+  ),
+  plus: (
+    <>
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </>
+  ),
+  minus: <line x1="5" y1="12" x2="19" y2="12" />,
+  undo: (
+    <>
+      <path d="M9 7L4 12l5 5" />
+      <path d="M4 12h9a6 6 0 0 1 6 6v1" />
+    </>
+  ),
 };
 
 const VaultIcon = ({
