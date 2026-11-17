@@ -3,6 +3,7 @@ import { db } from '../firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import Swal from 'sweetalert2';
 import VaultIcon from './VaultIcon';
+import { translateText } from '../i18n/translate';
 
 const localNotify = (mensaje, tipo = 'success') => {
     Swal.fire({
@@ -108,14 +109,16 @@ const MiCuenta = ({ usuario, onBack, styles, notify, sedeActual }) => {
     };
 
     const handleVolver = () => {
-        if (sucio && !window.confirm("Tienes cambios sin guardar. ¿Deseas salir y descartarlos?")) return;
+        const mensaje = translateText('Tienes cambios sin guardar. ¿Deseas salir y descartarlos?');
+        if (sucio && !window.confirm(mensaje)) return;
         onBack();
     };
 
     const handleDesvincular = async () => {
+        const mensaje = translateText('¿Seguro que deseas desvincularte de tu academia actual?');
         const confirmacionValida = typeof notify?.confirm === 'function'
-            ? notify.confirm("¿Seguro que deseas desvincularte de tu academia actual?")
-            : window.confirm("¿Seguro que deseas desvincularte de tu academia actual?");
+            ? notify.confirm(mensaje)
+            : window.confirm(mensaje);
 
         if (confirmacionValida) {
             setCargando(true);

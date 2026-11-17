@@ -44,6 +44,8 @@ import { getAdjacentVideo } from './utils/videoHelpers';
 import { obtenerTecnica } from './data/vaultIndex';
 import { tieneAccesoVideo, tieneAccesoVideoDinamico, pedirAcceso, setAccesoDinamico } from './utils/accesoVault';
 import { adyacenteEnRuta, construirAccesoRutas, mapaVideos, rutasParaUsuario } from './utils/rutasAprendizaje';
+import { useI18n } from './i18n/context';
+import { mensajeContenidoBloqueado, mensajeVideoBloqueado } from './i18n/translate';
 import TimerPage from './components/TimerPage';
 
 // --- NUEVOS COMPONENTES INTEGRADOS ---
@@ -115,6 +117,7 @@ const styles = {
 // --- 4. COMPONENTE PRINCIPAL (EXPORT DEFAULT) ---//
 export default function App() {
   // --- 1. ESTADOS ---
+  const { setLang, t } = useI18n();
   const [academiaData, setAcademiaData] = useState(null);
   const [showInstalar, setShowInstalar] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -209,6 +212,17 @@ export default function App() {
       if (unsubSnapshot) unsubSnapshot();
     };
   }, []);
+
+  const idiomaPrefCargado = React.useRef('');
+
+  React.useEffect(() => {
+    if (!usuario?.uid) return;
+    if (idiomaPrefCargado.current === usuario.uid) return;
+    idiomaPrefCargado.current = usuario.uid;
+    if (usuario.idioma === 'en' || usuario.idioma === 'es') {
+      setLang(usuario.idioma);
+    }
+  }, [usuario?.uid, usuario?.idioma, setLang]);
 
   // --- 2.b RUTAS, VIDEOS DINÁMICOS Y ASIGNACIONES ---
   // Una sola fuente de lectura para que mapa, búsqueda, Hub y reproductor
@@ -428,9 +442,7 @@ export default function App() {
 
     if (tecnica) {
       if (!tieneAccesoVideo(usuario, tecnica, accesoRutas)) {
-        if (window.confirm(
-          `CONTENIDO BLOQUEADO\n\n"${tecnica.nombre}" requiere autorización.\nCada curso tiene un video de prueba gratuito; para ver el resto necesitas acceso.\n\n¿Deseas solicitar acceso a "${tecnica.cursoTitulo}" por WhatsApp?`
-        )) {
+        if (window.confirm(mensajeContenidoBloqueado(tecnica))) {
           pedirAcceso(usuario, tecnica.cursoTitulo);
         }
         return;
@@ -444,9 +456,7 @@ export default function App() {
 
     const dinamico = v.fuente ? v : videosPorId.get(v.id) || null;
     if (!tieneAccesoVideoDinamico(usuario, dinamico || v, accesoRutas)) {
-      window.alert(
-        `CONTENIDO BLOQUEADO\n\n"${v.titulo || dinamico?.nombre || 'Este video'}" pertenece a una ruta que aún no está liberada para tu cuenta o tu dojo.`
-      );
+      window.alert(mensajeVideoBloqueado(v.titulo || dinamico?.nombre));
       return;
     }
 
@@ -489,7 +499,7 @@ export default function App() {
 
   const handleEliminarNota = async (notaId) => {
     if (!usuario) return;
-    if (!window.confirm("¿Seguro que quieres eliminar esta nota técnica?")) return;
+    if (!window.confirm(t('¿Seguro que quieres eliminar esta nota técnica?'))) return;
 
     try {
       const userRef = doc(db, "usuarios", usuario.uid);

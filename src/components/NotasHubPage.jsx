@@ -3,6 +3,7 @@ import { db } from '../firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import Swal from 'sweetalert2';
 import { obtenerTecnica } from '../data/vaultIndex';
+import { translateText } from '../i18n/translate';
 import VaultIcon from './VaultIcon';
 
 const notify = (mensaje, tipo = 'success') => {
@@ -119,7 +120,7 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles = {} }) => {
     const hayFiltro = Boolean(busquedaNota) || cursoFiltroValido !== 'TODOS';
 
     const eliminarNota = async (idNota) => {
-        if (!window.confirm('¿Seguro que deseas eliminar esta nota del Vault?')) return;
+        if (!window.confirm(translateText('¿Seguro que deseas eliminar esta nota del Vault?'))) return;
         try {
             const userRef = doc(db, 'usuarios', usuario.uid);
             const nuevasNotas = { ...usuario.notas };

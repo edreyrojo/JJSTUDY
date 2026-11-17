@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { buscarTecnicas, FACETAS, ESTADISTICAS, esVideoGratis } from '../data/vaultIndex';
 import { tieneAccesoVideo, pedirAcceso, tieneAccesoVideoDinamico } from '../utils/accesoVault';
+import { mensajeContenidoBloqueado } from '../i18n/translate';
 import { normalizarVideoDinamico } from '../utils/rutasAprendizaje';
 import { normalizar } from '../data/taxonomia';
 import VaultIcon from './VaultIcon';
@@ -99,9 +100,7 @@ const BusquedaPage = ({ onBack, onSelectVideo, styles, usuario, vistos = [], vid
             onSelectVideo({ titulo: t.nombre, id: t.id });
             return;
         }
-        if (window.confirm(
-            `CONTENIDO BLOQUEADO\n\n"${t.nombre}" requiere autorización.\nCada curso tiene un video de prueba gratuito; para ver el resto necesitas acceso.\n\n¿Deseas solicitar acceso a "${t.cursoTitulo}" por WhatsApp?`
-        )) {
+        if (window.confirm(mensajeContenidoBloqueado(t))) {
             pedirAcceso(usuario, t.cursoTitulo);
         }
     };

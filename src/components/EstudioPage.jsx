@@ -4,6 +4,7 @@ import { db } from '../firebase';
 import { doc, setDoc, addDoc, collection } from 'firebase/firestore';
 import { obtenerTecnica } from '../data/vaultIndex';
 import { tieneAccesoVideo, pedirAcceso } from '../utils/accesoVault';
+import { mensajeContenidoBloqueado } from '../i18n/translate';
 import VaultIcon from './VaultIcon';
 
 const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos = [], toggleVisto, usuario, styles = {}, getAdjacentVideo, accesoRutas }) => {
@@ -33,9 +34,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
 
         const tecnica = obtenerTecnica(siguiente.id);
         if (tecnica && !tieneAccesoVideo(usuario, tecnica, accesoRutas)) {
-            if (window.confirm(
-                `CONTENIDO BLOQUEADO\n\n"${tecnica.nombre}" requiere autorización.\nCada curso tiene un video de prueba gratuito; para ver el resto necesitas acceso.\n\n¿Deseas solicitar acceso a "${tecnica.cursoTitulo}" por WhatsApp?`
-            )) {
+            if (window.confirm(mensajeContenidoBloqueado(tecnica))) {
                 pedirAcceso(usuario, tecnica.cursoTitulo);
             }
             return;

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { localeActual } from '../i18n/translate';
 import { db } from '../firebase';
 import {
     collection,
@@ -54,7 +55,7 @@ const formatearFechaHora = (iso) => {
     if (!iso) return '';
     const fecha = new Date(iso);
     if (Number.isNaN(fecha.getTime())) return '';
-    return fecha.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
+    return fecha.toLocaleDateString(localeActual(), { day: '2-digit', month: 'short' });
 };
 
 const iniciales = (nombre = '') => {

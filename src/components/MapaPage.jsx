@@ -10,6 +10,7 @@ import {
 } from '../data/vaultIndex';
 import { DIMENSIONES } from '../data/taxonomia';
 import { tieneAccesoVideo, pedirAcceso } from '../utils/accesoVault';
+import { mensajeContenidoBloqueado } from '../i18n/translate';
 import VaultIcon from './VaultIcon';
 
 const MAX_NODOS_MAPA = 18;
@@ -196,9 +197,7 @@ const MapaPage = ({
             onSelectVideo({ titulo: t.nombre, id: t.id });
             return;
         }
-        if (window.confirm(
-            `CONTENIDO BLOQUEADO\n\n"${t.nombre}" requiere autorización.\nCada curso tiene un video de prueba gratuito; para ver el resto necesitas acceso.\n\n¿Deseas solicitar acceso a "${t.cursoTitulo}" por WhatsApp?`
-        )) {
+        if (window.confirm(mensajeContenidoBloqueado(t))) {
             pedirAcceso(usuario, t.cursoTitulo);
         }
     };

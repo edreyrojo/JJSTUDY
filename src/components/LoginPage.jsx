@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import VaultIcon from './VaultIcon';
+import { useI18n } from '../i18n/context';
 
 const LoginPage = ({
     onLogin,
@@ -18,13 +20,7 @@ const LoginPage = ({
 }) => {
     const [esRegistro, setEsRegistro] = useState(false);
     const [cargandoGoogle, setCargandoGoogle] = useState(false);
-    const [esMovil, setEsMovil] = useState(window.innerWidth < 768);
-
-    useEffect(() => {
-        const handleResize = () => setEsMovil(window.innerWidth < 768);
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
+    const { lang, toggleLang } = useI18n();
 
     // Verificación defensiva de props
     if (!setPassword || !setEmail) {
@@ -56,6 +52,7 @@ const LoginPage = ({
             flexDirection: 'column',
             justifyContent: 'center',
             alignItems: 'center',
+            position: 'relative',
             // 🛡️ Soporte Notch Integral (Safe Area)
             paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)',
             paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)',
@@ -64,6 +61,34 @@ const LoginPage = ({
             width: '100%',
             overflowX: 'hidden'
         }}>
+
+            <button
+                type="button"
+                onClick={toggleLang}
+                title={lang === 'es' ? 'Cambiar a inglés' : 'Switch to Spanish'}
+                aria-label={lang === 'es' ? 'Cambiar a inglés' : 'Switch to Spanish'}
+                style={{
+                    position: 'absolute',
+                    top: 'calc(env(safe-area-inset-top, 0px) + 14px)',
+                    right: 'calc(env(safe-area-inset-right, 0px) + 14px)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    background: 'rgba(10,10,10,0.92)',
+                    border: '1px solid rgba(212,175,55,0.5)',
+                    color: '#d4af37',
+                    borderRadius: '999px',
+                    padding: '6px 11px',
+                    fontSize: '0.56rem',
+                    fontWeight: 800,
+                    letterSpacing: '0.7px',
+                    cursor: 'pointer',
+                    zIndex: 10,
+                }}
+            >
+                <VaultIcon name="globe" size={13} />
+                <span>{lang === 'es' ? 'EN' : 'ES'}</span>
+            </button>
 
             {/* HEADER LOGO */}
             <div style={{ marginBottom: '25px', textAlign: 'center', width: '100%' }}>

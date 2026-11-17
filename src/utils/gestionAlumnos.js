@@ -4,6 +4,8 @@
  * mantiene el componente principal enfocado en la interfaz.
  */
 
+import { localeActual } from '../i18n/translate';
+
 export const TIPOS_SANGRE = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'No sé'];
 export const GRADOS = ['Blanco', 'Gris', 'Amarilla', 'Naranja', 'Verde', 'Azul', 'Morado', 'Café', 'Negro'];
 export const PARENTESCOS = ['Madre', 'Padre', 'Tutor(a)', 'Hermano(a)', 'Cónyuge', 'Hijo(a)', 'Amigo(a)', 'Otro'];
@@ -46,7 +48,7 @@ export const parseFechaLocal = (valor) => {
 export const formatearFecha = (valor, { conAnio = true } = {}) => {
     const fecha = parseFechaLocal(valor);
     if (!fecha) return '—';
-    return fecha.toLocaleDateString('es-MX', {
+    return fecha.toLocaleDateString(localeActual(), {
         day: '2-digit',
         month: 'short',
         ...(conAnio ? { year: 'numeric' } : {})
@@ -56,16 +58,17 @@ export const formatearFecha = (valor, { conAnio = true } = {}) => {
 export const formatearFechaHora = (valor) => {
     const fecha = parseFechaLocal(valor);
     if (!fecha) return '—';
-    return fecha.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+    return fecha.toLocaleDateString(localeActual(), { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
 export const formatearMoneda = (valor, moneda = 'MXN') => {
     const numero = Number(valor);
     if (!Number.isFinite(numero) || valor === '' || valor === null || valor === undefined) return '—';
     try {
-        return new Intl.NumberFormat('es-MX', {
+        return new Intl.NumberFormat(localeActual(), {
             style: 'currency',
             currency: moneda || 'MXN',
+            currencyDisplay: 'narrowSymbol',
             minimumFractionDigits: 0,
             maximumFractionDigits: 2
         }).format(numero);

@@ -1,3 +1,5 @@
+import { localeActual } from '../i18n/translate';
+
 /**
  * Datos y utilidades del planeador de clases de BJJ.
  * Mantener aquí las plantillas, tipos de bloque y transformaciones
@@ -306,7 +308,7 @@ export const formatearFecha = (fecha) => {
     const [anio, mes, dia] = partes;
     const fechaLocal = new Date(anio, mes - 1, dia);
     if (Number.isNaN(fechaLocal.getTime())) return fecha;
-    return fechaLocal.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+    return fechaLocal.toLocaleDateString(localeActual(), { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
 export const etiquetaTipoClase = (id) => TIPOS_CLASE.find(t => t.id === id)?.label || 'Personalizada';

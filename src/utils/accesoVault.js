@@ -12,6 +12,7 @@
  *      lección exacta (`ids`) o un curso completo (`cursos`).
  */
 import { esVideoGratis } from '../data/vaultIndex';
+import { mensajeSolicitudAcceso } from '../i18n/translate';
 
 let ACCESO_DINAMICO = { ids: new Set(), cursos: new Set() };
 
@@ -56,6 +57,6 @@ export const tieneAccesoVideoDinamico = (usuario, video, acceso) => {
 };
 
 export const pedirAcceso = (usuario, cursoId) => {
-  const mensaje = `Hola! Me gustaría solicitar acceso al instruccional: ${cursoId}. Mi correo es: ${usuario?.email || 'Sin correo'}`;
+  const mensaje = mensajeSolicitudAcceso(usuario, cursoId);
   window.open(`https://wa.me/524731632614?text=${encodeURIComponent(mensaje)}`);
 };

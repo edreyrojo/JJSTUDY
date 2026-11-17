@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, doc, query, orderBy, limit, getDocs, updateDoc, where } from 'firebase/firestore';
+import { collection, addDoc, doc, query, orderBy, limit, getDocs, setDoc, updateDoc, where } from 'firebase/firestore';
 import Swal from 'sweetalert2';
 import VaultIcon from './VaultIcon';
+import { useI18n } from '../i18n/context';
 
 const HubPage = ({
     onNavigate,
@@ -22,6 +23,16 @@ const HubPage = ({
     const [hayNotificacion, setHayNotificacion] = useState(false);
     const [showAnuncio, setShowAnuncio] = useState(false);
     const [ancho, setAncho] = useState(window.innerWidth);
+    const { lang, toggleLang } = useI18n();
+
+    const alternarIdioma = () => {
+        const siguiente = lang === 'es' ? 'en' : 'es';
+        if (usuario?.uid) {
+            setDoc(doc(db, 'usuarios', usuario.uid), { idioma: siguiente }, { merge: true })
+                .catch(() => {});
+        }
+        toggleLang();
+    };
 
     useEffect(() => {
         const handleResize = () => setAncho(window.innerWidth);
@@ -274,6 +285,16 @@ const HubPage = ({
 
     return (
         <div style={contenedorEstilos}>
+            <button
+                type="button"
+                className="hub-lang-toggle"
+                onClick={alternarIdioma}
+                title={lang === 'es' ? 'Cambiar a inglés' : 'Switch to Spanish'}
+                aria-label={lang === 'es' ? 'Cambiar a inglés' : 'Switch to Spanish'}
+            >
+                <VaultIcon name="globe" size={13} />
+                <span>{lang === 'es' ? 'EN' : 'ES'}</span>
+            </button>
             <style>{`
                 @keyframes pulse-gold {
                     0% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.7); }
@@ -284,6 +305,36 @@ const HubPage = ({
                     0% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 15px rgba(212,175,55,0.4); }
                     50% { transform: translate(-50%, -50%) scale(1.05); box-shadow: 0 0 25px rgba(212,175,55,0.7); }
                     100% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 15px rgba(212,175,55,0.4); }
+                }
+
+                .hub-lang-toggle {
+                    position: absolute;
+                    top: calc(env(safe-area-inset-top, 0px) + 14px);
+                    right: calc(env(safe-area-inset-right, 0px) + 14px);
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 5px;
+                    background: rgba(10, 10, 10, 0.92);
+                    border: 1px solid rgba(212, 175, 55, 0.5);
+                    color: #d4af37;
+                    border-radius: 999px;
+                    padding: 6px 11px;
+                    font-size: 0.56rem;
+                    font-weight: 800;
+                    letter-spacing: 0.7px;
+                    cursor: pointer;
+                    z-index: 120;
+                    backdrop-filter: blur(6px);
+                    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+                }
+                .hub-lang-toggle:hover,
+                .hub-lang-toggle:focus-visible {
+                    background: rgba(212, 175, 55, 0.14);
+                    border-color: #d4af37;
+                    outline: none;
+                }
+                .hub-lang-toggle:active {
+                    transform: translateY(1px);
                 }
 
                 .user-profile-card-circular {
@@ -661,6 +712,14 @@ const HubPage = ({
                 </button>
                 <button type="button" className="hub-action" onClick={() => setShowTutoriales(true)}>
                     <VaultIcon name="tutorial" size={14} /> TUTORIALES
+                </button>
+                <button
+                    type="button"
+                    className="hub-action"
+                    onClick={alternarIdioma}
+                    title={lang === 'es' ? 'Cambiar a inglés' : 'Switch to Spanish'}
+                >
+                    <VaultIcon name="globe" size={14} /> {lang === 'es' ? 'ENGLISH' : 'ESPAÑOL'}
                 </button>
                 {esMaestro && (
                     <button type="button" className="hub-action" onClick={() => onNavigate('panel_maestro')} title="Panel Maestro">
