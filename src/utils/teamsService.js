@@ -1,6 +1,6 @@
 import { db } from '../firebase';
 import {
-    doc, getDoc, setDoc, addDoc, updateDoc,
+    doc, getDoc, setDoc, addDoc,
     collection, query, where, getDocs, orderBy,
     onSnapshot, writeBatch
 } from 'firebase/firestore';
@@ -199,23 +199,18 @@ export const escucharSedesDeTeam = (teamId, callback) => {
 // ─────────────────────────────────────────────
 export const buildAlumnosQuery = ({ rol, teamId, sedeId, soloArchivados = false }) => {
     const activo = !soloArchivados;
-    
-    // Limpieza de datos (trim) para evitar errores por espacios ocultos
+
     const cleanTeamId = teamId?.trim();
     const cleanSedeId = sedeId?.trim();
 
-    // DEBUG: Nos ayudará en la consola si algo falla
-    console.log("🔍 Intentando cargar alumnos con:", { rol, cleanTeamId, cleanSedeId });
-
     if (!cleanTeamId) {
-        console.error("⚠️ Error: No se recibió un teamId válido.");
         return null;
     }
 
     const veTodoElTeam = ['propietario', 'profesor', 'admin'].includes(rol);
     const colRef = collection(db, "alumnos");
 
-    // Lógica para Propietarios/Admins (Ven todo el equipo, de todas las sedes)
+    // Propietarios, profesores y admins ven todo el equipo.
     if (veTodoElTeam) {
         return query(
             colRef,
@@ -223,13 +218,11 @@ export const buildAlumnosQuery = ({ rol, teamId, sedeId, soloArchivados = false 
             where("activo", "==", activo),
             orderBy("nombre", "asc")
         );
-    } 
+    }
 
-    // Lógica para Instructores (Ven solo su sede)
+    // Instructores ven solamente los alumnos de su sede.
     if (!cleanSedeId) {
-        console.warn("⚠️ Advertencia: Eres instructor pero tu usuario no tiene un sedeId asignado.");
-        // Forzamos un retorno vacío si no tiene sede, por seguridad
-        return query(colRef, where("teamId", "==", "nada_a_mostrar")); 
+        return query(colRef, where("teamId", "==", "nada_a_mostrar"));
     }
 
     return query(
