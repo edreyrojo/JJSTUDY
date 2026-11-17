@@ -4,19 +4,26 @@ import { LanguageContext } from './context';
 import { instalarTraduccionSwal } from './swal';
 import { iniciarTraduccionDom } from './domTranslator';
 
-const CLAVE_ALMACENAMIENTO = 'lafortuna_lang';
+const CLAVE_ALMACENAMIENTO = 'lafortuna_idioma_v2';
 
 instalarTraduccionSwal();
+
+// Limpia la clave antigua que podía haber quedado en inglés por la versión
+// anterior. La nueva clave nace en español por defecto.
+try {
+    localStorage.removeItem('lafortuna_lang');
+} catch {
+    // sin acceso a localStorage
+}
 
 const leerIdioma = () => {
     try {
         const guardado = localStorage.getItem(CLAVE_ALMACENAMIENTO);
         if (guardado === 'en' || guardado === 'es') return guardado;
-        const navegador = typeof navigator !== 'undefined' ? navigator.language : 'es';
-        return String(navegador || 'es').toLowerCase().startsWith('en') ? 'en' : 'es';
     } catch {
-        return 'es';
+        // Si localStorage está bloqueado, el idioma por defecto es español.
     }
+    return 'es';
 };
 
 const guardarIdioma = (idioma) => {

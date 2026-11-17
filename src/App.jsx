@@ -117,7 +117,7 @@ const styles = {
 // --- 4. COMPONENTE PRINCIPAL (EXPORT DEFAULT) ---//
 export default function App() {
   // --- 1. ESTADOS ---
-  const { setLang, t } = useI18n();
+  const { t } = useI18n();
   const [academiaData, setAcademiaData] = useState(null);
   const [showInstalar, setShowInstalar] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -212,17 +212,6 @@ export default function App() {
       if (unsubSnapshot) unsubSnapshot();
     };
   }, []);
-
-  const idiomaPrefCargado = React.useRef('');
-
-  React.useEffect(() => {
-    if (!usuario?.uid) return;
-    if (idiomaPrefCargado.current === usuario.uid) return;
-    idiomaPrefCargado.current = usuario.uid;
-    if (usuario.idioma === 'en' || usuario.idioma === 'es') {
-      setLang(usuario.idioma);
-    }
-  }, [usuario?.uid, usuario?.idioma, setLang]);
 
   // --- 2.b RUTAS, VIDEOS DINÁMICOS Y ASIGNACIONES ---
   // Una sola fuente de lectura para que mapa, búsqueda, Hub y reproductor

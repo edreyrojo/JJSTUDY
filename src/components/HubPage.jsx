@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, doc, query, orderBy, limit, getDocs, setDoc, updateDoc, where } from 'firebase/firestore';
+import { collection, addDoc, doc, query, orderBy, limit, getDocs, updateDoc, where } from 'firebase/firestore';
 import Swal from 'sweetalert2';
 import VaultIcon from './VaultIcon';
 import { useI18n } from '../i18n/context';
@@ -24,15 +24,6 @@ const HubPage = ({
     const [showAnuncio, setShowAnuncio] = useState(false);
     const [ancho, setAncho] = useState(window.innerWidth);
     const { lang, toggleLang } = useI18n();
-
-    const alternarIdioma = () => {
-        const siguiente = lang === 'es' ? 'en' : 'es';
-        if (usuario?.uid) {
-            setDoc(doc(db, 'usuarios', usuario.uid), { idioma: siguiente }, { merge: true })
-                .catch(() => {});
-        }
-        toggleLang();
-    };
 
     useEffect(() => {
         const handleResize = () => setAncho(window.innerWidth);
@@ -288,7 +279,7 @@ const HubPage = ({
             <button
                 type="button"
                 className="hub-lang-toggle"
-                onClick={alternarIdioma}
+                onClick={toggleLang}
                 title={lang === 'es' ? 'Cambiar a inglés' : 'Switch to Spanish'}
                 aria-label={lang === 'es' ? 'Cambiar a inglés' : 'Switch to Spanish'}
             >
@@ -712,14 +703,6 @@ const HubPage = ({
                 </button>
                 <button type="button" className="hub-action" onClick={() => setShowTutoriales(true)}>
                     <VaultIcon name="tutorial" size={14} /> TUTORIALES
-                </button>
-                <button
-                    type="button"
-                    className="hub-action"
-                    onClick={alternarIdioma}
-                    title={lang === 'es' ? 'Cambiar a inglés' : 'Switch to Spanish'}
-                >
-                    <VaultIcon name="globe" size={14} /> {lang === 'es' ? 'ENGLISH' : 'ESPAÑOL'}
                 </button>
                 {esMaestro && (
                     <button type="button" className="hub-action" onClick={() => onNavigate('panel_maestro')} title="Panel Maestro">
