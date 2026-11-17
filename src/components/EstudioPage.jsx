@@ -14,6 +14,10 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
     const [tiempoActivo, setTiempoActivo] = useState(video?.startTime || 0);
     const [nombreMarcador, setNombreMarcador] = useState("");
     const [esMovil, setEsMovil] = useState(window.innerWidth < 768);
+    const [esTablet, setEsTablet] = useState(() => {
+        const ancho = window.innerWidth;
+        return ancho >= 768 && ancho < 1100;
+    });
     const [pantallaCompleta, setPantallaCompleta] = useState(false);
     const [mostrarAlerta, setMostrarAlerta] = useState(false);
     const [mensajeAlerta, setMensajeAlerta] = useState("");
@@ -66,7 +70,11 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
     }, [video, usuario]);
 
     useEffect(() => {
-        const handleResize = () => setEsMovil(window.innerWidth < 768);
+        const handleResize = () => {
+            const ancho = window.innerWidth;
+            setEsMovil(ancho < 768);
+            setEsTablet(ancho >= 768 && ancho < 1100);
+        };
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
@@ -159,13 +167,19 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
     const youtubeSrc = `https://www.youtube.com/embed/${youtubeId}?rel=0&modestbranding=1&playsinline=1${tiempoActivo ? `&start=${tiempoActivo}` : ''}`;
     const videoSrc = fuente === 'youtube' ? youtubeSrc : driveSrc;
 
-    const abrirFuente = () => {
-        if (fuente === 'youtube') {
-            if (youtubeId) window.open(`https://www.youtube.com/watch?v=${youtubeId}`, '_blank', 'noopener,noreferrer');
-            return;
-        }
-        if (!driveId) return;
-        window.open(`https://drive.google.com/file/d/${driveId}/view`, '_blank', 'noopener,noreferrer');
+    const tamanoBotonBarra = '40px';
+    const estiloIconoBarra = {
+        ...(styles.btnOutline || {}),
+        width: tamanoBotonBarra,
+        height: tamanoBotonBarra,
+        minWidth: tamanoBotonBarra,
+        padding: 0,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: '8px',
+        flexShrink: 0,
+        cursor: 'pointer',
     };
 
     return (
@@ -193,72 +207,61 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
 
                 {/* HEADER COMPACTO CON NOTCH SAFE-AREA */}
                 <div style={{ 
-                    paddingTop: esMovil ? 'calc(env(safe-area-inset-top, 12px) + 6px)' : '10px',
+                    paddingTop: `calc(env(safe-area-inset-top, 0px) + ${esMovil ? '6px' : '10px'})`,
                     paddingBottom: '8px',
-                    paddingLeft: '12px',
-                    paddingRight: '12px',
+                    paddingLeft: 'calc(env(safe-area-inset-left, 0px) + 12px)',
+                    paddingRight: 'calc(env(safe-area-inset-right, 0px) + 12px)',
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'space-between', 
+                    gap: '8px',
                     backgroundColor: '#0a0a0a', 
                     minHeight: esMovil ? '55px' : '65px', 
                     boxSizing: 'border-box',
-                    borderBottom: '1px solid #1a1a1a'
+                    borderBottom: '1px solid #1a1a1a',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 20
                 }}>
                     {/* BOTONES DE NAVEGACIÓN */}
                     <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                        <button 
-                            onClick={onBack} 
-                            style={{ 
-                                ...(styles.btnOutline || {}), 
-                                width: 'auto', 
-                                padding: esMovil ? '6px 12px' : '8px 12px', 
-                                fontSize: esMovil ? '0.85rem' : 'inherit',
-                                borderColor: '#d4af37',
-                                color: '#d4af37',
-                                cursor: 'pointer'
-                            }}
+                        <button
+                            type="button"
+                            onClick={onBack}
+                            title="Volver al mapa"
+                            aria-label="Volver al mapa"
+                            style={estiloIconoBarra}
                         >
-                            <VaultIcon name="chevronLeft" size={16} />
+                            <VaultIcon name="map" size={17} />
                         </button>
 
                         {videoAnterior && (
                             <button
+                                type="button"
                                 onClick={() => navegarVideo('prev')}
-                                style={{ 
-                                    ...(styles.btnOutline || {}), 
-                                    width: 'auto', 
-                                    padding: esMovil ? '6px 12px' : '8px 12px', 
-                                    border: '1px solid #d4af37', 
-                                    color: '#d4af37',
-                                    fontSize: esMovil ? '0.85rem' : 'inherit',
-                                    cursor: 'pointer'
-                                }}
+                                title="Lección anterior"
+                                aria-label="Lección anterior"
+                                style={estiloIconoBarra}
                             >
-                                {puedeAnterior ? <VaultIcon name="chevronLeft" size={15} /> : <VaultIcon name="lock" size={14} color="#d4af37" />}
+                                {puedeAnterior ? <VaultIcon name="chevronLeft" size={16} /> : <VaultIcon name="lock" size={15} color="#d4af37" />}
                             </button>
                         )}
 
                         {videoSiguiente && (
                             <button
+                                type="button"
                                 onClick={() => navegarVideo('next')}
-                                style={{ 
-                                    ...(styles.btnOutline || {}), 
-                                    width: 'auto', 
-                                    padding: esMovil ? '6px 12px' : '8px 12px', 
-                                    border: '1px solid #d4af37', 
-                                    color: '#d4af37',
-                                    fontSize: esMovil ? '0.85rem' : 'inherit',
-                                    cursor: 'pointer'
-                                }}
+                                title="Siguiente lección"
+                                aria-label="Siguiente lección"
+                                style={estiloIconoBarra}
                             >
-                                {puedeSiguiente ? <VaultIcon name="chevronRight" size={15} /> : <VaultIcon name="lock" size={14} color="#d4af37" />}
+                                {puedeSiguiente ? <VaultIcon name="chevronRight" size={16} /> : <VaultIcon name="lock" size={15} color="#d4af37" />}
                             </button>
                         )}
                     </div>
 
                     {/* TÍTULO EN DESKTOP (CENTRADITO) */}
-                    {!esMovil && (
+                    {!esMovil && !esTablet && (
                         <div style={{ textAlign: 'center', flex: 1, padding: '0 10px', minWidth: 0 }}>
                             <span style={{ fontSize: '0.55rem', color: '#d4af37', letterSpacing: '2px', display: 'block', marginBottom: '2px', fontWeight: 'bold' }}>MODO ESTUDIO</span>
                             <h2 style={{ fontSize: '0.9rem', color: '#d4af37', margin: 0, fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '1px' }}>{video?.titulo}</h2>
@@ -266,56 +269,52 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                     )}
 
                     {/* HERRAMIENTAS DERECHAS */}
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
                         <button
+                            type="button"
                             onClick={() => setPantallaCompleta(v => !v)}
                             title={pantallaCompleta ? 'Salir de pantalla completa' : 'Pantalla completa'}
-                            aria-label="Pantalla completa"
-                            style={{
-                                background: 'none',
+                            aria-label={pantallaCompleta ? 'Salir de pantalla completa' : 'Pantalla completa'}
+                            style={estiloIconoBarra}
+                        >
+                            <VaultIcon name="fullscreen" size={17} />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onNavigateToNotes}
+                            title="Bitácora"
+                            aria-label="Bitácora"
+                            style={(esMovil || esTablet) ? estiloIconoBarra : {
+                                background: 'transparent',
                                 border: '1px solid #d4af37',
                                 color: '#d4af37',
-                                borderRadius: '4px',
-                                fontSize: esMovil ? '1rem' : '0.9rem',
-                                padding: '4px 8px',
+                                borderRadius: '8px',
+                                padding: '0 10px',
+                                height: '40px',
+                                fontSize: '0.6rem',
+                                fontWeight: 'bold',
                                 cursor: 'pointer',
-                                lineHeight: 1
+                                flexShrink: 0,
                             }}
                         >
-                            <VaultIcon name="fullscreen" size={16} />
+                            {(esMovil || esTablet)
+                                ? <VaultIcon name="notebook" size={17} />
+                                : 'BITÁCORA'}
                         </button>
-                        <button 
-                            onClick={onNavigateToNotes} 
-                            style={{ 
-                                background: 'none', 
-                                border: '1px solid #d4af37', 
-                                color: '#d4af37', 
-                                borderRadius: '4px', 
-                                fontSize: esMovil ? '0.6rem' : '0.6rem', 
-                                padding: esMovil ? '6px 10px' : '5px 10px', 
-                                cursor: 'pointer', 
-                                fontWeight: 'bold' 
-                            }}
-                        >
-                            BITÁCORA
-                        </button>
-                        <div 
-                            style={{ 
-                                cursor: 'pointer', 
-                                fontSize: esMovil ? '1.3rem' : '1.2rem', 
-                                padding: '2px',
-                                color: isCompletado ? '#d4af37' : '#777',
-                                filter: isCompletado ? 'drop-shadow(0 0 8px rgba(212, 175, 55, 0.7))' : 'grayscale(100%) opacity(0.4)',
-                                transition: 'all 0.2s ease',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                            }} 
+                        <button
+                            type="button"
                             onClick={() => toggleVisto(video?.id)}
-                            title={isCompletado ? "Lección completada" : "Marcar como vista"}
+                            title={isCompletado ? 'Lección completada' : 'Marcar como vista'}
+                            aria-label={isCompletado ? 'Lección completada' : 'Marcar como vista'}
+                            style={{
+                                ...estiloIconoBarra,
+                                color: isCompletado ? '#d4af37' : '#888',
+                                borderColor: isCompletado ? '#d4af37' : '#333',
+                                background: isCompletado ? 'rgba(212,175,55,0.08)' : '#111',
+                            }}
                         >
-                            <VaultIcon name="eye" size={19} />
-                        </div>
+                            <VaultIcon name="eye" size={18} />
+                        </button>
                     </div>
                 </div>
 
@@ -339,7 +338,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             gap: '10px',
-                            padding: 'calc(env(safe-area-inset-top, 0px) + 8px) 12px 8px',
+                            padding: `calc(env(safe-area-inset-top, 0px) + 8px) calc(env(safe-area-inset-right, 0px) + 12px) 8px calc(env(safe-area-inset-left, 0px) + 12px)`,
                             backgroundColor: '#0a0a0a',
                             borderBottom: '1px solid #222',
                             flexShrink: 0
@@ -378,23 +377,29 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
 
                 {/* TÍTULO EN MÓVIL (COMPACTO, JUSTO DEBAJO DEL VIDEO) */}
                 {esMovil && (
-                    <div style={{ padding: '8px 15px 4px 15px', textAlign: 'center', backgroundColor: '#070707' }}>
+                    <div style={{ padding: `8px calc(env(safe-area-inset-right, 0px) + 15px) 8px calc(env(safe-area-inset-left, 0px) + 15px)`, textAlign: 'center', backgroundColor: '#070707' }}>
                         <span style={{ fontSize: '0.5rem', color: '#d4af37', letterSpacing: '2px', display: 'block', marginBottom: '2px', fontWeight: 'bold' }}>MODO ESTUDIO</span>
                         <h2 style={{ fontSize: '0.85rem', color: '#d4af37', margin: 0, fontWeight: 'bold', wordBreak: 'break-word', letterSpacing: '0.5px', lineHeight: '1.3' }}>{video?.titulo}</h2>
-                        <button
-                            onClick={() => setPantallaCompleta(true)}
-                            style={{ marginTop: '6px', background: 'none', border: 'none', color: '#d4af37', fontSize: '0.62rem', cursor: 'pointer', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                        >
-                            <VaultIcon name="fullscreen" size={11} /> Ver en pantalla completa
-                        </button>
                     </div>
                 )}
 
-                {/* BOTÓN SIGUIENTE LECCIÓN Y REPORTAR FALLO */}
-                <div style={{ padding: '10px 15px 16px 15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box', backgroundColor: esMovil ? '#070707' : 'transparent' }}>
+                {/* SIGUIENTE LECCIÓN Y REPORTE DE FALLO */}
+                <div style={{
+                    paddingTop: '10px',
+                    paddingRight: 'calc(env(safe-area-inset-right, 0px) + 15px)',
+                    paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
+                    paddingLeft: 'calc(env(safe-area-inset-left, 0px) + 15px)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    boxSizing: 'border-box',
+                    backgroundColor: esMovil ? '#070707' : 'transparent'
+                }}>
                     <button
+                        type="button"
                         onClick={() => navegarVideo('next')}
                         title="Siguiente lección"
+                        aria-label="Siguiente lección"
                         style={{ 
                             background: '#111', 
                             border: '1px solid #d4af37', 
@@ -415,27 +420,25 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                         <VaultIcon name="skipNext" size={18} />
                     </button>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                        <button
-                            onClick={() => setMostrarReporte(true)}
-                            style={{ background: 'none', border: 'none', color: '#d4af37', opacity: 0.8, fontSize: '0.65rem', cursor: 'pointer', textDecoration: 'underline' }}
-                        >
-                            ¿Problemas con el video? Reportar fallo técnico
-                        </button>
-                        {esMovil && (
-                            <button
-                                onClick={abrirFuente}
-                                style={{ background: 'none', border: 'none', color: '#8a8a8a', fontSize: '0.62rem', cursor: 'pointer', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                            >
-                                Si los controles no responden, abrir en {fuente === 'youtube' ? 'YouTube' : 'Drive'} <VaultIcon name="external" size={10} />
-                            </button>
-                        )}
-                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setMostrarReporte(true)}
+                        title="Reportar fallo técnico"
+                        aria-label="Reportar fallo técnico"
+                        style={{
+                            ...estiloIconoBarra,
+                            color: '#d4af37',
+                            borderColor: 'rgba(212,175,55,0.45)',
+                            background: 'rgba(212,175,55,0.06)',
+                        }}
+                    >
+                        <VaultIcon name="flag" size={18} />
+                    </button>
                 </div>
             </div>
 
             {/* SECCIÓN DERECHA: NOTAS Y SINCRONIZACIÓN MANUAL */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '18px', backgroundColor: '#0f0f0f', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: `18px calc(env(safe-area-inset-right, 0px) + 18px) calc(env(safe-area-inset-bottom, 0px) + 18px) calc(env(safe-area-inset-left, 0px) + 18px)`, backgroundColor: '#0f0f0f', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
 
                 {!esMovil && (
                     <div style={{ marginBottom: '15px' }}>
