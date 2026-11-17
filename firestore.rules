@@ -193,10 +193,20 @@ service cloud.firestore {
     }
 
     // 6. CLASES / CONTENIDO
+    // - Cada dojo ve sus clases.
+    // - Las clases marcadas con visibilidad "global" se comparten con
+    //   instructores y profesores validados de otros dojos.
+    // - Esos instructores externos solo pueden añadir comentarios, nunca
+    //   editar el contenido de la clase.
     match /clases/{claseId} {
       allow read: if isAuthenticated() && (
         esAdminTotal() ||
-        resource.data.get('teamId', '') == getMiTeam()
+        resource.data.get('teamId', '') == getMiTeam() ||
+        (
+          resource.data.get('visibilidad', '') == 'global' &&
+          esValidado() &&
+          getRol() in ['profesor', 'instructor']
+        )
       );
 
       allow create: if esValidado() && (
@@ -206,7 +216,16 @@ service cloud.firestore {
 
       allow update: if esValidado() && (
         esAdminTotal() ||
-        (getRol() in ['profesor', 'instructor'] && resource.data.get('teamId', '') == getMiTeam() && request.resource.data.get('teamId', '') == getMiTeam())
+        (
+          getRol() in ['profesor', 'instructor'] &&
+          resource.data.get('teamId', '') == getMiTeam() &&
+          request.resource.data.get('teamId', '') == getMiTeam()
+        ) ||
+        (
+          resource.data.get('visibilidad', '') == 'global' &&
+          getRol() in ['profesor', 'instructor'] &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['comentarios', 'actualizadoEn'])
+        )
       );
 
       allow delete: if esValidado() && (
