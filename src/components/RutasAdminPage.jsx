@@ -1749,7 +1749,7 @@ const ModalPicker = ({
     return (
         <div style={s.modalOverlay} className="rutas-admin-modal-overlay rutas-admin-picker-overlay">
             <div style={{ ...s.modal, maxWidth: modoVault ? '720px' : '640px' }} className="rutas-admin-picker-modal">
-                <div style={s.modalHead}>
+                <div style={s.modalHead} className="rutas-admin-picker-head">
                     <div>
                         <span style={s.eyebrow}>AGREGAR LECCIÓN</span>
                         <h2 style={s.modalTitle}>{modoVault ? 'Contenido del Vault' : 'Videos indexados'}</h2>
@@ -2393,29 +2393,21 @@ const cssAdmin = `
         .rutas-admin-modal-overlay { padding: 0 !important; align-items: stretch !important; }
         .rutas-admin-modal-overlay > div { width: 100% !important; max-width: none !important; height: 100dvh !important; max-height: 100dvh !important; border-radius: 0 !important; border: none !important; }
         .rutas-admin-modal-overlay.rutas-admin-picker-overlay {
-            align-items: flex-end !important;
+            align-items: stretch !important;
             padding: 0 !important;
         }
         .rutas-admin-modal-overlay.rutas-admin-picker-overlay > .rutas-admin-picker-modal {
             width: 100% !important;
             max-width: none !important;
-            height: auto !important;
-            max-height: 70dvh !important;
-            border-radius: 18px 18px 0 0 !important;
-            border: 1px solid rgba(212,175,55,0.35) !important;
-            border-bottom: none !important;
-            box-shadow: 0 -18px 60px rgba(0,0,0,0.75) !important;
+            height: 100dvh !important;
+            max-height: 100dvh !important;
+            border-radius: 0 !important;
+            border: none !important;
+            box-shadow: none !important;
             animation: rutasPickerSheet .18s ease;
         }
-        .rutas-admin-picker-modal::before {
-            content: '';
-            display: block;
-            width: 40px;
-            height: 4px;
-            border-radius: 999px;
-            background: #2b2b2b;
-            margin: 8px auto 0;
-            flex-shrink: 0;
+        .rutas-admin-picker-head {
+            padding-top: calc(env(safe-area-inset-top, 0px) + 13px) !important;
         }
         .rutas-admin-picker-footer {
             padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 10px) !important;
