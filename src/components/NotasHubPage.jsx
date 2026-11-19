@@ -35,7 +35,7 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles = {} }) => {
     }, []);
 
     const esMovil = ancho < 768;
-    const esTablet = ancho >= 768 && ancho < 1200;
+    const esTablet = ancho >= 768 && ancho < 1320;
     const columnas = esMovil ? '1fr' : esTablet ? 'repeat(2, minmax(0, 1fr))' : 'repeat(3, minmax(0, 1fr))';
     const notasUsuario = usuario?.notas;
 
@@ -167,7 +167,6 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles = {} }) => {
                     }
                 } : undefined}
                 style={{
-                    ...(styles.card || {}),
                     textAlign: 'left',
                     backgroundColor: '#0a0a0a',
                     border: '1px solid #1f1f1f',
@@ -177,7 +176,7 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles = {} }) => {
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '9px',
-                    height: '100%',
+                    width: '100%',
                     minWidth: 0,
                     overflow: 'hidden',
                     cursor: puedeAbrir ? 'pointer' : 'default',
@@ -260,7 +259,7 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles = {} }) => {
                         fontSize: esMovil ? '0.8rem' : '0.84rem',
                         lineHeight: '1.55',
                         display: '-webkit-box',
-                        WebkitLineClamp: esMovil ? 3 : 4,
+                        WebkitLineClamp: esMovil ? 5 : 6,
                         WebkitBoxOrient: 'vertical',
                         overflow: 'hidden',
                         whiteSpace: 'pre-wrap',
@@ -349,7 +348,7 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles = {} }) => {
                 }
             `}</style>
 
-            <div style={{ width: '100%', maxWidth: '1440px', margin: '0 auto', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+            <div style={{ width: '100%', maxWidth: '1680px', margin: '0 auto', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                 {/* ENCABEZADO */}
                 <div style={{
                     display: 'grid',
@@ -518,7 +517,7 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles = {} }) => {
                     width: '100%',
                     paddingBottom: '20px',
                     boxSizing: 'border-box',
-                    alignItems: 'stretch',
+                    alignItems: 'start',
                     alignContent: 'start'
                 }}>
                     {notas.length === 0 ? (
