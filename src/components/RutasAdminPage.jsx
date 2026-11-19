@@ -439,11 +439,14 @@ const RutasAdminPage = ({ onBack, usuario }) => {
     const agregarLeccion = (seccionId, leccion) => {
         setDraft((prev) => ({
             ...prev,
-            secciones: (prev.secciones || []).map((seccion) => (
-                seccion.id === seccionId
-                    ? { ...seccion, lecciones: [...(seccion.lecciones || []), leccion] }
-                    : seccion
-            ))
+            secciones: (prev.secciones || []).map((seccion) => {
+                if (seccion.id !== seccionId) return seccion;
+                const yaExiste = (seccion.lecciones || []).some(
+                    (actual) => actual.ref === leccion.ref && actual.tipo === leccion.tipo
+                );
+                if (yaExiste) return seccion;
+                return { ...seccion, lecciones: [...(seccion.lecciones || []), leccion] };
+            })
         }));
     };
 
@@ -476,13 +479,23 @@ const RutasAdminPage = ({ onBack, usuario }) => {
         const curso = obtenerCurso(cursoId);
         const tecnicas = tecnicasDeCurso(cursoId);
         if (tecnicas.length === 0) return;
+
+        const seccion = (draft?.secciones || []).find((s) => s.id === seccionId);
+        const existentes = new Set((seccion?.lecciones || []).map((l) => l.ref));
+        const nuevas = tecnicas.filter((t) => !existentes.has(t.id));
+
+        if (nuevas.length === 0) {
+            notify('Ese curso ya está completo en esta sección');
+            return;
+        }
+
         setDraft((prev) => ({
             ...prev,
-            secciones: (prev.secciones || []).map((seccion) => {
-                if (seccion.id !== seccionId) return seccion;
-                const existentes = new Set((seccion.lecciones || []).map((l) => l.ref));
-                const nuevas = tecnicas
-                    .filter((t) => !existentes.has(t.id))
+            secciones: (prev.secciones || []).map((s) => {
+                if (s.id !== seccionId) return s;
+                const refs = new Set((s.lecciones || []).map((l) => l.ref));
+                const agregar = tecnicas
+                    .filter((t) => !refs.has(t.id))
                     .map((t) => ({
                         id: nuevoId(),
                         tipo: 'vault',
@@ -490,11 +503,10 @@ const RutasAdminPage = ({ onBack, usuario }) => {
                         titulo: t.nombre,
                         cursoTitulo: curso?.titulo || t.cursoTitulo
                     }));
-                return { ...seccion, lecciones: [...(seccion.lecciones || []), ...nuevas] };
+                return { ...s, lecciones: [...(s.lecciones || []), ...agregar] };
             })
         }));
-        notify(`${tecnicas.length} lecciones agregadas`);
-        setPicker(null);
+        notify(`${nuevas.length} lecciones agregadas`);
     };
 
     // --- CURSOS LIBERADOS (MAPA COMPLETO) ---
@@ -722,6 +734,13 @@ const RutasAdminPage = ({ onBack, usuario }) => {
             .filter((v) => v.id && (!texto || v.busca.includes(texto)))
             .slice(0, 40);
     }, [picker, pickerTerm, videos]);
+
+    const seccionPicker = picker
+        ? (draft?.secciones || []).find((seccion) => seccion.id === picker.seccionId) || null
+        : null;
+    const leccionesSeccionPicker = seccionPicker?.lecciones || [];
+    const refsSeccionPicker = new Set(leccionesSeccionPicker.map((leccion) => leccion.ref));
+    const refsRutaPicker = new Set(leccionesDeRuta(draft).map((leccion) => leccion.ref));
 
     return (
         <div style={s.root} className="rutas-admin-root">
@@ -1001,6 +1020,11 @@ const RutasAdminPage = ({ onBack, usuario }) => {
                     setTermino={setPickerTerm}
                     resultadosVault={resultadosVault}
                     videosFiltrados={videosFiltrados}
+                    seccionTitulo={seccionPicker?.titulo || ''}
+                    leccionesSeccion={leccionesSeccionPicker}
+                    refsSeccion={refsSeccionPicker}
+                    refsRuta={refsRutaPicker}
+                    esMovil={esMovil}
                     onCerrar={() => setPicker(null)}
                     onElegirVault={(tecnica) => {
                         agregarLeccion(picker.seccionId, {
@@ -1010,7 +1034,6 @@ const RutasAdminPage = ({ onBack, usuario }) => {
                             titulo: tecnica.nombre,
                             cursoTitulo: tecnica.cursoTitulo
                         });
-                        setPickerTerm('');
                     }}
                     onElegirVideo={(video) => {
                         agregarLeccion(picker.seccionId, {
@@ -1021,7 +1044,6 @@ const RutasAdminPage = ({ onBack, usuario }) => {
                             cursoTitulo: video.cursoTitulo,
                             fuente: video.fuente
                         });
-                        setPickerTerm('');
                     }}
                     onAgregarCurso={(cursoId) => agregarCursoCompleto(picker.seccionId, cursoId)}
                 />
@@ -1703,6 +1725,11 @@ const ModalPicker = ({
     setTermino,
     resultadosVault,
     videosFiltrados,
+    seccionTitulo,
+    leccionesSeccion = [],
+    refsSeccion = new Set(),
+    refsRuta = new Set(),
+    esMovil = false,
     onCerrar,
     onElegirVault,
     onElegirVideo,
@@ -1716,9 +1743,12 @@ const ModalPicker = ({
         return CURSOS.filter((curso) => normalizar(`${curso.titulo} ${curso.autor}`).includes(texto)).slice(0, 8);
     }, [modoVault, termino]);
 
+    const estaEnSeccion = (ref) => Boolean(refsSeccion?.has?.(ref));
+    const estaEnRuta = (ref) => Boolean(refsRuta?.has?.(ref));
+
     return (
-        <div style={s.modalOverlay} className="rutas-admin-modal-overlay">
-            <div style={{ ...s.modal, maxWidth: modoVault ? '720px' : '640px' }}>
+        <div style={s.modalOverlay} className="rutas-admin-modal-overlay rutas-admin-picker-overlay">
+            <div style={{ ...s.modal, maxWidth: modoVault ? '720px' : '640px' }} className="rutas-admin-picker-modal">
                 <div style={s.modalHead}>
                     <div>
                         <span style={s.eyebrow}>AGREGAR LECCIÓN</span>
@@ -1733,7 +1763,7 @@ const ModalPicker = ({
                     <div style={s.searchBox}>
                         <VaultIcon name="search" size={13} color="#777" />
                         <input
-                            autoFocus
+                            autoFocus={!esMovil}
                             value={termino}
                             onChange={(e) => setTermino(e.target.value)}
                             placeholder={modoVault ? 'Buscar técnica, autor o curso...' : 'Buscar video indexado...'}
@@ -1741,57 +1771,136 @@ const ModalPicker = ({
                         />
                     </div>
 
+                    <div style={s.pickerSummary}>
+                        <div style={s.pickerSummaryHead}>
+                            <span style={s.pickerSummaryTitle}>
+                                <VaultIcon name="layers" size={12} />
+                                {seccionTitulo || 'Sección'} · {leccionesSeccion.length} {leccionesSeccion.length === 1 ? 'lección' : 'lecciones'}
+                            </span>
+                            <span style={s.pickerSummaryHint}>Se actualiza al agregar</span>
+                        </div>
+                        {leccionesSeccion.length > 0 ? (
+                            <div style={s.pickerAddedList} className="rutas-picker-added-list">
+                                {leccionesSeccion.map((leccion, indice) => (
+                                    <span
+                                        key={`${leccion.ref}-${indice}`}
+                                        style={s.pickerAddedChip}
+                                        title={leccion.titulo || ''}
+                                    >
+                                        <VaultIcon
+                                            name={leccion.tipo === 'video'
+                                                ? (leccion.fuente === 'youtube' ? 'youtube' : 'drive')
+                                                : 'bookOpen'}
+                                            size={9}
+                                        />
+                                        <span style={s.pickerAddedChipText}>{leccion.titulo || 'Lección'}</span>
+                                    </span>
+                                ))}
+                            </div>
+                        ) : (
+                            <span style={s.pickerSummaryEmpty}>Aún no hay lecciones en esta sección.</span>
+                        )}
+                    </div>
+
                     {modoVault && cursos.length > 0 && (
                         <div style={s.cursosPicker}>
                             <span style={s.pickerGroupLabel}>CURSOS COMPLETOS</span>
-                            {cursos.map((curso) => (
-                                <div key={curso.id} style={s.cursoPickerRow}>
-                                    <div style={s.cursoPickerInfo}>
-                                        <strong>{curso.titulo}</strong>
-                                        <span>{curso.autor} · {curso.total} videos</span>
+                            {cursos.map((curso) => {
+                                const tecnicasCurso = tecnicasDeCurso(curso.id);
+                                const agregadas = tecnicasCurso.filter((tecnica) => estaEnSeccion(tecnica.id)).length;
+                                const completo = tecnicasCurso.length > 0 && agregadas === tecnicasCurso.length;
+                                return (
+                                    <div key={curso.id} style={s.cursoPickerRow}>
+                                        <div style={s.cursoPickerInfo}>
+                                            <strong>{curso.titulo}</strong>
+                                            <span>
+                                                {curso.autor} · {curso.total} videos
+                                                {agregadas > 0 ? ` · ${agregadas} ${agregadas === 1 ? 'agregada' : 'agregadas'}` : ''}
+                                            </span>
+                                        </div>
+                                        {completo ? (
+                                            <span style={s.pickerAddedBadge}>
+                                                <VaultIcon name="check" size={10} /> AGREGADO
+                                            </span>
+                                        ) : (
+                                            <button type="button" onClick={() => onAgregarCurso(curso.id)} style={s.softBtn}>
+                                                <VaultIcon name="plus" size={11} /> AGREGAR TODO
+                                            </button>
+                                        )}
                                     </div>
-                                    <button type="button" onClick={() => onAgregarCurso(curso.id)} style={s.softBtn}>
-                                        <VaultIcon name="plus" size={11} /> AGREGAR TODO
-                                    </button>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
 
                     <span style={s.pickerGroupLabel}>{modoVault ? 'TÉCNICAS' : 'VIDEOS'}</span>
-                    <div style={s.pickerList}>
+                    <div style={s.pickerList} className="rutas-picker-list">
                         {modoVault && resultadosVault.length === 0 && (
                             <div style={s.listEmpty}><span>Escribe para buscar técnicas del Vault.</span></div>
                         )}
                         {!modoVault && videosFiltrados.length === 0 && (
                             <div style={s.listEmpty}><span>No hay videos indexados que coincidan.</span></div>
                         )}
-                        {modoVault && resultadosVault.map((tecnica) => (
-                            <button key={`${tecnica.id}-${tecnica.cursoId}`} type="button" onClick={() => onElegirVault(tecnica)} style={s.pickerItem}>
-                                <span style={s.pickerIcon}><VaultIcon name="bookOpen" size={13} /></span>
-                                <span style={s.pickerText}>
-                                    <strong>{tecnica.nombre}</strong>
-                                    <span>{tecnica.cursoTitulo} · {tecnica.posicion} · {tecnica.tipo}</span>
-                                </span>
-                                <VaultIcon name="plus" size={13} />
-                            </button>
-                        ))}
-                        {!modoVault && videosFiltrados.map((video) => (
-                            <button key={video.id} type="button" onClick={() => onElegirVideo(video)} style={s.pickerItem}>
-                                <span style={s.pickerIcon}>
-                                    <VaultIcon name={video.fuente === 'youtube' ? 'youtube' : 'drive'} size={13} />
-                                </span>
-                                <span style={s.pickerText}>
-                                    <strong>{video.nombre}</strong>
-                                    <span>{video.cursoTitulo} · {video.posicion} · {video.tipo}</span>
-                                </span>
-                                <VaultIcon name="plus" size={13} />
-                            </button>
-                        ))}
+                        {modoVault && resultadosVault.map((tecnica) => {
+                            const agregado = estaEnSeccion(tecnica.id);
+                            const enOtra = !agregado && estaEnRuta(tecnica.id);
+                            return (
+                                <button
+                                    key={`${tecnica.id}-${tecnica.cursoId}`}
+                                    type="button"
+                                    onClick={() => { if (!agregado) onElegirVault(tecnica); }}
+                                    style={agregado ? s.pickerItemAdded : s.pickerItem}
+                                    title={agregado ? 'Ya está en esta sección' : enOtra ? 'Ya está en otra sección' : 'Agregar a esta sección'}
+                                    aria-disabled={agregado}
+                                >
+                                    <span style={s.pickerIcon}><VaultIcon name="bookOpen" size={13} /></span>
+                                    <span style={s.pickerText}>
+                                        <strong>{tecnica.nombre}</strong>
+                                        <span>{tecnica.cursoTitulo} · {tecnica.posicion} · {tecnica.tipo}</span>
+                                    </span>
+                                    {agregado ? (
+                                        <span style={s.pickerAddedBadge}><VaultIcon name="check" size={10} /> AGREGADO</span>
+                                    ) : enOtra ? (
+                                        <span style={s.pickerOtherBadge}>OTRA SECCIÓN</span>
+                                    ) : (
+                                        <VaultIcon name="plus" size={13} />
+                                    )}
+                                </button>
+                            );
+                        })}
+                        {!modoVault && videosFiltrados.map((video) => {
+                            const agregado = estaEnSeccion(video.id);
+                            const enOtra = !agregado && estaEnRuta(video.id);
+                            return (
+                                <button
+                                    key={video.id}
+                                    type="button"
+                                    onClick={() => { if (!agregado) onElegirVideo(video); }}
+                                    style={agregado ? s.pickerItemAdded : s.pickerItem}
+                                    title={agregado ? 'Ya está en esta sección' : enOtra ? 'Ya está en otra sección' : 'Agregar a esta sección'}
+                                    aria-disabled={agregado}
+                                >
+                                    <span style={s.pickerIcon}>
+                                        <VaultIcon name={video.fuente === 'youtube' ? 'youtube' : 'drive'} size={13} />
+                                    </span>
+                                    <span style={s.pickerText}>
+                                        <strong>{video.nombre}</strong>
+                                        <span>{video.cursoTitulo} · {video.posicion} · {video.tipo}</span>
+                                    </span>
+                                    {agregado ? (
+                                        <span style={s.pickerAddedBadge}><VaultIcon name="check" size={10} /> AGREGADO</span>
+                                    ) : enOtra ? (
+                                        <span style={s.pickerOtherBadge}>OTRA SECCIÓN</span>
+                                    ) : (
+                                        <VaultIcon name="plus" size={13} />
+                                    )}
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 
-                <div style={s.modalFooter}>
+                <div style={s.modalFooter} className="rutas-admin-picker-footer">
                     <button type="button" onClick={onCerrar} style={s.ghostBtn}>CERRAR</button>
                 </div>
             </div>
@@ -2217,7 +2326,51 @@ const s = {
         width: '28px', height: '28px', flexShrink: 0, borderRadius: '6px', display: 'flex', alignItems: 'center',
         justifyContent: 'center', background: 'rgba(212,175,55,0.06)', border: '1px solid rgba(212,175,55,0.22)', color: '#d4af37'
     },
-    pickerText: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1px' }
+    pickerText: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1px' },
+    pickerSummary: {
+        display: 'flex', flexDirection: 'column', gap: '6px', background: '#080808',
+        border: '1px solid #1e1e1e', borderRadius: '8px', padding: '8px'
+    },
+    pickerSummaryHead: {
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        gap: '8px', flexWrap: 'wrap'
+    },
+    pickerSummaryTitle: {
+        display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#d4af37',
+        fontSize: '0.54rem', fontWeight: 800
+    },
+    pickerSummaryHint: { color: '#666', fontSize: '0.46rem' },
+    pickerSummaryEmpty: { color: '#666', fontSize: '0.52rem' },
+    pickerAddedList: {
+        display: 'flex', gap: '4px', overflowX: 'auto', paddingBottom: '2px',
+        scrollbarWidth: 'thin'
+    },
+    pickerAddedChip: {
+        display: 'inline-flex', alignItems: 'center', gap: '4px', maxWidth: '190px',
+        background: 'rgba(76,175,80,0.06)', border: '1px solid rgba(76,175,80,0.25)',
+        color: '#89d18c', borderRadius: '999px', padding: '3px 7px', fontSize: '0.48rem',
+        flexShrink: 0
+    },
+    pickerAddedChipText: {
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '150px'
+    },
+    pickerItemAdded: {
+        display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left',
+        background: 'rgba(76,175,80,0.05)', border: '1px solid rgba(76,175,80,0.3)',
+        borderRadius: '7px', padding: '7px', cursor: 'default', color: '#cfcfcf'
+    },
+    pickerAddedBadge: {
+        display: 'inline-flex', alignItems: 'center', gap: '3px', flexShrink: 0,
+        color: '#4CAF50', border: '1px solid rgba(76,175,80,0.4)',
+        background: 'rgba(76,175,80,0.08)', borderRadius: '999px',
+        padding: '2px 6px', fontSize: '0.42rem', fontWeight: 800
+    },
+    pickerOtherBadge: {
+        display: 'inline-flex', alignItems: 'center', flexShrink: 0,
+        color: '#d4af37', border: '1px solid rgba(212,175,55,0.3)',
+        background: 'rgba(212,175,55,0.06)', borderRadius: '999px',
+        padding: '2px 6px', fontSize: '0.42rem', fontWeight: 800
+    },
 };
 
 const cssAdmin = `
@@ -2239,6 +2392,41 @@ const cssAdmin = `
         .rutas-admin-root h1 { font-size: 0.95rem !important; letter-spacing: 0.4px !important; }
         .rutas-admin-modal-overlay { padding: 0 !important; align-items: stretch !important; }
         .rutas-admin-modal-overlay > div { width: 100% !important; max-width: none !important; height: 100dvh !important; max-height: 100dvh !important; border-radius: 0 !important; border: none !important; }
+        .rutas-admin-modal-overlay.rutas-admin-picker-overlay {
+            align-items: flex-end !important;
+            padding: 0 !important;
+        }
+        .rutas-admin-modal-overlay.rutas-admin-picker-overlay > .rutas-admin-picker-modal {
+            width: 100% !important;
+            max-width: none !important;
+            height: auto !important;
+            max-height: 70dvh !important;
+            border-radius: 18px 18px 0 0 !important;
+            border: 1px solid rgba(212,175,55,0.35) !important;
+            border-bottom: none !important;
+            box-shadow: 0 -18px 60px rgba(0,0,0,0.75) !important;
+            animation: rutasPickerSheet .18s ease;
+        }
+        .rutas-admin-picker-modal::before {
+            content: '';
+            display: block;
+            width: 40px;
+            height: 4px;
+            border-radius: 999px;
+            background: #2b2b2b;
+            margin: 8px auto 0;
+            flex-shrink: 0;
+        }
+        .rutas-admin-picker-footer {
+            padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 10px) !important;
+        }
+        .rutas-admin-picker-modal .rutas-picker-list {
+            max-height: none !important;
+        }
+    }
+    @keyframes rutasPickerSheet {
+        from { transform: translateY(22px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
     }
     @media (prefers-reduced-motion: reduce) {
         .rutas-admin-root *, .rutas-admin-root *::before, .rutas-admin-root *::after {
