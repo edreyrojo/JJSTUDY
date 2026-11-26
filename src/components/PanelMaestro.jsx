@@ -4,10 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import {
-    collection, query, where, onSnapshot,
-    orderBy, doc, updateDoc
-} from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { escucharSedesDeTeam, crearSedeAfiliada, obtenerStatsDeTeam } from '../utils/teamsService';
 import Swal from 'sweetalert2';
 
@@ -23,7 +20,7 @@ const notify = (mensaje, tipo = 'success') => {
     });
 };
 
-const PanelMaestro = ({ usuario, teamData, sedeData, styles, onVerSede, onBack }) => {
+const PanelMaestro = ({ usuario, teamData, styles, onVerSede, onBack }) => {
     const [sedes, setSedes] = useState([]);
     const [stats, setStats] = useState({ statsPorSede: {}, totalAlumnos: 0, totalAtrasados: 0 });
     const [sedeSeleccionada, setSedeSeleccionada] = useState(null);
@@ -35,17 +32,17 @@ const PanelMaestro = ({ usuario, teamData, sedeData, styles, onVerSede, onBack }
     const [formSede, setFormSede] = useState({ nombre: '', ciudad: '' });
     const [cargandoCrear, setCargandoCrear] = useState(false);
 
-    const teamId = usuario.teamId;
+    const teamId = usuario?.teamId || usuario?.academiaId || usuario?.uid || '';
 
     // 1. Escuchar sedes en tiempo real
     useEffect(() => {
-        if (!teamId) return;
+        if (!teamId) return undefined;
         const unsub = escucharSedesDeTeam(teamId, (data) => {
             setSedes(data);
-            // AUTO-SELECCIÓN: Si no hay sede seleccionada, elegimos la primera para que no esté vacío
-            if (data.length > 0 && !sedeSeleccionada) {
-                setSedeSeleccionada(data[0]);
-            }
+            // AUTO-SELECCIÓN: Si no hay sede seleccionada, elegimos la primera.
+            if (data.length > 0) setSedeSeleccionada((prev) => prev || data[0]);
+        }, (error) => {
+            console.error('No se pudieron cargar las sedes:', error);
         });
         return () => unsub();
     }, [teamId]);
@@ -65,10 +62,9 @@ const PanelMaestro = ({ usuario, teamData, sedeData, styles, onVerSede, onBack }
             return;
         }
 
-        console.log("🔍 Consultando alumnos para la sede ID:", sedeSeleccionada.id);
-
         const q = query(
             collection(db, "alumnos"),
+            where("teamId", "==", teamId),
             where("sedeId", "==", sedeSeleccionada.id),
             where("activo", "==", true)
         );
@@ -77,13 +73,12 @@ const PanelMaestro = ({ usuario, teamData, sedeData, styles, onVerSede, onBack }
             const listaAlumnos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             listaAlumnos.sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
             setAlumnosDeSede(listaAlumnos);
-            console.log(`✅ Alumnos cargados: ${listaAlumnos.length}`);
         }, (error) => {
-            console.error("❌ Error en la query de alumnos:", error);
+            console.error("Error en la query de alumnos:", error);
         });
 
         return () => unsub();
-    }, [sedeSeleccionada]);
+    }, [sedeSeleccionada, teamId]);
 
     const handleCrearSede = async () => {
         if (!formSede.nombre || !formSede.ciudad) return notify("Completa nombre y ciudad.", "error");
@@ -98,7 +93,7 @@ const PanelMaestro = ({ usuario, teamData, sedeData, styles, onVerSede, onBack }
             setMostrarCrearSede(false);
             setFormSede({ nombre: '', ciudad: '' });
             notify(`Sede creada. Código: ${result.codigoAcceso} 🏯`);
-        } catch (e) {
+        } catch {
             notify("Error al crear sede.", "error");
         } finally {
             setCargandoCrear(false);
@@ -261,16 +256,18 @@ const PanelMaestro = ({ usuario, teamData, sedeData, styles, onVerSede, onBack }
                                 </div>
 
                                 {/* Botón entrar a gestión */}
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); onVerSede(sede); }}
-                                    style={{
-                                        ...styles.btnOutline,
-                                        width: '100%', marginTop: '12px',
-                                        fontSize: '0.7rem', padding: '8px'
-                                    }}
-                                >
-                                    GESTIONAR ALUMNOS →
-                                </button>
+                                {typeof onVerSede === 'function' && (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onVerSede(sede); }}
+                                        style={{
+                                            ...styles.btnOutline,
+                                            width: '100%', marginTop: '12px',
+                                            fontSize: '0.7rem', padding: '8px'
+                                        }}
+                                    >
+                                        GESTIONAR ALUMNOS →
+                                    </button>
+                                )}
                             </div>
                         );
                     })}

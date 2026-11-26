@@ -4,6 +4,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import Swal from 'sweetalert2';
 import VaultIcon from './VaultIcon';
 import { translateText } from '../i18n/translate';
+import { comprimirImagen } from '../utils/imageUtils';
 
 const localNotify = (mensaje, tipo = 'success') => {
     Swal.fire({
@@ -27,7 +28,6 @@ const crearDatos = (usuario) => ({
     edad: usuario?.edad || '',
     ciudad: usuario?.ciudad || '',
     bio: usuario?.bio || '',
-    academiaIdEnlace: '',
     pesoCategoria: usuario?.pesoCategoria || '',
     especialidad: usuario?.especialidad || '',
     tiempoEntrenando: usuario?.tiempoEntrenando || '',
@@ -41,6 +41,7 @@ const crearDatos = (usuario) => ({
 
 const MiCuenta = ({ usuario, onBack, styles, notify, sedeActual }) => {
     const [cargando, setCargando] = useState(false);
+    const [procesandoFoto, setProcesandoFoto] = useState(false);
     const [estado, setEstado] = useState('idle');
     const [esMovil, setEsMovil] = useState(window.innerWidth < 768);
     const [datos, setDatos] = useState(() => crearDatos(usuario));
@@ -65,33 +66,42 @@ const MiCuenta = ({ usuario, onBack, styles, notify, sedeActual }) => {
     const tallas = ['A00', 'A0', 'A1', 'A1L', 'A2', 'A2L', 'A3', 'A4', 'A5'];
     const sangres = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
 
-    const handleFotoChange = (e) => {
+    const handleFotoChange = async (e) => {
         const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => setDatos(prev => ({ ...prev, fotoBase64: reader.result }));
-            reader.readAsDataURL(file);
-        }
         e.target.value = '';
+        if (!file) return;
+        setProcesandoFoto(true);
+        try {
+            // Se comprime antes de guardar: el documento de Firestore tiene
+            // un límite de 1 MB y una foto de teléfono lo rebasa fácilmente.
+            const base64 = await comprimirImagen(file, {
+                maxDimension: 720,
+                quality: 0.74,
+                maxBytes: 300000
+            });
+            setDatos(prev => ({ ...prev, fotoBase64: base64 }));
+            ejecutarNotificacion("Foto lista. Pulsa GUARDAR CAMBIOS.");
+        } catch (error) {
+            ejecutarNotificacion(error?.message || "No se pudo procesar la foto.", "error");
+        } finally {
+            setProcesandoFoto(false);
+        }
     };
 
     const handleGuardar = async () => {
-        if (cargando || !sucio) return;
+        if (cargando || procesandoFoto || !sucio) return;
         setCargando(true);
         try {
             const userRef = doc(db, "usuarios", usuario.uid);
             const datosAGuardar = { ...datos };
-            delete datosAGuardar.academiaIdEnlace;
-
-            if (datos.academiaIdEnlace && datos.academiaIdEnlace.trim() !== "") {
-                datosAGuardar.academiaId = datos.academiaIdEnlace.trim();
-                datosAGuardar.academiaNombre = "Sede Pendiente de Verificar";
+            // No reescribimos la foto si no cambió: ahorra escritura y evita
+            // acercarnos al límite de 1 MB del documento.
+            if (datos.fotoBase64 === referencia.fotoBase64) {
+                delete datosAGuardar.fotoBase64;
             }
-
             await updateDoc(userRef, datosAGuardar);
-            const limpio = { ...datos, academiaIdEnlace: '' };
-            setDatos(limpio);
-            setReferencia(limpio);
+            setDatos(datos);
+            setReferencia(datos);
             setEstado('guardado');
             ejecutarNotificacion("Pasaporte actualizado correctamente");
         } catch (error) {
@@ -139,13 +149,15 @@ const MiCuenta = ({ usuario, onBack, styles, notify, sedeActual }) => {
         return `https://wa.me/${String(numero).replace(/\D/g, '')}`;
     };
 
-    const textoBotonGuardar = cargando
-        ? 'GUARDANDO...'
-        : sucio
-            ? 'GUARDAR CAMBIOS'
-            : estado === 'guardado'
-                ? 'GUARDADO'
-                : 'SIN CAMBIOS';
+    const textoBotonGuardar = procesandoFoto
+        ? 'PROCESANDO FOTO...'
+        : cargando
+            ? 'GUARDANDO...'
+            : sucio
+                ? 'GUARDAR CAMBIOS'
+                : estado === 'guardado'
+                    ? 'GUARDADO'
+                    : 'SIN CAMBIOS';
 
     return (
         <div style={{
@@ -411,8 +423,10 @@ const MiCuenta = ({ usuario, onBack, styles, notify, sedeActual }) => {
                             </div>
 
                             <div style={{ borderTop: '1px solid #222', paddingTop: '10px' }}>
-                                <p style={{ color: '#888', fontSize: '0.6rem', margin: '0 0 6px 0', fontWeight: 'bold' }}>CÓDIGO DE NUEVA SEDE:</p>
-                                <input placeholder="Pega el ID del Profesor..." style={{ ...(styles.input || {}), width: '100%', margin: 0, fontSize: '0.75rem', padding: '8px', boxSizing: 'border-box' }} value={datos.academiaIdEnlace} onChange={e => setDatos(prev => ({ ...prev, academiaIdEnlace: e.target.value }))} />
+                                <p style={{ color: '#888', fontSize: '0.6rem', margin: '0 0 4px 0', fontWeight: 'bold' }}>¿CAMBIAR DE SEDE?</p>
+                                <p style={{ color: '#666', fontSize: '0.66rem', margin: 0, lineHeight: 1.45 }}>
+                                    Pide a tu profesor un código de acceso. La vinculación la autoriza el staff del dojo para proteger tus datos.
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -453,7 +467,7 @@ const MiCuenta = ({ usuario, onBack, styles, notify, sedeActual }) => {
 
                     <button
                         onClick={handleGuardar}
-                        disabled={!sucio || cargando}
+                        disabled={!sucio || cargando || procesandoFoto}
                         style={{
                             ...(styles.btnGold || {}),
                             width: 'auto',
@@ -466,9 +480,9 @@ const MiCuenta = ({ usuario, onBack, styles, notify, sedeActual }) => {
                             alignItems: 'center',
                             justifyContent: 'center',
                             gap: '5px',
-                            backgroundColor: cargando ? '#b8962d' : '#d4af37',
-                            opacity: (!sucio || cargando) ? 0.5 : 1,
-                            cursor: (!sucio || cargando) ? 'not-allowed' : 'pointer'
+                            backgroundColor: (cargando || procesandoFoto) ? '#b8962d' : '#d4af37',
+                            opacity: (!sucio || cargando || procesandoFoto) ? 0.5 : 1,
+                            cursor: (!sucio || cargando || procesandoFoto) ? 'not-allowed' : 'pointer'
                         }}
                     >
                         {estado === 'guardado' && !sucio && <VaultIcon name="check" size={12} color="#000" />}

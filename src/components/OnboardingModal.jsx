@@ -23,15 +23,16 @@ const OnboardingModal = ({ usuario, styles, onComplete }) => {
     // --- LÓGICA DE MIGRACIÓN AUTOMÁTICA ---
     useEffect(() => {
         const verificarMigracion = async () => {
-            // Si el usuario ya es profesor pero no tiene teamId, es un usuario "Legacy" (como Gustavo)
-            if (usuario?.rol === 'profesor' && !usuario?.teamId) {
+            // Si el usuario ya es profesor pero no tiene teamId, es un usuario
+            // legacy con academiaId. Si no hay academiaId, se le deja elegir.
+            if (usuario?.rol === 'profesor' && !usuario?.teamId && usuario?.academiaId) {
                 setPaso('migrando');
                 setCargando(true);
                 try {
                     console.log("Detectado usuario Legacy. Iniciando migración de bóveda...");
                     const resultado = await migrarDatosLegacy(usuario);
                     onComplete(resultado); // Cierra el modal y actualiza App
-                } catch (e) {
+                } catch {
                     setError("Error en la migración. Contacta a soporte.");
                     setPaso('elegir');
                 } finally {
@@ -55,7 +56,7 @@ const OnboardingModal = ({ usuario, styles, onComplete }) => {
                 ...formProp
             });
             onComplete(result);
-        } catch (e) {
+        } catch {
             setError('Error al crear el team. Intenta de nuevo.');
         } finally {
             setCargando(false);

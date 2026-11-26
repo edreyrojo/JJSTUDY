@@ -101,6 +101,17 @@ const notify = (mensaje, tipo = 'success') => {
   });
 };
 
+// Lee JSON de localStorage sin dejar la app en pantalla negra si está corrupto.
+const leerGuardadoLocal = (clave, porDefecto) => {
+  try {
+    const guardado = localStorage.getItem(clave);
+    return guardado ? JSON.parse(guardado) : porDefecto;
+  } catch {
+    try { localStorage.removeItem(clave); } catch { /* noop */ }
+    return porDefecto;
+  }
+};
+
 // --- 1. CONFIGURACIÓN DE ESTILOS ---
 const styles = {
   containerCenter: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh' },
@@ -124,23 +135,18 @@ export default function App() {
   const [usuario, setUsuario] = React.useState(null);
   const [cargando, setCargando] = React.useState(true);
   const [page, setPage] = useState('login');
+  const [sedeGestionSel, setSedeGestionSel] = useState(null);
   const [userRole, setUserRole] = useState('usuario');
   const [categoriaSel, setCategoriaSel] = useState('AUTORES');
   const [autorSel, setAutorSel] = useState(null);
   const [instrSel, setInstrSel] = useState(null);
   const [volSel, setVolSel] = useState(null);
-  const [vistos, setVistos] = useState(() => {
-    const guardado = localStorage.getItem('lafortuna_vistos');
-    return guardado ? JSON.parse(guardado) : [];
-  });
+  const [vistos, setVistos] = useState(() => leerGuardadoLocal('lafortuna_vistos', []));
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [nombreCompleto, setNombreCompleto] = useState('');
   const [error, setError] = useState('');
-  const [videoActual, setVideoActual] = useState(() => {
-    const guardado = localStorage.getItem('lafortuna_last_video');
-    return guardado ? JSON.parse(guardado) : null;
-  });
+  const [videoActual, setVideoActual] = useState(() => leerGuardadoLocal('lafortuna_last_video', null));
   const [academiaIdInput, setAcademiaIdInput] = useState('');
   const [rutasData, setRutasData] = useState({ rutas: [], videos: [], asignaciones: [] });
 
@@ -165,7 +171,7 @@ export default function App() {
               const q = query(collection(db, "sedes"), where("teamId", "==", data.teamId));
               getDocs(q).then((querySnapshot) => {
                 if (!querySnapshot.empty) {
-                  setAcademiaData(querySnapshot.docs[0].data());
+                  setAcademiaData({ id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() });
                 } else {
                   setAcademiaData(null);
                 }
@@ -182,7 +188,9 @@ export default function App() {
               localStorage.setItem('lafortuna_notas', JSON.stringify(data.notas));
             }
 
-            const necesitaOnboarding = data.necesitaOnboarding === true && !data.teamId;
+            const necesitaOnboarding = data.necesitaOnboarding === true
+              && !data.teamId
+              && ['profesor', 'instructor'].includes(data.rol);
             setShowOnboarding(necesitaOnboarding);
 
             if (data.validado) {
@@ -217,7 +225,7 @@ export default function App() {
   // Una sola fuente de lectura para que mapa, búsqueda, Hub y reproductor
   // apliquen el mismo acceso que el constructor del administrador.
   React.useEffect(() => {
-    if (!usuario?.uid) {
+    if (!usuario?.uid || !usuario?.validado) {
       setRutasData({ rutas: [], videos: [], asignaciones: [] });
       return undefined;
     }
@@ -241,7 +249,7 @@ export default function App() {
     ];
 
     return () => unsubs.forEach((unsub) => unsub());
-  }, [usuario?.uid]);
+  }, [usuario?.uid, usuario?.validado]);
 
   // --- 3. FUNCIONES DE LÓGICA ---
 
@@ -251,6 +259,7 @@ export default function App() {
       setVistos([]);
       setVideoActual(null);
       setUsuario(null);
+      setSedeGestionSel(null);
       localStorage.removeItem('lafortuna_vistos');
       localStorage.removeItem('lafortuna_last_video');
       localStorage.removeItem('lafortuna_notas');
@@ -280,10 +289,11 @@ export default function App() {
         email: user.email,
         nombre: nombreCompleto,
         rol: rolAsignado,
-        academiaId: (rolAsignado === 'instructor') ? academiaIdInput.trim() : null,
         validado: isAdmin,
         fechaRegistro: new Date().toISOString(),
-        necesitaOnboarding: true
+        // El código de academia solo sirve para solicitar rol de instructor.
+        // La vinculación real se hace después con un código verificado.
+        necesitaOnboarding: !isAdmin && rolAsignado === 'instructor'
       });
 
       if (isAdmin) {
@@ -365,24 +375,43 @@ export default function App() {
       const rolFinal = isAdmin
         ? 'admin'
         : (['profesor', 'instructor'].includes(rolPrevio) ? rolPrevio : 'alumno');
+      const esStaffPrevio = ['profesor', 'instructor'].includes(rolFinal);
+
+      // Copiamos solo progreso y datos personales. NUNCA rol, validado,
+      // cursos liberados, equipo ni sede: eso lo autoriza un administrador.
+      const CAMPOS_HEREDABLES = [
+        'nombre', 'fotoBase64', 'cinturon', 'grados', 'bio', 'edad', 'ciudad',
+        'pesoCategoria', 'especialidad', 'tiempoEntrenando', 'genero',
+        'telefono', 'emergencia', 'tipoSangre', 'instagram', 'tallaGi',
+        'notas', 'vistos'
+      ];
+      const heredado = {};
+      if (datosPrevios) {
+        CAMPOS_HEREDABLES.forEach((campo) => {
+          if (datosPrevios[campo] !== undefined) heredado[campo] = datosPrevios[campo];
+        });
+      }
 
       // La cuenta nace PENDIENTE (o queda pendiente si venía de otro método).
       // El maestro la autoriza desde AdminPage → AUTORIZAR.
       await setDoc(userRef, {
-        ...(datosPrevios || {}),
+        ...heredado,
         uid: user.uid,
         email: user.email,
-        nombre: datosPrevios?.nombre || user.displayName || user.email.split('@')[0],
+        nombre: heredado.nombre || user.displayName || user.email.split('@')[0],
         rol: rolFinal,
         validado: isAdmin,
         fechaRegistro: datosPrevios?.fechaRegistro || new Date().toISOString(),
-        fechaUltimoAcceso: new Date().toISOString()
+        fechaUltimoAcceso: new Date().toISOString(),
+        necesitaOnboarding: !isAdmin && esStaffPrevio
       });
 
       if (isAdmin) {
         notify("¡Bienvenido, Ngasi! Acceso total concedido vía Google.");
       } else if (datosPrevios) {
-        notify("Recuperamos tu progreso anterior. Tu cuenta queda pendiente de validación del profesor.");
+        notify(esStaffPrevio
+          ? "Recuperamos tu progreso. Un administrador debe asignarte equipo y sede."
+          : "Recuperamos tu progreso anterior. Tu cuenta queda pendiente de validación del profesor.");
       } else {
         notify("Registro con Google exitoso. Espera a que el profesor valide tu perfil.");
       }
@@ -560,7 +589,10 @@ export default function App() {
               onNavigate={(p) => {
                 if (p === 'instalar') setShowInstalar(true);
                 else if (p === 'onboarding') setShowOnboarding(true);
-                else setPage(p);
+                else {
+                  if (p === 'alumnos') setSedeGestionSel(null);
+                  setPage(p);
+                }
               }}
               onContinue={handleContinue}
               hasSession={!!videoActual}
@@ -668,13 +700,14 @@ export default function App() {
         if (['admin', 'profesor', 'instructor'].includes(userRole)) {
           return (
             <GestionAlumnosPage
-              onBack={() => setPage('hub')}
+              onBack={() => { setSedeGestionSel(null); setPage('hub'); }}
               styles={styles}
               usuario={usuario}
+              sedeActual={sedeGestionSel || (usuario?.sedeId ? null : academiaData)}
             />
           );
         }
-        return <HubPage onNavigate={setPage} userRole={userRole} onLogout={handleLogout} styles={styles} />;
+        return <HubPage usuario={usuario} onNavigate={setPage} userRole={userRole} onLogout={handleLogout} styles={styles} />;
 
       case 'planeador':
         if (['admin', 'profesor', 'instructor'].includes(userRole)) {
@@ -712,6 +745,12 @@ export default function App() {
           return (
             <PanelMaestro
               usuario={usuario}
+              teamData={academiaData}
+              sedeData={academiaData}
+              onVerSede={(sede) => {
+                setSedeGestionSel(sede || null);
+                setPage('alumnos');
+              }}
               onBack={() => setPage('hub')}
               styles={styles}
             />

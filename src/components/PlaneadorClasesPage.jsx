@@ -136,6 +136,9 @@ const PlaneadorClasesPage = ({ onBack, usuario }) => {
     const [clasesEquipo, setClasesEquipo] = useState([]);
     const [clasesGlobales, setClasesGlobales] = useState([]);
     const [alumnos, setAlumnos] = useState([]);
+    // Copia local de la clase recién guardada: si el límite de la consulta
+    // deja fuera el documento nuevo, la vista de detalle sigue funcionando.
+    const [claseRecienGuardada, setClaseRecienGuardada] = useState(null);
     const [cargando, setCargando] = useState(true);
     const [errorDatos, setErrorDatos] = useState('');
     const [errorGlobal, setErrorGlobal] = useState(false);
@@ -210,8 +213,9 @@ const PlaneadorClasesPage = ({ onBack, usuario }) => {
     );
 
     const claseActual = useMemo(
-        () => clases.find((c) => c.id === claseIdSeleccionada) || null,
-        [clases, claseIdSeleccionada]
+        () => clases.find((c) => c.id === claseIdSeleccionada)
+            || (claseRecienGuardada?.id === claseIdSeleccionada ? claseRecienGuardada : null),
+        [clases, claseIdSeleccionada, claseRecienGuardada]
     );
 
     const alumnosActivos = useMemo(
@@ -221,7 +225,8 @@ const PlaneadorClasesPage = ({ onBack, usuario }) => {
         [alumnos]
     );
 
-    const esMiClase = Boolean(claseActual && (claseActual.teamId === teamId || esAdmin));
+    const esMiClase = Boolean(claseActual && claseActual.teamId === teamId);
+    const puedeEditarClase = Boolean(claseActual && (claseActual.teamId === teamId || esAdmin));
     const bloqueTimer = timerBloqueIdx !== null ? claseActual?.bloques?.[timerBloqueIdx] || null : null;
     const timerActivo = timerFase !== 'idle';
 
@@ -721,21 +726,27 @@ const PlaneadorClasesPage = ({ onBack, usuario }) => {
 
             if (claseEditandoId) {
                 await updateDoc(doc(db, 'clases', claseEditandoId), payload);
+                setClaseRecienGuardada((prev) => (
+                    prev && prev.id === claseEditandoId ? { ...prev, ...payload } : prev
+                ));
                 setClaseIdSeleccionada(claseEditandoId);
                 setClaseEditandoId(null);
                 setModo('detalle');
                 notify('Clase actualizada');
             } else {
-                const ref = await addDoc(collection(db, 'clases'), {
+                const nuevoDoc = {
                     ...payload,
                     teamId,
                     academiaId: teamId,
+                    sedeId: usuario?.sedeId || '',
                     creadoPor: usuario?.uid || '',
                     creadoEn: new Date().toISOString(),
                     asistencia: {},
                     comentarios: [],
                     feedback: null
-                });
+                };
+                const ref = await addDoc(collection(db, 'clases'), nuevoDoc);
+                setClaseRecienGuardada(normalizarClase({ id: ref.id, ...nuevoDoc }));
                 setClaseIdSeleccionada(ref.id);
                 setClaseEditandoId(null);
                 setModo('detalle');
@@ -814,6 +825,7 @@ const PlaneadorClasesPage = ({ onBack, usuario }) => {
                 };
 
                 const yaAsistio = (alumno.asistencias || []).includes(fechaClase);
+                const registroPrevio = claseActual.asistencia?.[alumno.id] || null;
                 if (registro.presente && !yaAsistio) {
                     batch.update(doc(db, 'alumnos', alumno.id), {
                         asistencias: arrayUnion(fechaClase),
@@ -823,9 +835,16 @@ const PlaneadorClasesPage = ({ onBack, usuario }) => {
                             nota: registro.nota || 'Asistió'
                         })
                     });
-                } else if (!registro.presente && yaAsistio) {
+                } else if (!registro.presente && registroPrevio?.presente) {
+                    // Solo desmarcamos si ESTA clase había marcado al alumno.
+                    // Así no borramos la asistencia que otra clase del mismo día registró.
                     batch.update(doc(db, 'alumnos', alumno.id), {
-                        asistencias: arrayRemove(fechaClase)
+                        asistencias: arrayRemove(fechaClase),
+                        historialTecnico: arrayRemove({
+                            fecha: fechaClase,
+                            clase: claseActual.titulo,
+                            nota: registroPrevio.nota || 'Asistió'
+                        })
                     });
                 }
             });
@@ -851,7 +870,7 @@ const PlaneadorClasesPage = ({ onBack, usuario }) => {
     const subirFoto = async (event) => {
         const file = event.target.files?.[0];
         event.target.value = '';
-        if (!file || !claseActual || !esMiClase) return;
+        if (!file || !claseActual || !puedeEditarClase) return;
         setSubiendoFoto(true);
         try {
             const base64 = await comprimirImagen(file, { maxDimension: 1100, quality: 0.72, maxBytes: 620000 });
@@ -871,7 +890,7 @@ const PlaneadorClasesPage = ({ onBack, usuario }) => {
     };
 
     const quitarFoto = async () => {
-        if (!claseActual || !esMiClase) return;
+        if (!claseActual || !puedeEditarClase) return;
         const res = await Swal.fire({
             title: '¿Quitar la foto?',
             text: 'La foto se eliminará de esta clase.',
@@ -900,7 +919,7 @@ const PlaneadorClasesPage = ({ onBack, usuario }) => {
 
     // --- BITÁCORA / COMENTARIOS ---
     const guardarFeedback = async () => {
-        if (!claseActual || !esMiClase || guardandoFeedback) return;
+        if (!claseActual || !puedeEditarClase || guardandoFeedback) return;
         setGuardandoFeedback(true);
         try {
             await updateDoc(doc(db, 'clases', claseActual.id), {
@@ -1480,6 +1499,7 @@ const PlaneadorClasesPage = ({ onBack, usuario }) => {
                             <DetalleClase
                                 clase={claseActual}
                                 esMiClase={esMiClase}
+                                puedeEditar={puedeEditarClase}
                                 esAdmin={esAdmin}
                                 usuario={usuario}
                                 alumnos={alumnosActivos}
@@ -1851,6 +1871,7 @@ const EditorBloque = ({
 const DetalleClase = ({
     clase,
     esMiClase,
+    puedeEditar,
     esAdmin,
     usuario,
     alumnos,
@@ -1940,7 +1961,7 @@ const DetalleClase = ({
                 <div style={s.planEmpty}>
                     <VaultIcon name="clipboard" size={26} color="#666" />
                     <span>Esta clase todavía no tiene bloques.</span>
-                    {esMiClase && <button type="button" onClick={onEditar} style={s.ghostBtn}>EDITAR CLASE</button>}
+                    {puedeEditar && <button type="button" onClick={onEditar} style={s.ghostBtn}>EDITAR CLASE</button>}
                 </div>
             ) : (
                 <div style={s.timeline}>
@@ -2115,7 +2136,7 @@ const DetalleClase = ({
                     <button type="button" onClick={abrirFoto} style={s.photoButton} aria-label="Ampliar foto de la clase">
                         <img src={clase.fotoBase64} alt={`Foto de la clase ${clase.titulo}`} style={s.photoImg} />
                     </button>
-                    {esMiClase && (
+                    {puedeEditar && (
                         <div style={s.photoActions}>
                             <label htmlFor="planner-foto-input" style={s.photoActionBtn}>
                                 <VaultIcon name="camera" size={12} /> {subiendoFoto ? 'PROCESANDO...' : 'CAMBIAR'}
@@ -2129,13 +2150,13 @@ const DetalleClase = ({
             ) : (
                 <div style={s.photoEmpty}>
                     <span style={s.photoEmptyIcon}><VaultIcon name="camera" size={24} color="#d4af37" /></span>
-                    <strong style={s.photoEmptyTitle}>{esMiClase ? 'Inmortaliza la sesión' : 'Sin foto del día'}</strong>
+                    <strong style={s.photoEmptyTitle}>{puedeEditar ? 'Inmortaliza la sesión' : 'Sin foto del día'}</strong>
                     <p style={s.photoEmptyText}>
-                        {esMiClase
+                        {puedeEditar
                             ? 'Una foto del grupo, del drill o del detalle técnico del día.'
                             : 'El dojo autor no compartió una foto de esta sesión.'}
                     </p>
-                    {esMiClase && (
+                    {puedeEditar && (
                         <label htmlFor="planner-foto-input" style={s.goldBtn}>
                             <VaultIcon name="camera" size={14} /> {subiendoFoto ? 'PROCESANDO...' : 'TOMAR / SUBIR FOTO'}
                         </label>
@@ -2157,7 +2178,7 @@ const DetalleClase = ({
                 )}
             </div>
 
-            {esMiClase ? (
+            {puedeEditar ? (
                 <div style={s.feedbackBody}>
                     <div style={s.ratingRow}>
                         <span style={s.fieldLabelInline}>VALORACIÓN</span>
@@ -2437,12 +2458,12 @@ const DetalleClase = ({
                     <button type="button" onClick={onDuplicar} style={s.ghostBtn}>
                         <VaultIcon name="copy" size={14} /> DUPLICAR
                     </button>
-                    {esMiClase && (
+                    {puedeEditar && (
                         <button type="button" onClick={onEditar} style={s.ghostBtn}>
                             <VaultIcon name="edit" size={14} /> EDITAR
                         </button>
                     )}
-                    {esMiClase && (
+                    {puedeEditar && (
                         <button type="button" onClick={onEliminar} style={s.dangerBtn}>
                             <VaultIcon name="trash" size={14} /> ELIMINAR
                         </button>

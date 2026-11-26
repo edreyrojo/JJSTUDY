@@ -192,10 +192,10 @@ const LoginPage = ({
                             />
                         </div>
                         <div>
-                            <label style={{ color: '#aaa', fontSize: '0.7rem', display: 'block', marginBottom: '4px' }}>CÓDIGO DE ACADEMIA (Opcional)</label>
+                            <label style={{ color: '#aaa', fontSize: '0.7rem', display: 'block', marginBottom: '4px' }}>CÓDIGO DE ACADEMIA (solo instructores)</label>
                             <input
                                 type="text"
-                                placeholder="Código del Profesor"
+                                placeholder="Código que te dio tu profesor"
                                 style={{
                                     ...(styles.input || {}),
                                     width: '100%',

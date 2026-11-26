@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, getDocs, doc, deleteDoc, addDoc, writeBatch, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, getDocs, getDoc, doc, deleteDoc, addDoc, writeBatch, setDoc, updateDoc } from 'firebase/firestore';
 import Swal from 'sweetalert2';
 import { DB_INSTRUCCIONALES } from '../data/instruccionales';
 import VaultIcon from './VaultIcon';
+import { sincronizarCodigosAcceso } from '../utils/teamsService';
+import { comprimirImagen } from '../utils/imageUtils';
 
 const notify = (mensaje, tipo = 'success') => {
     Swal.fire({
@@ -164,14 +166,28 @@ const AdminPage = ({ onBack }) => {
     const generarCodigoSedeMadre = async (idSede, nombreAca) => {
         try {
             const prefijo = (nombreAca || 'DOJO').slice(0, 4).toUpperCase().replace(/[^A-Z]/g, 'X');
-            const rand = Math.floor(100 + Math.random() * 900);
+            const rand = Math.floor(100000 + Math.random() * 900000);
             const nuevoCodigo = `${prefijo}-MADRE${rand}`;
             const sedeRef = doc(db, 'sedes', idSede);
+            const sedeSnap = await getDoc(sedeRef);
+            const teamIdSede = sedeSnap.exists()
+                ? (sedeSnap.data().teamId || sedeSnap.data().academiaId || idSede)
+                : idSede;
+
             await setDoc(sedeRef, {
                 codigoAcceso: nuevoCodigo,
                 nombreSede: nombreAca || 'Sede Madre Principal',
                 ciudad: 'Sede Central'
             }, { merge: true });
+
+            // Mapeo privado código → sede para que las reglas validen la vinculación.
+            await setDoc(doc(db, 'codigosAcceso', nuevoCodigo), {
+                sedeId: idSede,
+                teamId: teamIdSede,
+                nombreSede: nombreAca || 'Sede Madre Principal',
+                actualizadoEn: new Date().toISOString()
+            }, { merge: true });
+
             Swal.fire({
                 title: 'Código generado',
                 html: `<strong style="color:#d4af37;font-size:1.2rem">${nuevoCodigo}</strong>`,
@@ -196,16 +212,22 @@ const AdminPage = ({ onBack }) => {
         }
     };
 
-    const handleLogoAcademiaChange = (e) => {
-        const file = e.target.files[0];
+    const handleLogoAcademiaChange = async (e) => {
+        const file = e.target.files?.[0];
+        e.target.value = '';
         if (!file) return;
-        if (file.size > 1048487) {
-            Swal.fire('Error', 'La imagen es demasiado pesada. Máximo 1 MB.', 'error');
-            return;
+        try {
+            // Comprimimos el logo: el base64 sin comprimir rebasa el límite
+            // de 1 MB del documento de Firestore.
+            const base64 = await comprimirImagen(file, {
+                maxDimension: 600,
+                quality: 0.76,
+                maxBytes: 380000
+            });
+            setLogoAcademiaBase64(base64);
+        } catch (error) {
+            Swal.fire('Error', error?.message || 'No se pudo procesar el logo.', 'error');
         }
-        const reader = new FileReader();
-        reader.onloadend = () => setLogoAcademiaBase64(reader.result);
-        reader.readAsDataURL(file);
     };
 
     const handleAction = async (id, collectionName, action, data = null) => {
@@ -366,6 +388,27 @@ const AdminPage = ({ onBack }) => {
             }
         } catch (error) {
             notify('Error: ' + error.message, 'error');
+        }
+    };
+
+    const handleSincronizarCodigos = async () => {
+        const res = await Swal.fire({
+            title: '¿Sincronizar códigos?',
+            text: 'Copia los códigos de acceso existentes a la colección privada para que los instructores puedan vincularse. Es seguro ejecutarlo varias veces.',
+            icon: 'question',
+            showCancelButton: true,
+            background: '#1a1a1a',
+            color: '#fff',
+            confirmButtonColor: '#d4af37',
+            cancelButtonColor: '#333',
+            confirmButtonText: 'Sí, sincronizar'
+        });
+        if (!res.isConfirmed) return;
+        try {
+            const total = await sincronizarCodigosAcceso();
+            notify(total > 0 ? `Códigos sincronizados: ${total}` : 'No hay sedes con código.');
+        } catch (error) {
+            notify('No se pudieron sincronizar: ' + error.message, 'error');
         }
     };
 
@@ -976,6 +1019,9 @@ const AdminPage = ({ onBack }) => {
                                             </button>
                                             <button type="button" onClick={copiarReporte} className="admin-btn" style={s.btnOutlineAction}>
                                                 <VaultIcon name="copy" size={14} /> Copiar reporte de diagnóstico
+                                            </button>
+                                            <button type="button" onClick={handleSincronizarCodigos} className="admin-btn" style={s.btnOutlineAction}>
+                                                <VaultIcon name="lock" size={14} /> Sincronizar códigos de acceso
                                             </button>
                                         </div>
 

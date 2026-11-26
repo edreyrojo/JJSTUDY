@@ -283,10 +283,29 @@ const RutasAdminPage = ({ onBack, usuario }) => {
 
         const estado = forzarEstado || draft.estado || 'borrador';
         const lecciones = leccionesDeRuta(draft);
-        if (estado === 'publicada' && lecciones.length === 0) {
-            notify('Agrega al menos una lección antes de publicar.', 'error');
-            setTab('contenido');
-            return null;
+        if (estado === 'publicada') {
+            const resolubles = lecciones.filter((leccion) => resolverLeccion(leccion, videosPorId));
+            if (resolubles.length === 0) {
+                notify('Agrega al menos una lección que se pueda reproducir antes de publicar.', 'error');
+                setTab('contenido');
+                return null;
+            }
+            if (resolubles.length < lecciones.length) {
+                const rotas = lecciones.length - resolubles.length;
+                const res = await Swal.fire({
+                    title: 'Lecciones sin contenido',
+                    text: `${rotas} lección(es) apuntan a videos o técnicas que ya no existen. Los alumnos las verán vacías. ¿Publicar de todas formas?`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    background: '#1a1a1a',
+                    color: '#fff',
+                    confirmButtonColor: '#d4af37',
+                    cancelButtonColor: '#333',
+                    confirmButtonText: 'Publicar',
+                    cancelButtonText: 'Revisar'
+                });
+                if (!res.isConfirmed) return null;
+            }
         }
 
         setGuardando(true);
@@ -370,6 +389,19 @@ const RutasAdminPage = ({ onBack, usuario }) => {
 
     const eliminarRuta = async () => {
         if (!draft?.id) {
+            const res = await Swal.fire({
+                title: '¿Descartar borrador?',
+                text: 'La ruta que estás creando no se ha guardado.',
+                icon: 'warning',
+                showCancelButton: true,
+                background: '#1a1a1a',
+                color: '#fff',
+                confirmButtonColor: '#ff6b6b',
+                cancelButtonColor: '#333',
+                confirmButtonText: 'Sí, descartar',
+                cancelButtonText: 'Seguir editando'
+            });
+            if (!res.isConfirmed) return;
             setDraft(null);
             setDraftBase('');
             return;
@@ -1176,7 +1208,7 @@ const TabContenido = ({
                                     )}
                                     {lecciones.map((leccion, lIndice) => {
                                         const playable = resolverLeccion({ ...leccion, seccionId: seccion.id }, videosPorId);
-                                        const fuente = leccion.tipo === 'video' ? leccion.fuente : 'drive';
+                                        const fuente = leccion.tipo === 'video' ? leccion.fuente : 'vault';
                                         return (
                                             <div key={leccion.id || `${leccion.ref}-${lIndice}`} style={s.lessonRow}>
                                                 <span style={s.lessonIndex}>{String(lIndice + 1).padStart(2, '0')}</span>
@@ -1369,7 +1401,7 @@ const TabVideos = ({ videos, onNuevo, onEditar, onEliminar, onIndexarEnRuta, dra
                                 >
                                     <VaultIcon name="plus" size={12} />
                                 </button>
-                                <button type="button" onClick={() => onEditar(video)} style={s.iconBtnSmall} title="Editar video" aria-label="Editar video">
+                                <button type="button" onClick={() => onEditar(videos.find((v) => v.id === video.docId) || video)} style={s.iconBtnSmall} title="Editar video" aria-label="Editar video">
                                     <VaultIcon name="edit" size={12} />
                                 </button>
                                 <button type="button" onClick={() => onEliminar(video)} style={s.iconBtnDanger} title="Eliminar video" aria-label="Eliminar video">

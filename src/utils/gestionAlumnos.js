@@ -148,6 +148,7 @@ export const crearConfigInicial = (sede = {}) => {
         email: sede.email || '',
         instagram: sede.instagram || '',
         logoBase64: sede.logoBase64 || sede.logobase64 || '',
+        teamId: sede.teamId || '',
         horarios: Array.isArray(sede.horarios) ? sede.horarios : [],
         programas,
         codigoAcceso: sede.codigoAcceso || '',

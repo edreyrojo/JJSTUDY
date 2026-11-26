@@ -7,6 +7,7 @@ import {
     doc,
     updateDoc,
     setDoc,
+    writeBatch,
     arrayUnion,
     query,
     where,
@@ -179,7 +180,9 @@ const GestionAlumnosPage = ({ onBack, usuario, sedeActual }) => {
         const texto = busqueda.trim().toLowerCase();
         return base.filter((alumno) => {
             if (soloAlertas && !tieneAlertaMedica(alumno) && tieneContactoEmergencia(alumno)) return false;
-            if (filtroPago !== 'todos') {
+            // En archivados no aplicamos filtro de pago: un alumno archivado
+            // siempre está "INACTIVO" y el filtro dejaría la lista vacía.
+            if (!verArchivados && filtroPago !== 'todos') {
                 const estado = calcularEstadoPago(alumno.fechaPago, alumno.activo);
                 if (estado.key !== filtroPago) return false;
             }
@@ -215,11 +218,13 @@ const GestionAlumnosPage = ({ onBack, usuario, sedeActual }) => {
         getDocs(q)
             .then((snap) => {
                 if (cancelado) return;
-                setSedeFallbackId(snap.empty ? teamId : snap.docs[0].id);
+                // Si no existe una sede real, NO usamos el teamId como sedeId:
+                // eso dejaba alumnos huérfanos que los instructores no veían.
+                setSedeFallbackId(snap.empty ? '' : snap.docs[0].id);
             })
             .catch((error) => {
                 console.error('Error al detectar la sede:', error);
-                if (!cancelado) setSedeFallbackId(teamId);
+                if (!cancelado) setSedeFallbackId('');
             });
         return () => { cancelado = true; };
     }, [sedeActual?.id, usuario?.sedeId, teamId]);
@@ -442,7 +447,11 @@ const GestionAlumnosPage = ({ onBack, usuario, sedeActual }) => {
 
         setGuardandoAlumno(true);
         try {
-            const idSede = sedeIdEfectiva || teamId;
+            const idSede = sedeIdEfectiva || '';
+            if (!idSede) {
+                notify('Tu cuenta no tiene una sede asignada. Pide a un administrador que la cree antes de registrar alumnos.', 'error');
+                return;
+            }
             const edadFinal = nuevo.fechaNacimiento ? calcularEdad(nuevo.fechaNacimiento) : nuevo.edad;
             const payload = {
                 ...nuevo,
@@ -463,7 +472,7 @@ const GestionAlumnosPage = ({ onBack, usuario, sedeActual }) => {
 
             if (editandoId) {
                 const editable = { ...payload };
-                ['asistencias', 'historialTecnico', 'historialPagos', 'ultimoPago', 'fechaRegistro', 'registradoPor'].forEach((campo) => delete editable[campo]);
+                ['id', 'asistencias', 'historialTecnico', 'historialPagos', 'ultimoPago', 'fechaRegistro', 'registradoPor'].forEach((campo) => delete editable[campo]);
                 await setDoc(doc(db, 'alumnos', editandoId), editable, { merge: true });
                 setMostrarForm(false);
                 setEditandoId(null);
@@ -560,7 +569,9 @@ const GestionAlumnosPage = ({ onBack, usuario, sedeActual }) => {
         setAlumnoPagoId(alumno.id);
         setPagoDraft({
             fecha: fechaHoy(),
-            monto: alumno.montoMensualidad ?? config.mensualidadBase ?? '',
+            monto: (alumno.montoMensualidad !== '' && alumno.montoMensualidad != null)
+                ? alumno.montoMensualidad
+                : (config.mensualidadBase ?? ''),
             metodo: alumno.metodoPagoPreferido || metodosPago[0] || 'Efectivo',
             meses: 1,
             nota: ''
@@ -748,10 +759,24 @@ const GestionAlumnosPage = ({ onBack, usuario, sedeActual }) => {
                 horarios: [...(configDraft.horarios || [])].sort((a, b) => String(a.hora).localeCompare(String(b.hora))),
                 mensualidadBase: configDraft.mensualidadBase === '' ? '' : Math.max(0, Number(configDraft.mensualidadBase) || 0),
                 diaVencimiento: Math.min(31, Math.max(1, Number(configDraft.diaVencimiento) || 1)),
-                teamId,
                 ultimaActualizacion: new Date().toISOString()
             };
-            await setDoc(doc(db, 'sedes', sedeIdEfectiva), payload, { merge: true });
+            const batch = writeBatch(db);
+            batch.set(doc(db, 'sedes', sedeIdEfectiva), payload, { merge: true });
+
+            // Mantenemos el mapeo privado código → sede al día (atómico con la sede).
+            const codigo = String(payload.codigoAcceso || '').trim().toUpperCase();
+            if (codigo) {
+                batch.set(doc(db, 'codigosAcceso', codigo), {
+                    sedeId: sedeIdEfectiva,
+                    teamId: configDraft.teamId || teamId,
+                    nombreSede: payload.nombre,
+                    actualizadoEn: new Date().toISOString()
+                }, { merge: true });
+            }
+
+            await batch.commit();
+
             setConfig(crearConfigInicial(payload));
             setEditandoConfig(false);
             notify('Configuración del dojo guardada');

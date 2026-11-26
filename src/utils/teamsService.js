@@ -7,24 +7,40 @@ import {
 
 // ─────────────────────────────────────────────
 // GENERADOR DE CÓDIGOS DE ACCESO POR SEDE
-// Formato: PREFIJO-CIUDAD-NNN (ej: HAKA-LEO-001)
+// Formato: PREFIJO-CIUDAD-NNNNNN (ej: HAKA-LEO-482913)
+// El código es la única llave para vincularse a una sede; por eso usa
+// 6 dígitos (900,000 combinaciones) en lugar de 3.
 // ─────────────────────────────────────────────
 export const generarCodigoAcceso = (nombreTeam, nombreCiudad) => {
-    const prefijo = nombreTeam
+    const prefijo = String(nombreTeam || 'TEAM')
         .toUpperCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, '')
         .replace(/[^A-Z]/g, '')
         .substring(0, 4)
         .padEnd(4, 'X');
 
-    const ciudad = nombreCiudad
+    const ciudad = String(nombreCiudad || 'HQ')
         .toUpperCase()
         .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // quitar acentos
         .replace(/[^A-Z]/g, '')
         .substring(0, 3)
         .padEnd(3, 'X');
 
-    const numero = Math.floor(Math.random() * 900 + 100); // 100-999
+    const numero = Math.floor(Math.random() * 900000 + 100000); // 100000-999999
     return `${prefijo}-${ciudad}-${numero}`;
+};
+
+// Guarda el mapeo código → sede. Es lo que permite validar la vinculación
+// desde las reglas de Firestore sin exponer todas las sedes.
+const guardarCodigoAcceso = async (codigoAcceso, { sedeId, teamId, nombreSede }) => {
+    const codigo = String(codigoAcceso || '').trim().toUpperCase();
+    if (!codigo || !sedeId) return;
+    await setDoc(doc(db, 'codigosAcceso', codigo), {
+        sedeId,
+        teamId: teamId || '',
+        nombreSede: nombreSede || '',
+        actualizadoEn: new Date().toISOString()
+    }, { merge: true });
 };
 
 // ─────────────────────────────────────────────
@@ -89,6 +105,7 @@ export const crearNuevoTeam = async ({ uid, nombreTeam, nombreSede, ciudad }) =>
     batch.set(sedeRef, {
         teamId: uid,
         nombre: nombreSede,
+        nombreSede,
         ciudad: ciudad,
         tipo: 'sede_principal',
         codigoAcceso: codigoAcceso,
@@ -98,6 +115,14 @@ export const crearNuevoTeam = async ({ uid, nombreTeam, nombreSede, ciudad }) =>
         fechaCreacion: new Date().toISOString(),
         activa: true
     });
+
+    // 2.b Mapeo del código de acceso (colección privada, no listable).
+    batch.set(doc(db, 'codigosAcceso', codigoAcceso), {
+        sedeId: sedeRef.id,
+        teamId: uid,
+        nombreSede: nombreSede,
+        actualizadoEn: new Date().toISOString()
+    }, { merge: true });
 
     // 3. Actualizar el usuario como propietario
     const usuarioRef = doc(db, "usuarios", uid);
@@ -121,38 +146,80 @@ export const crearNuevoTeam = async ({ uid, nombreTeam, nombreSede, ciudad }) =>
 };
 
 // ─────────────────────────────────────────────
-// ONBOARDING: Instructor se vincula con código de sede
+// ONBOARDING: Instructor/profesor se vincula con código de sede
+// El código se resuelve en `codigosAcceso` (solo lectura por ID exacto),
+// no listando todas las sedes. Las reglas verifican ese mapeo.
 // ─────────────────────────────────────────────
 export const vincularInstructorASede = async (uid, codigoAcceso) => {
-    // Buscar la sede por código
-    const q = query(
-        collection(db, "sedes"),
-        where("codigoAcceso", "==", codigoAcceso.trim().toUpperCase())
-    );
-    const snap = await getDocs(q);
-
-    if (snap.empty) {
-        throw new Error("Código de acceso inválido. Verifica con tu profesor.");
+    const codigo = String(codigoAcceso || '').trim().toUpperCase();
+    if (!codigo) {
+        throw new Error("Ingresa el código que te dio tu profesor.");
     }
 
-    const sedeDoc = snap.docs[0];
-    const sedeData = sedeDoc.data();
+    const mapaSnap = await getDoc(doc(db, 'codigosAcceso', codigo));
+    if (!mapaSnap.exists()) {
+        throw new Error("Código no reconocido. Pide a tu profesor que sincronice el código de la sede.");
+    }
 
-    // Actualizar usuario
-    await setDoc(doc(db, "usuarios", uid), {
-        rol: 'instructor',
-        teamId: sedeData.teamId,
-        sedeId: sedeDoc.id,
-        academiaId: sedeData.teamId, // <--- FALTABA ESTO
-        necesitaOnboarding: false, // <--- PREVIENE EL BUCLE PARA INSTRUCTORES
-        fechaVinculacion: new Date().toISOString()
+    const mapa = mapaSnap.data();
+    const sedeId = mapa.sedeId;
+    const teamId = mapa.teamId;
+    if (!sedeId || !teamId) {
+        throw new Error("El código está incompleto. Pide a tu profesor que lo regenere.");
+    }
+
+    // Conservamos el rol de staff si ya lo tenía; si es nuevo, entra como instructor.
+    const usuarioRef = doc(db, "usuarios", uid);
+    const usuarioSnap = await getDoc(usuarioRef);
+    const rolActual = usuarioSnap.exists() ? usuarioSnap.data().rol : null;
+    const rolFinal = ['profesor', 'instructor'].includes(rolActual) ? rolActual : 'instructor';
+
+    await setDoc(usuarioRef, {
+        rol: rolFinal,
+        teamId,
+        sedeId,
+        academiaId: teamId,
+        academiaNombre: mapa.nombreSede || '',
+        necesitaOnboarding: false,
+        fechaVinculacion: new Date().toISOString(),
+        codigoVerificado: codigo
     }, { merge: true });
 
     return {
-        teamId: sedeData.teamId,
-        sedeId: sedeDoc.id,
-        nombreSede: sedeData.nombre
+        teamId,
+        sedeId,
+        academiaId: teamId,
+        nombreSede: mapa.nombreSede || ''
     };
+};
+
+// ─────────────────────────────────────────────
+// MIGRACIÓN: copia los códigos existentes de `sedes` a `codigosAcceso`.
+// El administrador debe ejecutarlo una vez después de desplegar las reglas.
+// ─────────────────────────────────────────────
+export const sincronizarCodigosAcceso = async () => {
+    const snap = await getDocs(collection(db, 'sedes'));
+    const sedes = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .filter((sede) => String(sede.codigoAcceso || '').trim());
+
+    let creados = 0;
+    for (let i = 0; i < sedes.length; i += 400) {
+        const batch = writeBatch(db);
+        sedes.slice(i, i + 400).forEach((sede) => {
+            const codigo = String(sede.codigoAcceso).trim().toUpperCase();
+            batch.set(doc(db, 'codigosAcceso', codigo), {
+                sedeId: sede.id,
+                teamId: sede.teamId || sede.academiaId || '',
+                nombreSede: sede.nombreSede || sede.nombre || '',
+                actualizadoEn: new Date().toISOString()
+            }, { merge: true });
+            creados += 1;
+        });
+        await batch.commit();
+    }
+
+    return creados;
 };
 
 // ─────────────────────────────────────────────
@@ -160,10 +227,13 @@ export const vincularInstructorASede = async (uid, codigoAcceso) => {
 // ─────────────────────────────────────────────
 export const crearSedeAfiliada = async ({ teamId, nombreSede, ciudad, nombreTeam }) => {
     const codigoAcceso = generarCodigoAcceso(nombreTeam, ciudad);
+    const sedeRef = doc(collection(db, "sedes"));
+    const batch = writeBatch(db);
 
-    const sedeRef = await addDoc(collection(db, "sedes"), {
+    batch.set(sedeRef, {
         teamId,
         nombre: nombreSede,
+        nombreSede,
         ciudad,
         tipo: 'afiliado',
         codigoAcceso,
@@ -174,21 +244,36 @@ export const crearSedeAfiliada = async ({ teamId, nombreSede, ciudad, nombreTeam
         activa: true
     });
 
+    batch.set(doc(db, 'codigosAcceso', codigoAcceso), {
+        sedeId: sedeRef.id,
+        teamId: teamId || '',
+        nombreSede: nombreSede || '',
+        actualizadoEn: new Date().toISOString()
+    }, { merge: true });
+
+    await batch.commit();
+
     return { sedeId: sedeRef.id, codigoAcceso };
 };
 
 // ─────────────────────────────────────────────
 // SEDES: Escucha en tiempo real todas las sedes de un team
 // ─────────────────────────────────────────────
-export const escucharSedesDeTeam = (teamId, callback) => {
+export const escucharSedesDeTeam = (teamId, callback, onError) => {
+    // Sin orderBy para no depender de un índice compuesto. Se ordena en cliente.
     const q = query(
         collection(db, "sedes"),
-        where("teamId", "==", teamId),
-        orderBy("fechaCreacion", "asc")
+        where("teamId", "==", teamId)
     );
     return onSnapshot(q, (snap) => {
-        const sedes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const sedes = snap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .sort((a, b) => String(a.fechaCreacion || '').localeCompare(String(b.fechaCreacion || '')));
         callback(sedes);
+    }, (error) => {
+        console.error('Error al escuchar sedes:', error);
+        if (typeof onError === 'function') onError(error);
+        else callback([]);
     });
 };
 
@@ -287,6 +372,18 @@ export const migrarDatosLegacy = async ({ uid, academiaId, nombreTeam, nombreSed
         codigoAcceso = sedesSnap.docs[0].data().codigoAcceso;
     }
 
+    if (!codigoAcceso) {
+        throw new Error("La sede no tiene código de acceso. Pide a un administrador que lo regenere antes de migrar.");
+    }
+
+    // El código debe existir ANTES de actualizar al usuario, porque las reglas
+    // verifican el mapeo `codigosAcceso` en la misma operación.
+    await guardarCodigoAcceso(codigoAcceso, {
+        sedeId,
+        teamId: academiaId,
+        nombreSede: nombreSede || "Sede Principal"
+    });
+
     // 3. Migrar todos los alumnos con este academiaId
     const alumnosQ = query(
         collection(db, "alumnos"),
@@ -310,10 +407,14 @@ export const migrarDatosLegacy = async ({ uid, academiaId, nombreTeam, nombreSed
 
     // 4. Actualizar usuario
     batch.set(doc(db, "usuarios", uid), {
-        rol: 'propietario',
+        rol: 'profesor',
         teamId: academiaId,
         sedeId: sedeId,
-        fechaMigracion: new Date().toISOString()
+        academiaId: academiaId,
+        necesitaOnboarding: false,
+        codigoVerificado: codigoAcceso,
+        fechaVinculacion: new Date().toISOString(),
+        fechaActualizacion: new Date().toISOString()
     }, { merge: true });
 
     await batch.commit();

@@ -9,9 +9,6 @@ service cloud.firestore {
     }
 
     // Devuelve null si el documento todavía no existe (usuario nuevo).
-    // ANTES: get(...).data directo -> error para usuarios sin documento ->
-    // Firestore negaba con "Missing or insufficient permissions" cualquier
-    // operación que usara getRol()/esValidado()/getMiTeam().
     function getUserData() {
       let userDoc = get(/databases/$(database)/documents/usuarios/$(request.auth.uid));
       return userDoc != null ? userDoc.data : null;
@@ -22,8 +19,7 @@ service cloud.firestore {
       return userData != null ? userData.get('rol', 'sin_rol') : 'sin_rol';
     }
 
-    // Admin por UID histórico O por correo. Así el maestro conserva sus
-    // permisos sin importar si entra con contraseña o con Google.
+    // Admin por UID histórico O por correo.
     function isAdmin() {
       return isAuthenticated() && (
         request.auth.uid == "V3vfEnmtSzRNljxJVG8Za4gOb9W2" ||
@@ -31,8 +27,6 @@ service cloud.firestore {
       );
     }
 
-    // Admin total = el maestro (UID/correo) o cualquier usuario que el maestro
-    // haya marcado con rol "admin" desde el panel.
     function esAdminTotal() {
       return isAdmin() || (isAuthenticated() && getRol() == 'admin');
     }
@@ -44,13 +38,11 @@ service cloud.firestore {
       );
     }
 
-    // Función segura para obtener el academiaId o fallback usando .get()
     function getMiAcademia() {
       let data = getUserData();
       return data != null ? data.get('academiaId', data.get('teamId', request.auth.uid)) : request.auth.uid;
     }
 
-    // Función segura para obtener el teamId o fallback usando .get()
     function getMiTeam() {
       let data = getUserData();
       return data != null ? data.get('teamId', data.get('academiaId', request.auth.uid)) : request.auth.uid;
@@ -66,38 +58,48 @@ service cloud.firestore {
              resource.data.get('academiaId', '') == getMiAcademia();
     }
 
+    function esDuenoDelPerfil(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Comprueba que un código de sede existe y apunta a la sede indicada.
+    function codigoValido(codigo, sedeId) {
+      return codigo is string && codigo != '' && sedeId is string && sedeId != '' &&
+        exists(/databases/$(database)/documents/codigosAcceso/$(codigo)) &&
+        get(/databases/$(database)/documents/codigosAcceso/$(codigo)).data.get('sedeId', '') == sedeId;
+    }
+
     // --- REGLAS DE COLECCIONES ---
 
     // 1. USUARIOS
+    // Regla clave: un usuario NUNCA puede cambiarse a sí mismo el rol,
+    // la validación, los cursos liberados ni el equipo/sede. Eso solo lo
+    // hace el administrador. El único cambio de rol permitido es el
+    // onboarding inicial (una sola vez) verificado por código o por team propio.
     match /usuarios/{userId} {
 
-      // Leer UN documento: siempre el propio (aunque no esté validado),
-      // el admin, o un profesor/instructor sobre su equipo.
       allow get: if isAuthenticated() && (
         request.auth.uid == userId ||
         esAdminTotal() ||
         (getRol() in ['profesor', 'instructor'] && esDeMiEquipo())
       );
 
-      // Consultar/listar:
-      // - Admin: todos los usuarios.
-      // - Profesor/instructor: los de su equipo.
-      // - Cualquier usuario: solo documentos con SU correo. Esto habilita la
-      //   búsqueda where("email", "==", miCorreo) del login con Google y evita
-      //   el "Missing or insufficient permissions" de los usuarios nuevos.
       allow list: if isAuthenticated() && (
         esAdminTotal() ||
         (getRol() in ['profesor', 'instructor'] && esDeMiEquipo()) ||
         resource.data.get('email', '') == request.auth.token.email
       );
 
-      // Crear el propio perfil: SIEMPRE nace pendiente de validación.
-      // Un usuario no puede auto-asignarse el rol admin ni validarse.
+      // Crear el propio perfil: SIEMPRE nace pendiente, sin cursos liberados
+      // y sin equipo/sede asignados por el propio usuario.
       allow create: if isAuthenticated() && request.auth.uid == userId && (
         (
           request.resource.data.get('email', '') == request.auth.token.email &&
           request.resource.data.get('validado', false) == false &&
-          request.resource.data.get('rol', 'alumno') != 'admin'
+          request.resource.data.get('rol', 'alumno') in ['alumno', 'instructor', 'profesor'] &&
+          request.resource.data.get('cursos_liberados', []).size() == 0 &&
+          request.resource.data.get('teamId', null) == null &&
+          request.resource.data.get('sedeId', null) == null
         ) ||
         (
           // Excepción: el maestro creando su propio perfil de admin.
@@ -107,14 +109,86 @@ service cloud.firestore {
         )
       );
 
-      // Actualizar: el admin valida y cambia roles. El usuario puede editar su
-      // perfil/onboarding, pero NO puede marcarse validado ni hacerse admin.
       allow update: if isAuthenticated() && (
+        // El administrador puede editar todo.
         esAdminTotal() ||
         (
-          request.auth.uid == userId &&
-          request.resource.data.get('rol', 'alumno') != 'admin' &&
-          request.resource.data.get('validado', false) == resource.data.get('validado', false)
+          // Perfil: solo campos personales. Rol, validación, cursos,
+          // email, equipo y sede quedan congelados.
+          esDuenoDelPerfil(userId) &&
+          request.resource.data.get('email', '') == resource.data.get('email', '') &&
+          request.resource.data.get('rol', 'alumno') == resource.data.get('rol', 'alumno') &&
+          request.resource.data.get('validado', false) == resource.data.get('validado', false) &&
+          request.resource.data.get('cursos_liberados', []) == resource.data.get('cursos_liberados', []) &&
+          request.resource.data.get('teamId', null) == resource.data.get('teamId', null) &&
+          request.resource.data.get('sedeId', null) == resource.data.get('sedeId', null) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'nombre', 'fotoBase64', 'bio', 'cinturon', 'grados', 'edad', 'ciudad',
+            'pesoCategoria', 'especialidad', 'tiempoEntrenando', 'genero',
+            'telefono', 'emergencia', 'tipoSangre', 'instagram', 'tallaGi',
+            'notas', 'vistos', 'ultimoAnuncioVisto',
+            'necesitaOnboarding', 'fechaActualizacion', 'fechaUltimoAcceso'
+          ])
+        ) ||
+        (
+          // Desvincularse de una academia: solo se permite dejar los campos
+          // en null. Unirse a otra academia pasa por el staff/onboarding.
+          esDuenoDelPerfil(userId) &&
+          request.resource.data.get('academiaId', null) == null &&
+          request.resource.data.get('academiaNombre', null) == null &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['academiaId', 'academiaNombre'])
+        ) ||
+        (
+          // Onboarding inicial (una sola vez): el usuario ya es staff y aún no
+          // tiene equipo. Un alumno normal NO puede auto-promoverse.
+          esDuenoDelPerfil(userId) &&
+          resource.data.get('rol', 'alumno') in ['profesor', 'instructor'] &&
+          resource.data.get('necesitaOnboarding', false) == true &&
+          request.resource.data.get('necesitaOnboarding', false) == false &&
+          request.resource.data.get('validado', false) == resource.data.get('validado', false) &&
+          request.resource.data.get('cursos_liberados', []).size() == 0 &&
+          (
+            // Fundador: crea su propio team (teamId = su uid).
+            (
+              request.resource.data.get('rol', '') == 'profesor' &&
+              request.resource.data.get('teamId', '') == request.auth.uid &&
+              request.resource.data.get('academiaId', '') == request.auth.uid
+            ) ||
+            // Instructor o profesor que se une con un código de sede válido.
+            (
+              request.resource.data.get('rol', '') in ['profesor', 'instructor'] &&
+              request.resource.data.get('teamId', '') == request.resource.data.get('academiaId', '') &&
+              codigoValido(
+                request.resource.data.get('codigoVerificado', ''),
+                request.resource.data.get('sedeId', '')
+              )
+            )
+          ) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'rol', 'teamId', 'sedeId', 'academiaId', 'academiaNombre',
+            'necesitaOnboarding', 'fechaVinculacion', 'fechaActualizacion',
+            'codigoVerificado'
+          ])
+        ) ||
+        (
+          // Re-vincularse a otra sede usando el código de esa sede.
+          // El rol no puede cambiar y los cursos liberados se conservan.
+          esDuenoDelPerfil(userId) &&
+          resource.data.get('necesitaOnboarding', false) == false &&
+          getRol() in ['profesor', 'instructor'] &&
+          request.resource.data.get('validado', false) == resource.data.get('validado', false) &&
+          request.resource.data.get('cursos_liberados', []) == resource.data.get('cursos_liberados', []) &&
+          request.resource.data.get('rol', '') == resource.data.get('rol', '') &&
+          request.resource.data.get('teamId', '') == request.resource.data.get('academiaId', '') &&
+          codigoValido(
+            request.resource.data.get('codigoVerificado', ''),
+            request.resource.data.get('sedeId', '')
+          ) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'teamId', 'sedeId', 'academiaId', 'academiaNombre',
+            'necesitaOnboarding', 'fechaVinculacion', 'fechaActualizacion',
+            'codigoVerificado'
+          ])
         )
       );
 
@@ -123,47 +197,88 @@ service cloud.firestore {
 
     // 2. TEAMS
     match /teams/{teamId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && (request.auth.uid == teamId || esAdminTotal());
+      allow read: if isAuthenticated() && (
+        esAdminTotal() || request.auth.uid == teamId || getMiTeam() == teamId
+      );
+      allow create: if isAuthenticated() && (
+        request.auth.uid == teamId ||
+        esAdminTotal() ||
+        (esValidado() && getRol() in ['profesor', 'instructor'] &&
+          request.resource.data.get('propietarioUid', '') == request.auth.uid)
+      );
+      allow update, delete: if isAuthenticated() && (request.auth.uid == teamId || esAdminTotal());
     }
 
-    // 3. SEDES (Blindaje total y flexible para Onboarding y Gestión)
+    // 3. SEDES
+    // Solo se leen las sedes del propio equipo (o todas si eres admin).
+    // El código de acceso se valida contra el mapeo privado `codigosAcceso`.
     match /sedes/{sedeId} {
-      allow read: if isAuthenticated();
-
-      // Permite creación a profesores/instructores asignando su teamId o por UID directo
-      allow create: if isAuthenticated() && (
+      allow read: if isAuthenticated() && (
         esAdminTotal() ||
+        getMiSede() == sedeId ||
+        (getUserData() != null && resource.data.get('teamId', '') == getMiTeam())
+      );
+
+      // Permite crear la sede del propio team (onboarding del fundador) o
+      // una sede afiliada por parte del staff ya validado.
+      allow create: if esValidado() && (
+        esAdminTotal() ||
+        request.auth.uid == request.resource.data.get('teamId', '') ||
         (getRol() in ['profesor', 'instructor'] && (
           request.resource.data.get('teamId', '') == getMiTeam() ||
           request.resource.data.get('teamId', '') == request.auth.uid
         ))
       );
 
-      // PERMITE EDICIÓN SI: Es admin, coincide el teamId/academiaId, o si el documento de la sede
-      // guarda explícitamente su UID en campos de enlace (teamId o profesorUid), o si su perfil tiene el sedeId.
-      allow update, delete: if isAuthenticated() && (
+      // El staff puede editar su sede, pero NO cambiar el team ni el código
+      // de acceso (eso solo lo hace el administrador). Tampoco puede borrarla.
+      allow update: if isAuthenticated() && (
         esAdminTotal() ||
-        (getRol() in ['profesor', 'instructor'] && (
-          resource.data.get('teamId', '') == getMiTeam() ||
-          resource.data.get('academiaId', '') == getMiAcademia() ||
-          resource.data.get('teamId', '') == request.auth.uid ||
-          resource.data.get('profesorUid', '') == request.auth.uid ||
-          resource.data.get('teamIdProfesor', '') == request.auth.uid ||
-          getMiSede() == sedeId
-        ))
+        (
+          getRol() in ['profesor', 'instructor'] &&
+          request.resource.data.get('teamId', '') == resource.data.get('teamId', '') &&
+          request.resource.data.get('codigoAcceso', '') == resource.data.get('codigoAcceso', '') &&
+          (
+            resource.data.get('teamId', '') == getMiTeam() ||
+            resource.data.get('academiaId', '') == getMiAcademia() ||
+            resource.data.get('teamId', '') == request.auth.uid ||
+            resource.data.get('profesorUid', '') == request.auth.uid ||
+            resource.data.get('teamIdProfesor', '') == request.auth.uid ||
+            getMiSede() == sedeId
+          )
+        )
       );
+
+      allow delete: if esAdminTotal();
+    }
+
+    // 3.b CÓDIGOS DE ACCESO
+    // El documento se identifica por el código. Se puede leer por ID exacto
+    // (para vincularse) pero NO listar: así no se pueden enumerar.
+    match /codigosAcceso/{codigo} {
+      allow get: if isAuthenticated();
+
+      allow list: if esAdminTotal();
+
+      allow create, update: if esValidado() && (
+        esAdminTotal() ||
+        request.auth.uid == request.resource.data.get('teamId', '') ||
+        (getRol() in ['profesor', 'instructor'] &&
+          request.resource.data.get('teamId', '') == getMiTeam())
+      );
+
+      allow delete: if esAdminTotal();
     }
 
     // 4. ACADEMIAS
     match /academias/{academiaId} {
+      // Nombre y logo no son secretos; el listado se usa para el Hub.
       allow read: if isAuthenticated();
 
-      // El Admin entra directo. El profesor/instructor solo si está validado y es el dueño.
       allow write: if esAdminTotal() || (esValidado() && getRol() in ['profesor', 'instructor'] && request.auth.uid == academiaId);
     }
 
-    // 5. ALUMNOS (El Admin tiene superpoderes de edición y lectura global)
+    // 5. ALUMNOS
     match /alumnos/{alumnoId} {
 
       allow read: if esValidado() && (
@@ -193,11 +308,6 @@ service cloud.firestore {
     }
 
     // 6. CLASES / CONTENIDO
-    // - Cada dojo ve sus clases.
-    // - Las clases marcadas con visibilidad "global" se comparten con
-    //   instructores y profesores validados de otros dojos.
-    // - Esos instructores externos solo pueden añadir comentarios, nunca
-    //   editar el contenido de la clase.
     match /clases/{claseId} {
       allow read: if isAuthenticated() && (
         esAdminTotal() ||
@@ -218,8 +328,8 @@ service cloud.firestore {
         esAdminTotal() ||
         (
           getRol() in ['profesor', 'instructor'] &&
-          resource.data.get('teamId', '') == getMiTeam() &&
-          request.resource.data.get('teamId', '') == getMiTeam()
+          request.resource.data.get('teamId', '') == getMiTeam() &&
+          resource.data.get('teamId', '') == getMiTeam()
         ) ||
         (
           resource.data.get('visibilidad', '') == 'global' &&
@@ -259,22 +369,20 @@ service cloud.firestore {
     }
 
     // 10. VIDEOS INDEXADOS Y RUTAS DE APRENDIZAJE
-    // Los metadatos son legibles por usuarios autenticados porque el mapa, la
-    // búsqueda y el reproductor los necesitan para resolver una lección. El
-    // acceso real al video se valida en la app con las asignaciones publicadas.
-    // Solo el administrador indexa videos o construye/publica rutas.
+    // Metadatos legibles solo por usuarios validados. El acceso de reproducción
+    // real se sigue validando en la app con asignaciones publicadas.
     match /videos/{videoId} {
-      allow read: if isAuthenticated();
+      allow read: if esValidado();
       allow write: if esAdminTotal();
     }
 
     match /rutas/{rutaId} {
-      allow read: if isAuthenticated();
+      allow read: if esValidado();
       allow write: if esAdminTotal();
     }
 
     match /asignacionesRuta/{asignacionId} {
-      allow read: if isAuthenticated();
+      allow read: if esValidado();
       allow write: if esAdminTotal();
     }
   }
