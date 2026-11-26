@@ -26,7 +26,6 @@ import {
 } from 'firebase/firestore';
 
 // 4. Tus otros archivos (Componentes y Páginas)
-// Las páginas pesadas se cargan bajo demanda para aligerar el arranque.
 const GestionAlumnosPage = React.lazy(() => import('./components/GestionAlumnosPage'));
 const PlaneadorClasesPage = React.lazy(() => import('./components/PlaneadorClasesPage'));
 const MapaPage = React.lazy(() => import('./components/MapaPage'));
@@ -40,9 +39,7 @@ const RutasAprendizajePage = React.lazy(() => import('./components/RutasAprendiz
 const TimerPage = React.lazy(() => import('./components/TimerPage'));
 const PanelMaestro = React.lazy(() => import('./components/PanelMaestro'));
 
-import { DB_INSTRUCCIONALES } from './data/instruccionales';
-import LoginPage from './components/LoginPage';
-import HubPage from './components/HubPage';
+import LoginPage from './components/LoginPage';import HubPage from './components/HubPage';
 import InstalacionModal from './components/InstalacionModal';
 import { getAdjacentVideo } from './utils/videoHelpers';
 import { obtenerTecnica } from './data/vaultIndex';
