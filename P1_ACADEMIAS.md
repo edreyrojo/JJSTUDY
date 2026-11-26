@@ -136,17 +136,32 @@ La pestaña MARCAS incluye un reproductor embebido:
 - Botones **-5s / -1s / +1s / +5s** para ajustar fino.
 - Al tocar una marca existente, el video salta a ese momento.
 
-Drive bloquea la reproducción directa entre dominios
-(`Cross-Origin-Resource-Policy: same-site`), por eso se agregó
-`api/drive.js` en Vercel: un proxy de solo lectura con soporte de `Range`
-que sirve el video desde el mismo dominio de la app. Si el proxy falla, el
-panel cae automáticamente al visor oficial de Drive dentro de un iframe y
-permite escribir el tiempo a mano.
+### Reproductor nativo y búsqueda exacta
 
-El proxy solo se usa en la vista de admin y responde en trozos de 4 MB para
-no mantener funciones abiertas. Si el ancho de banda de Vercel se vuelve un
-problema, se puede desactivar `import.meta.env.PROD` en el componente y el
-panel seguirá funcionando con el visor de Drive.
+Drive bloquea el `<video>` directo con `Cross-Origin-Resource-Policy: same-site`,
+así que se usa la **Google Drive API v3** con una clave pública restringida:
+
+```
+https://www.googleapis.com/drive/v3/files/{id}?alt=media&key=...
+```
+
+- La clave solo permite `drive.googleapis.com` y solo responde a los
+  referrers de `jjstudy.vercel.app` y `localhost`.
+- No da acceso a archivos privados: únicamente reproduce archivos que ya son
+  públicos en el Vault.
+- Soporta `Range`, por lo que el navegador puede buscar, pausar y saltar a un
+  segundo exacto.
+- La lógica está en `src/utils/driveVideo.js`. Para rotar la clave se define
+  `VITE_DRIVE_API_KEY` en Vercel.
+- Si el video no es público o la clave falla, tanto el admin como el Modo
+  Estudio caen automáticamente al visor oficial de Drive en un iframe.
+
+Validación de duración:
+
+- El admin muestra la duración real del video.
+- No permite guardar una marca posterior al final del video.
+- Las marcas viejas que quedaron fuera de rango se muestran en rojo en el
+  panel y se ocultan en Modo Estudio para no saltar al final por error.
 
 ## 9. Siguiente endurecimiento (opcional)
 

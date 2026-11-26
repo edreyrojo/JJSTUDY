@@ -129,6 +129,11 @@ const MarcasVideoAdminPage = () => {
     [marcas, videoSelId]
   );
 
+  const marcasFueraDeRango = useMemo(() => {
+    if (!modoNativo || duracionVideo <= 0) return [];
+    return marcasVideo.filter((marca) => Number(marca.segundos) > duracionVideo + 1);
+  }, [marcasVideo, modoNativo, duracionVideo]);
+
   const limpiarForm = () => {
     setForm({ tiempo: '', titulo: '', descripcion: '' });
     setEditandoId(null);
@@ -244,6 +249,31 @@ const MarcasVideoAdminPage = () => {
       titulo: marca.titulo || '',
       descripcion: marca.descripcion || ''
     });
+  };
+
+  const limpiarFueraDeRango = async () => {
+    if (!marcasFueraDeRango.length) return;
+    const res = await Swal.fire({
+      title: '¿Eliminar marcas fuera del video?',
+      text: `${marcasFueraDeRango.length} marca(s) superan la duración de ${formatearTiempo(duracionVideo)}. No funcionarán en este video.`,
+      icon: 'warning',
+      showCancelButton: true,
+      background: '#0a0a0a',
+      color: '#fff',
+      confirmButtonColor: '#ff6b6b',
+      cancelButtonColor: '#333',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+    if (!res.isConfirmed) return;
+    try {
+      await Promise.all(
+        marcasFueraDeRango.map((marca) => deleteDoc(doc(db, 'marcasVideo', marca.id)))
+      );
+      notify(`${marcasFueraDeRango.length} marca(s) eliminada(s)`);
+    } catch (error) {
+      notify(`No se pudieron eliminar: ${error.message}`, 'error');
+    }
   };
 
   const eliminar = async (marca) => {
@@ -434,7 +464,14 @@ const MarcasVideoAdminPage = () => {
               <section style={m.panel}>
                 <div style={m.panelHead}>
                   <h4 style={m.panelTitle}><VaultIcon name="pin" size={14} /> Marcas de este video</h4>
-                  <span style={m.panelMeta}>{marcasVideo.length}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <span style={m.panelMeta}>{marcasVideo.length}</span>
+                    {marcasFueraDeRango.length > 0 && (
+                      <button type="button" onClick={limpiarFueraDeRango} style={m.dangerBtn}>
+                        <VaultIcon name="trash" size={11} /> LIMPIAR FUERA DE RANGO ({marcasFueraDeRango.length})
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {marcasVideo.length === 0 && (
                   <p style={m.empty}>Aún no hay marcas globales para este video.</p>
@@ -593,6 +630,7 @@ const m = {
   markerActions: { display: 'flex', gap: '4px', flexShrink: 0 },
   iconBtn: { background: '#111', border: '1px solid #2a2a2a', color: '#d4af37', borderRadius: '5px', padding: '6px', display: 'flex', cursor: 'pointer' },
   iconBtnDanger: { background: 'rgba(255,107,107,0.06)', border: '1px solid rgba(255,107,107,0.3)', color: '#ff6b6b', borderRadius: '5px', padding: '6px', display: 'flex', cursor: 'pointer' },
+  dangerBtn: { display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255,107,107,0.08)', border: '1px solid rgba(255,107,107,0.35)', color: '#ff6b6b', borderRadius: '5px', padding: '5px 7px', fontSize: '0.55rem', fontWeight: 700, cursor: 'pointer' },
   formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px' },
   field: { display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0 },
   nudgeRow: { display: 'flex', gap: '3px', marginTop: '3px' },
