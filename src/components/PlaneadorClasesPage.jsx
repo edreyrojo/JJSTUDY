@@ -132,7 +132,6 @@ const PlaneadorClasesPage = ({ onBack, usuario }) => {
     const userName = usuario?.nombre || 'Instructor';
     const dojoNombre = usuario?.academiaNombre || usuario?.nombreSede || '';
     const esAdmin = usuario?.rol === 'admin';
-    const esInstructor = usuario?.rol === 'instructor';
 
     // --- DATOS ---
     const [clasesEquipo, setClasesEquipo] = useState([]);
@@ -230,13 +229,17 @@ const PlaneadorClasesPage = ({ onBack, usuario }) => {
 
     const esMiClase = Boolean(
         claseActual &&
-        claseActual.teamId === teamId &&
-        (!esInstructor || !claseActual.sedeId || claseActual.sedeId === usuario?.sedeId)
+        (esAdmin || (
+            claseActual.teamId === teamId &&
+            claseActual.sedeId === usuario?.sedeId
+        ))
     );
     const puedeEditarClase = Boolean(
         claseActual &&
-        (claseActual.teamId === teamId || esAdmin) &&
-        (!esInstructor || !claseActual.sedeId || claseActual.sedeId === usuario?.sedeId)
+        (esAdmin || (
+            claseActual.teamId === teamId &&
+            claseActual.sedeId === usuario?.sedeId
+        ))
     );
     const bloqueTimer = timerBloqueIdx !== null ? claseActual?.bloques?.[timerBloqueIdx] || null : null;
     const timerActivo = timerFase !== 'idle';
@@ -290,46 +293,60 @@ const PlaneadorClasesPage = ({ onBack, usuario }) => {
         setCargando(true);
         setErrorDatos('');
 
-        const qEquipo = query(collection(db, 'clases'), where('teamId', '==', teamId), limit(150));
-        const unsubEquipo = onSnapshot(
-            qEquipo,
-            (snap) => {
-                setClasesEquipo(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-                setCargando(false);
-            },
-            (error) => {
-                console.error('Error al cargar clases del dojo:', error);
-                setErrorDatos('No se pudieron cargar las clases de tu dojo.');
-                setCargando(false);
-            }
-        );
-
-        const qGlobal = query(collection(db, 'clases'), where('visibilidad', '==', 'global'), limit(40));
-        const unsubGlobal = onSnapshot(
-            qGlobal,
-            (snap) => {
-                setClasesGlobales(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-                setErrorGlobal(false);
-            },
-            (error) => {
-                console.warn('Biblioteca global no disponible:', error?.code || error);
-                setClasesGlobales([]);
-                setErrorGlobal(true);
-            }
-        );
-
-        const esInstructor = usuario?.rol === 'instructor';
-        const qAlumnos = esInstructor
-            ? query(
-                collection(db, 'alumnos'),
-                where('teamId', '==', teamId),
-                where('sedeId', '==', usuario?.sedeId || '')
+        const qEquipo = esAdmin
+            ? query(collection(db, 'clases'), where('teamId', '==', teamId), limit(150))
+            : usuario?.sedeId
+                ? query(
+                    collection(db, 'clases'),
+                    where('teamId', '==', teamId),
+                    where('sedeId', '==', usuario.sedeId),
+                    limit(150)
+                )
+                : null;
+        const unsubEquipo = qEquipo
+            ? onSnapshot(
+                qEquipo,
+                (snap) => {
+                    setClasesEquipo(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+                    setCargando(false);
+                },
+                (error) => {
+                    console.error('Error al cargar clases del dojo:', error);
+                    setErrorDatos('No se pudieron cargar las clases de tu sede.');
+                    setCargando(false);
+                }
             )
-            : query(collection(db, 'alumnos'), where('teamId', '==', teamId));
-        // Un instructor sin sede no debe ver alumnos "sueltos" de otras sedes.
-        const unsubAlumnos = (esInstructor && !usuario?.sedeId)
-            ? (() => { setAlumnos([]); return () => {}; })()
-            : onSnapshot(
+            : (() => { setClasesEquipo([]); setCargando(false); return () => {}; })();
+
+        const qGlobal = esAdmin
+            ? query(collection(db, 'clases'), where('visibilidad', '==', 'global'), limit(40))
+            : null;
+        const unsubGlobal = qGlobal
+            ? onSnapshot(
+                qGlobal,
+                (snap) => {
+                    setClasesGlobales(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+                    setErrorGlobal(false);
+                },
+                (error) => {
+                    console.warn('Biblioteca global no disponible:', error?.code || error);
+                    setClasesGlobales([]);
+                    setErrorGlobal(true);
+                }
+            )
+            : (() => { setClasesGlobales([]); return () => {}; })();
+
+        const qAlumnos = esAdmin
+            ? query(collection(db, 'alumnos'), where('teamId', '==', teamId))
+            : usuario?.sedeId
+                ? query(
+                    collection(db, 'alumnos'),
+                    where('teamId', '==', teamId),
+                    where('sedeId', '==', usuario.sedeId)
+                )
+                : null;
+        const unsubAlumnos = qAlumnos
+            ? onSnapshot(
                 qAlumnos,
                 (snap) => {
                     setAlumnos(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -337,14 +354,15 @@ const PlaneadorClasesPage = ({ onBack, usuario }) => {
                 (error) => {
                     console.error('Error al cargar alumnos:', error);
                 }
-            );
+            )
+            : (() => { setAlumnos([]); return () => {}; })();
 
         return () => {
             unsubEquipo();
             unsubGlobal();
             unsubAlumnos();
         };
-    }, [teamId, usuario?.rol, usuario?.sedeId]);
+    }, [teamId, esAdmin, usuario?.sedeId]);
 
     // --- ASISTENCIA: INICIALIZAR / MEZCLAR ALUMNOS ---
     useEffect(() => {
@@ -726,6 +744,9 @@ const PlaneadorClasesPage = ({ onBack, usuario }) => {
         if (guardando) return;
         if (!nuevaClase.titulo.trim()) return notify('Falta el título de la sesión', 'error');
         if (!teamId) return notify('Tu cuenta no tiene un dojo asignado.', 'error');
+        if (!esAdmin && !usuario?.sedeId) {
+            return notify('Tu cuenta no tiene una sede asignada. Pide al administrador que te asigne una.', 'error');
+        }
 
         setGuardando(true);
         try {
@@ -733,8 +754,8 @@ const PlaneadorClasesPage = ({ onBack, usuario }) => {
             const payload = {
                 titulo: nuevaClase.titulo.trim().slice(0, 80),
                 fecha: nuevaClase.fecha || fechaHoy(),
-                esPublica: Boolean(nuevaClase.esPublica),
-                visibilidad: nuevaClase.esPublica ? 'global' : 'dojo',
+                esPublica: false,
+                visibilidad: 'sede',
                 tipoClase: nuevaClase.tipoClase,
                 nivel: nuevaClase.nivel,
                 duracionObjetivo: Math.max(0, Number(nuevaClase.duracionObjetivo) || 0),
@@ -1061,8 +1082,7 @@ const PlaneadorClasesPage = ({ onBack, usuario }) => {
 
     const eliminarClase = async (clase) => {
         if (!clase) return;
-        const claseDeMiSede = !esInstructor || !clase.sedeId || clase.sedeId === usuario?.sedeId;
-        if (!(esAdmin || (clase.teamId === teamId && claseDeMiSede))) return;
+        if (!(esAdmin || (clase.teamId === teamId && clase.sedeId === usuario?.sedeId))) return;
         const res = await Swal.fire({
             title: '¿Eliminar esta clase?',
             text: 'Esta acción no se puede deshacer.',
@@ -1241,17 +1261,19 @@ const PlaneadorClasesPage = ({ onBack, usuario }) => {
                                     onClick={() => setTabBiblioteca('dojo')}
                                     style={tabBiblioteca === 'dojo' ? s.mainTabActive : s.mainTab}
                                 >
-                                    <VaultIcon name="users" size={14} /> MI DOJO
+                                    <VaultIcon name="users" size={14} /> MI SEDE
                                     <span style={s.tabCount}>{clasesDojo.length}</span>
                                 </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setTabBiblioteca('global')}
-                                    style={tabBiblioteca === 'global' ? s.mainTabActive : s.mainTab}
-                                >
-                                    <VaultIcon name="globe" size={14} /> GLOBAL
-                                    <span style={s.tabCount}>{clasesGlobalesVisibles.length}</span>
-                                </button>
+                                {esAdmin && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setTabBiblioteca('global')}
+                                        style={tabBiblioteca === 'global' ? s.mainTabActive : s.mainTab}
+                                    >
+                                        <VaultIcon name="globe" size={14} /> GLOBAL
+                                        <span style={s.tabCount}>{clasesGlobalesVisibles.length}</span>
+                                    </button>
+                                )}
                             </div>
                             <button type="button" onClick={() => iniciarEditor()} style={s.goldBtn}>
                                 <VaultIcon name="plus" size={15} /> NUEVA SESIÓN
@@ -1379,37 +1401,11 @@ const PlaneadorClasesPage = ({ onBack, usuario }) => {
 
                             <div style={s.visibilityBox}>
                                 <span style={s.fieldLabel}>VISIBILIDAD</span>
-                                <div style={s.visibilityOptions}>
-                                    <button
-                                        type="button"
-                                        onClick={() => actualizarCampo('esPublica', false)}
-                                        className="planner-visibility-option"
-                                        style={!nuevaClase.esPublica ? s.visibilityActive : s.visibilityOption}
-                                    >
-                                        <VaultIcon name="lock" size={16} color={!nuevaClase.esPublica ? '#000' : '#888'} />
-                                        <span>
-                                            <strong>MI DOJO</strong>
-                                            <small>Solo instructores de tu equipo.</small>
-                                        </span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => actualizarCampo('esPublica', true)}
-                                        className="planner-visibility-option"
-                                        style={nuevaClase.esPublica ? s.visibilityActive : s.visibilityOption}
-                                    >
-                                        <VaultIcon name="globe" size={16} color={nuevaClase.esPublica ? '#000' : '#888'} />
-                                        <span>
-                                            <strong>GLOBAL</strong>
-                                            <small>Visible para instructores de otros dojos.</small>
-                                        </span>
-                                    </button>
-                                </div>
-                                {nuevaClase.esPublica && (
-                                    <p style={s.visibilityNote}>
-                                        Otros instructores podrán ver la clase y dejar comentarios. No podrán editarla.
-                                    </p>
-                                )}
+                                <p style={s.visibilityNote}>
+                                    Las clases son privadas de tu sede. El contenido que se comparte
+                                    con toda la academia se publica desde Admin → Academias → Contenido
+                                    (instruccionales y rutas).
+                                </p>
                             </div>
                         </div>
 

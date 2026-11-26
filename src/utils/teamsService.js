@@ -292,10 +292,10 @@ export const buildAlumnosQuery = ({ rol, teamId, sedeId, soloArchivados = false 
         return null;
     }
 
-    const veTodoElTeam = ['propietario', 'profesor', 'admin'].includes(rol);
+    const veTodoElTeam = ['admin'].includes(rol);
     const colRef = collection(db, "alumnos");
 
-    // Propietarios, profesores y admins ven todo el equipo.
+    // Solo el admin ve todo el team. Profesores e instructores ven su sede.
     if (veTodoElTeam) {
         return query(
             colRef,
@@ -305,7 +305,7 @@ export const buildAlumnosQuery = ({ rol, teamId, sedeId, soloArchivados = false 
         );
     }
 
-    // Instructores ven solamente los alumnos de su sede.
+    // Sin sede no se muestra nada (evita filtrar alumnos de otras sedes).
     if (!cleanSedeId) {
         return query(colRef, where("teamId", "==", "nada_a_mostrar"));
     }

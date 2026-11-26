@@ -279,97 +279,77 @@ service cloud.firestore {
     }
 
     // 5. ALUMNOS
+    // Aislamiento estricto por SEDE:
     // - Admin: todo.
-    // - Profesor: todo su team.
-    // - Instructor: SOLO los alumnos de su sede.
+    // - Profesor e instructor: SOLO los alumnos de su propia sede.
+    //   El profesor de la sede madre NO ve los alumnos de sus sedes afiliadas.
     match /alumnos/{alumnoId} {
 
       allow read: if esValidado() && (
         esAdminTotal() ||
-        (getRol() == 'profesor' && esDeMiEquipo()) ||
-        (getRol() == 'instructor' &&
+        (getRol() in ['profesor', 'instructor'] &&
           resource.data.get('teamId', '') == getMiTeam() &&
           resource.data.get('sedeId', '') == getMiSede())
       );
 
       allow create: if esValidado() && (
         esAdminTotal() ||
-        (getRol() == 'profesor' &&
-          request.resource.data.get('teamId', '') == getMiTeam()) ||
-        (getRol() == 'instructor' &&
+        (getRol() in ['profesor', 'instructor'] &&
           request.resource.data.get('teamId', '') == getMiTeam() &&
           request.resource.data.get('sedeId', '') == getMiSede())
       );
 
       allow update: if esValidado() && (
         esAdminTotal() ||
-        (getRol() == 'profesor' &&
-          esDeMiEquipo() &&
-          request.resource.data.get('teamId', '') == getMiTeam()) ||
-        (getRol() == 'instructor' &&
-          esDeMiEquipo() &&
+        (getRol() in ['profesor', 'instructor'] &&
+          resource.data.get('teamId', '') == getMiTeam() &&
           resource.data.get('sedeId', '') == getMiSede() &&
+          request.resource.data.get('teamId', '') == getMiTeam() &&
           request.resource.data.get('sedeId', '') == getMiSede())
       );
 
       allow delete: if esValidado() && (
         esAdminTotal() ||
-        (getRol() == 'profesor' && esDeMiEquipo()) ||
-        (getRol() == 'instructor' &&
-          esDeMiEquipo() &&
+        (getRol() in ['profesor', 'instructor'] &&
+          resource.data.get('teamId', '') == getMiTeam() &&
           resource.data.get('sedeId', '') == getMiSede())
       );
     }
 
     // 6. CLASES / CONTENIDO
-    // Lectura: todo el team (la agenda no es secreta) + clases globales.
-    // Escritura: profesor en todo el team; instructor solo en su sede.
+    // Las clases son operativas y locales a la SEDE. Incluyen asistencia
+    // (nombres y notas de alumnos), por eso NO se comparten entre sedes.
+    // El contenido compartido se publica con rutas/instruccionales.
     match /clases/{claseId} {
       allow read: if isAuthenticated() && (
         esAdminTotal() ||
-        resource.data.get('teamId', '') == getMiTeam() ||
-        (
-          resource.data.get('visibilidad', '') == 'global' &&
-          esValidado() &&
-          getRol() in ['profesor', 'instructor']
-        )
+        (esValidado() &&
+          getRol() in ['profesor', 'instructor'] &&
+          resource.data.get('teamId', '') == getMiTeam() &&
+          resource.data.get('sedeId', '') == getMiSede())
       );
 
       allow create: if esValidado() && (
         esAdminTotal() ||
-        (getRol() == 'profesor' && request.resource.data.get('teamId', '') == getMiTeam()) ||
-        (getRol() == 'instructor' &&
+        (getRol() in ['profesor', 'instructor'] &&
           request.resource.data.get('teamId', '') == getMiTeam() &&
           request.resource.data.get('sedeId', '') == getMiSede())
       );
 
       allow update: if esValidado() && (
         esAdminTotal() ||
-        (
-          getRol() == 'profesor' &&
+        (getRol() in ['profesor', 'instructor'] &&
           resource.data.get('teamId', '') == getMiTeam() &&
-          request.resource.data.get('teamId', '') == getMiTeam()
-        ) ||
-        (
-          getRol() == 'instructor' &&
-          resource.data.get('teamId', '') == getMiTeam() &&
+          resource.data.get('sedeId', '') == getMiSede() &&
           request.resource.data.get('teamId', '') == getMiTeam() &&
-          request.resource.data.get('sedeId', '') == resource.data.get('sedeId', '') &&
-          (resource.data.get('sedeId', '') == getMiSede() || resource.data.get('sedeId', '') == '')
-        ) ||
-        (
-          resource.data.get('visibilidad', '') == 'global' &&
-          getRol() in ['profesor', 'instructor'] &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['comentarios', 'actualizadoEn'])
-        )
+          request.resource.data.get('sedeId', '') == getMiSede())
       );
 
       allow delete: if esValidado() && (
         esAdminTotal() ||
-        (getRol() == 'profesor' && resource.data.get('teamId', '') == getMiTeam()) ||
-        (getRol() == 'instructor' &&
+        (getRol() in ['profesor', 'instructor'] &&
           resource.data.get('teamId', '') == getMiTeam() &&
-          (resource.data.get('sedeId', '') == getMiSede() || resource.data.get('sedeId', '') == ''))
+          resource.data.get('sedeId', '') == getMiSede())
       );
     }
 
