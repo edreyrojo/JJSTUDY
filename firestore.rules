@@ -394,5 +394,12 @@ service cloud.firestore {
       allow read: if esValidado();
       allow write: if esAdminTotal();
     }
+
+    // Marcas de tiempo globales de instruccionales: las crea el admin y las
+    // ven todos los usuarios validados. Son independientes de las notas privadas.
+    match /marcasVideo/{marcaId} {
+      allow read: if esValidado();
+      allow write: if esAdminTotal();
+    }
   }
 }

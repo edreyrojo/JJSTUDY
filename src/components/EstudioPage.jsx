@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 // IMPORTANTE: Importaciones para Firestore
 import { db } from '../firebase';
-import { doc, setDoc, addDoc, collection } from 'firebase/firestore';
+import { doc, setDoc, addDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import { obtenerTecnica } from '../data/vaultIndex';
 import { tieneAccesoVideo, pedirAcceso } from '../utils/accesoVault';
 import { mensajeContenidoBloqueado } from '../i18n/translate';
@@ -14,6 +14,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
     const [timestamp, setTimestamp] = useState("");
     const [tiempoActivo, setTiempoActivo] = useState(video?.startTime || 0);
     const [nombreMarcador, setNombreMarcador] = useState("");
+    const [marcasGlobales, setMarcasGlobales] = useState([]);
     const [esMovil, setEsMovil] = useState(window.innerWidth < 768);
     const [esTablet, setEsTablet] = useState(() => {
         const ancho = window.innerWidth;
@@ -71,6 +72,29 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
         }
     }, [video, usuario]);
 
+    // Marcas de tiempo globales creadas por el administrador para este video.
+    useEffect(() => {
+        if (!video?.id) {
+            setMarcasGlobales([]);
+            return undefined;
+        }
+        const q = query(collection(db, 'marcasVideo'), where('videoId', '==', video.id));
+        const unsub = onSnapshot(
+            q,
+            (snap) => {
+                const lista = snap.docs
+                    .map((d) => ({ id: d.id, ...d.data() }))
+                    .sort((a, b) => Number(a.segundos) - Number(b.segundos));
+                setMarcasGlobales(lista);
+            },
+            (error) => {
+                console.error('No se pudieron cargar los marcadores globales:', error);
+                setMarcasGlobales([]);
+            }
+        );
+        return () => unsub();
+    }, [video?.id]);
+
     useEffect(() => {
         const handleResize = () => {
             const ancho = window.innerWidth;
@@ -116,6 +140,11 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
             setMostrarAlerta(true); 
             setTimeout(() => setMostrarAlerta(false), 2000);
         }
+    };
+
+    const saltarASegundos = (segundos) => {
+        const valor = Number(segundos);
+        if (Number.isFinite(valor) && valor >= 0) setTiempoActivo(Math.round(valor));
     };
 
     const saltarATiempo = (marcaTexto) => {
@@ -471,8 +500,37 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                     </div>
                 </div>
 
+                {/* MARCAS GLOBALES DEL ADMINISTRADOR */}
+                {marcasGlobales.length > 0 && (
+                    <div style={{ backgroundColor: '#111', padding: '12px', borderRadius: '8px', marginBottom: '14px', border: '1px solid rgba(212,175,55,0.35)' }}>
+                        <p style={{ fontSize: '0.62rem', color: '#d4af37', margin: '0 0 8px 0', letterSpacing: '1px', fontWeight: 'bold' }}>
+                            MARCADORES DEL PROFESOR:
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            {marcasGlobales.map((marca) => (
+                                <button
+                                    key={marca.id}
+                                    type="button"
+                                    onClick={() => saltarASegundos(marca.segundos)}
+                                    style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', textAlign: 'left', background: '#0a0a0a', border: '1px solid #2a2a2a', borderRadius: '7px', padding: '8px', cursor: 'pointer', color: '#ddd', width: '100%', boxSizing: 'border-box' }}
+                                >
+                                    <span style={{ flexShrink: 0, backgroundColor: '#d4af37', color: '#000', borderRadius: '4px', padding: '2px 6px', fontSize: '0.62rem', fontWeight: 'bold' }}>
+                                        {marca.tiempo || '00:00'}
+                                    </span>
+                                    <span style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                                        <strong style={{ fontSize: '0.75rem', color: '#eee' }}>{marca.titulo}</strong>
+                                        {marca.descripcion && (
+                                            <small style={{ fontSize: '0.65rem', color: '#888', lineHeight: 1.35 }}>{marca.descripcion}</small>
+                                        )}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {/* TRACKER DE MARCAS DINÁMICO */}
-                <p style={{ fontSize: '0.6rem', color: '#d4af37', opacity: 0.7, margin: '0 0 8px 4px', letterSpacing: '1px' }}>MARCADORES EN ESTE VIDEO:</p>
+                <p style={{ fontSize: '0.6rem', color: '#d4af37', opacity: 0.7, margin: '0 0 8px 4px', letterSpacing: '1px' }}>MIS MARCADORES EN ESTE VIDEO:</p>
                 <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '10px', marginBottom: '12px', scrollbarWidth: 'none' }}>
                     {(nota.match(/\[\d+:\d+\]\s*(?:-?\s*([^[\n]*))?/g) || []).map((marcaCompleta, i) => {
                         const tiempoMatch = marcaCompleta.match(/\[\d+:\d+\]/);

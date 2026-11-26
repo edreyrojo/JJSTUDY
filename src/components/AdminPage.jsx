@@ -5,6 +5,7 @@ import Swal from 'sweetalert2';
 import { DB_INSTRUCCIONALES } from '../data/instruccionales';
 import VaultIcon from './VaultIcon';
 import AcademiasAdminPage from './AcademiasAdminPage';
+import MarcasVideoAdminPage from './MarcasVideoAdminPage';
 import { sincronizarCodigosAcceso } from '../utils/teamsService';
 import { comprimirDataUrl } from '../utils/imageUtils';
 
@@ -394,6 +395,7 @@ const AdminPage = ({ onBack }) => {
     const tabs = [
         { id: 'usuarios', label: 'USUARIOS', icon: 'user', badge: usuariosPendientes },
         { id: 'estructuras', label: 'ESTRUCTURAS', icon: 'building', badge: 0 },
+        { id: 'marcas', label: 'MARCAS', icon: 'clock', badge: 0 },
         { id: 'anuncios', label: 'ANUNCIOS', icon: 'megaphone', badge: anuncios.length },
         { id: 'tickets', label: 'SOPORTE', icon: 'flag', badge: tickets.length },
         { id: 'mantenimiento', label: 'MANTENIMIENTO', icon: 'settings', badge: 0 }
@@ -566,6 +568,13 @@ const AdminPage = ({ onBack }) => {
                                     sedes={sedes}
                                     usuarios={usuarios}
                                 />
+                            </div>
+                        )}
+
+                        {/* MARCAS DE TIEMPO GLOBALES */}
+                        {tabActiva === 'marcas' && (
+                            <div style={s.viewSection}>
+                                <MarcasVideoAdminPage />
                             </div>
                         )}
 
