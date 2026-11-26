@@ -125,6 +125,29 @@ Al asignarlas, el botón **NORMALIZAR** alinea su team y sus datos.
 - Son independientes: el alumno puede seguir creando sus propias marcas sin
   modificar las globales.
 
+### Reproductor y captura exacta
+
+La pestaña MARCAS incluye un reproductor embebido:
+
+- El admin reproduce y pausa el instruccional dentro de la misma pantalla.
+- **CAPTURAR TIEMPO** toma el segundo exacto del reproductor y lo pone en el
+  campo TIEMPO.
+- **IR AL TIEMPO ESCRITO** salta a un minuto concreto para verificar.
+- Botones **-5s / -1s / +1s / +5s** para ajustar fino.
+- Al tocar una marca existente, el video salta a ese momento.
+
+Drive bloquea la reproducción directa entre dominios
+(`Cross-Origin-Resource-Policy: same-site`), por eso se agregó
+`api/drive.js` en Vercel: un proxy de solo lectura con soporte de `Range`
+que sirve el video desde el mismo dominio de la app. Si el proxy falla, el
+panel cae automáticamente al visor oficial de Drive dentro de un iframe y
+permite escribir el tiempo a mano.
+
+El proxy solo se usa en la vista de admin y responde en trozos de 4 MB para
+no mantener funciones abiertas. Si el ancho de banda de Vercel se vuelve un
+problema, se puede desactivar `import.meta.env.PROD` en el componente y el
+panel seguirá funcionando con el visor de Drive.
+
 ## 9. Siguiente endurecimiento (opcional)
 
 - Mover `clases.asistencia` a una subcolección privada
