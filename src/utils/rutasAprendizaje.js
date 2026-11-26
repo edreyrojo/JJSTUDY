@@ -341,10 +341,8 @@ export const coincideDestino = (asignacion, usuario) => {
         return Boolean(destino) && destino === uid;
     }
     if (tipo === 'sede' || tipo === 'dojo') {
-        if (!destino) return false;
-        if (destino === sedeId || destino === teamId) return true;
-        const teamSede = asignacion.destinoTeamId || '';
-        return Boolean(teamSede) && teamSede === teamId;
+        // Estricto: una ruta de sede solo se ve en esa sede, no en todo el team.
+        return Boolean(destino) && destino === sedeId;
     }
     if (tipo === 'academia' || tipo === 'team') {
         const academiaId = usuario.academiaId || '';

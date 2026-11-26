@@ -43,7 +43,7 @@ import LoginPage from './components/LoginPage';import HubPage from './components
 import InstalacionModal from './components/InstalacionModal';
 import { getAdjacentVideo } from './utils/videoHelpers';
 import { obtenerTecnica } from './data/vaultIndex';
-import { tieneAccesoVideo, tieneAccesoVideoDinamico, pedirAcceso, setAccesoDinamico, setCursosAcademia } from './utils/accesoVault';
+import { tieneAccesoVideo, tieneAccesoVideoDinamico, pedirAcceso, setAccesoDinamico, setCursosAcademia, setCursosSede } from './utils/accesoVault';
 import { adyacenteEnRuta, construirAccesoRutas, mapaVideos, rutasParaUsuario } from './utils/rutasAprendizaje';
 import { useI18n } from './i18n/context';
 import { mensajeContenidoBloqueado, mensajeVideoBloqueado } from './i18n/translate';
@@ -157,6 +157,7 @@ export default function App() {
   const { t } = useI18n();
   const [academiaData, setAcademiaData] = useState(null);
   const [academiaPerfil, setAcademiaPerfil] = useState(null);
+  const [sedePerfil, setSedePerfil] = useState(null);
   const [showInstalar, setShowInstalar] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [usuario, setUsuario] = React.useState(null);
@@ -270,6 +271,29 @@ export default function App() {
   React.useEffect(() => {
     setCursosAcademia(academiaPerfil?.cursos_liberados || []);
   }, [academiaPerfil]);
+
+  // Sede del usuario: cursos liberados solo para esta sede.
+  React.useEffect(() => {
+    const sedeId = usuario?.sedeId;
+    const valido = typeof sedeId === 'string'
+      && sedeId.trim() !== ''
+      && !sedeId.includes('/')
+      && !sedeId.startsWith('http');
+    if (!valido) {
+      setSedePerfil(null);
+      return undefined;
+    }
+    const unsub = onSnapshot(
+      doc(db, 'sedes', sedeId),
+      (snap) => setSedePerfil(snap.exists() ? { id: snap.id, ...snap.data() } : null),
+      () => setSedePerfil(null)
+    );
+    return () => unsub();
+  }, [usuario?.sedeId]);
+
+  React.useEffect(() => {
+    setCursosSede(sedePerfil?.cursos_liberados || []);
+  }, [sedePerfil]);
 
   // --- 2.c RUTAS, VIDEOS DINÁMICOS Y ASIGNACIONES ---
   // Una sola fuente de lectura para que mapa, búsqueda, Hub y reproductor

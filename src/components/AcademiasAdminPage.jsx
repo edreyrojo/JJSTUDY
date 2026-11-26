@@ -89,6 +89,7 @@ const AcademiasAdminPage = ({ academias = [], sedes = [], usuarios = [] }) => {
   const [formStaff, setFormStaff] = useState({ uid: '', rol: 'instructor', sedeId: '' });
   const [formAjustes, setFormAjustes] = useState({ nombre: '', ciudad: '', ownerUid: '', logoBase64: '' });
   const [busquedaCurso, setBusquedaCurso] = useState('');
+  const [contenidoDestino, setContenidoDestino] = useState('');
 
   const dialogRef = useDialogA11y(Boolean(modal), () => {
     if (!guardando) setModal(null);
@@ -188,6 +189,39 @@ const AcademiasAdminPage = ({ academias = [], sedes = [], usuarios = [] }) => {
         .map((asignacion) => asignacion.rutaId)
     );
   }, [asignaciones, academia, teamId]);
+
+  const sedeContenido = useMemo(
+    () => sedesDeAcademia.find((sede) => sede.id === contenidoDestino) || null,
+    [sedesDeAcademia, contenidoDestino]
+  );
+
+  const cursosScope = useMemo(() => new Set(
+    sedeContenido
+      ? (Array.isArray(sedeContenido.cursos_liberados) ? sedeContenido.cursos_liberados : [])
+      : (Array.isArray(academia?.cursos_liberados) ? academia.cursos_liberados : [])
+  ), [sedeContenido, academia]);
+
+  const rutasScope = useMemo(() => {
+    if (!academia) return new Set();
+    if (sedeContenido) {
+      return new Set(
+        asignaciones
+          .filter((asignacion) => asignacion.destinoTipo === 'sede' && asignacion.destinoId === sedeContenido.id)
+          .map((asignacion) => asignacion.rutaId)
+      );
+    }
+    return rutasLiberadas;
+  }, [asignaciones, academia, sedeContenido, rutasLiberadas]);
+
+  useEffect(() => {
+    if (contenidoDestino && !sedesDeAcademia.some((sede) => sede.id === contenidoDestino)) {
+      setContenidoDestino('');
+    }
+  }, [sedesDeAcademia, contenidoDestino]);
+
+  useEffect(() => {
+    setContenidoDestino('');
+  }, [academia?.id]);
 
   const busquedaCursos = useMemo(() => {
     const texto = busquedaCurso.trim().toLowerCase();
@@ -465,11 +499,18 @@ const AcademiasAdminPage = ({ academias = [], sedes = [], usuarios = [] }) => {
 
   const toggleCurso = async (cursoId) => {
     if (!academia) return;
-    const actuales = new Set(academia.cursos_liberados || []);
+    const actuales = new Set(
+      sedeContenido
+        ? (sedeContenido.cursos_liberados || [])
+        : (academia.cursos_liberados || [])
+    );
     if (actuales.has(cursoId)) actuales.delete(cursoId);
     else actuales.add(cursoId);
     try {
-      await updateDoc(doc(db, 'academias', academia.id), {
+      const ref = sedeContenido
+        ? doc(db, 'sedes', sedeContenido.id)
+        : doc(db, 'academias', academia.id);
+      await updateDoc(ref, {
         cursos_liberados: [...actuales],
         ultimaActualizacion: hoyIso()
       });
@@ -481,28 +522,33 @@ const AcademiasAdminPage = ({ academias = [], sedes = [], usuarios = [] }) => {
   const toggleRuta = async (ruta) => {
     if (!academia) return;
     const team = teamDeAcademia(academia);
+    const destinoTipo = sedeContenido ? 'sede' : 'academia';
+    const destinoId = sedeContenido ? sedeContenido.id : academia.id;
+    const destinoNombre = sedeContenido
+      ? (sedeContenido.nombreSede || sedeContenido.nombre || 'Sede')
+      : nombreAcademia(academia);
     const existente = asignaciones.find((asignacion) => (
       asignacion.rutaId === ruta.id &&
-      asignacion.destinoTipo === 'academia' &&
-      (asignacion.destinoId === academia.id || (team && asignacion.destinoTeamId === team))
+      asignacion.destinoTipo === destinoTipo &&
+      asignacion.destinoId === destinoId
     ));
     try {
       if (existente) {
         await deleteDoc(doc(db, 'asignacionesRuta', existente.id));
-        notify(`Ruta retirada de ${nombreAcademia(academia)}`);
+        notify(`Ruta retirada de ${destinoNombre}`);
       } else {
         await addDoc(collection(db, 'asignacionesRuta'), {
           rutaId: ruta.id,
           rutaNombre: ruta.nombre || 'Ruta',
-          destinoTipo: 'academia',
-          destinoId: academia.id,
+          destinoTipo,
+          destinoId,
           destinoTeamId: team,
-          destinoNombre: nombreAcademia(academia),
+          destinoNombre,
           estado: 'activa',
           asignadaPor: auth.currentUser?.uid || '',
           asignadaEn: hoyIso()
         });
-        notify(`Ruta liberada a ${nombreAcademia(academia)}`);
+        notify(`Ruta liberada a ${destinoNombre}`);
       }
     } catch (error) {
       notify(`No se pudo actualizar la ruta: ${error.message}`, 'error');
@@ -1020,11 +1066,33 @@ const AcademiasAdminPage = ({ academias = [], sedes = [], usuarios = [] }) => {
               )}
 
               {tab === 'contenido' && (
-                <div style={a.contentGrid}>
+                <div style={a.stack}>
+                  <div style={a.scopeBox}>
+                    <span style={a.fieldLabel}>APLICAR CONTENIDO A</span>
+                    <select
+                      value={contenidoDestino}
+                      onChange={(event) => setContenidoDestino(event.target.value)}
+                      style={a.input}
+                    >
+                      <option value="">Toda la academia ({sedesVisibles.length} sedes)</option>
+                      {sedesVisibles.map((sede) => (
+                        <option key={sede.id} value={sede.id}>
+                          Solo {sede.nombreSede || sede.nombre}
+                        </option>
+                      ))}
+                    </select>
+                    <p style={a.helpText}>
+                      {sedeContenido
+                        ? `Lo que marques aquí se verá solo en ${sedeContenido.nombreSede || sedeContenido.nombre}.`
+                        : `Lo que marques aquí se hereda a las ${sedesVisibles.length} sedes de ${nombreAcademia(academia)}.`}
+                    </p>
+                  </div>
+
+                  <div style={a.contentGrid}>
                   <section style={a.panel}>
                     <div style={a.panelHead}>
                       <h4 style={a.panelTitle}><VaultIcon name="bookOpen" size={15} /> Instruccionales</h4>
-                      <span style={a.panelMeta}>{cursosLiberados.size} liberados</span>
+                      <span style={a.panelMeta}>{cursosScope.size} liberados</span>
                     </div>
                     <div style={a.searchBoxSmall}>
                       <VaultIcon name="search" size={13} color="#777" />
@@ -1041,7 +1109,7 @@ const AcademiasAdminPage = ({ academias = [], sedes = [], usuarios = [] }) => {
                         <label key={curso.id} style={a.checkRow}>
                           <input
                             type="checkbox"
-                            checked={cursosLiberados.has(curso.id)}
+                            checked={cursosScope.has(curso.id)}
                             onChange={() => toggleCurso(curso.id)}
                           />
                           <span style={a.checkText}>
@@ -1056,10 +1124,12 @@ const AcademiasAdminPage = ({ academias = [], sedes = [], usuarios = [] }) => {
                   <section style={a.panel}>
                     <div style={a.panelHead}>
                       <h4 style={a.panelTitle}><VaultIcon name="route" size={15} /> Rutas de aprendizaje</h4>
-                      <span style={a.panelMeta}>{rutasLiberadas.size} liberadas</span>
+                      <span style={a.panelMeta}>{rutasScope.size} liberadas</span>
                     </div>
                     <p style={a.helpText}>
-                      Una ruta liberada aquí se hereda a las {sedesVisibles.length} sedes de la academia.
+                      {sedeContenido
+                        ? `Solo el staff y alumnos de ${sedeContenido.nombreSede || sedeContenido.nombre} verán estas rutas.`
+                        : `Se heredan a las ${sedesVisibles.length} sedes de la academia.`}
                     </p>
                     <div style={a.checkList}>
                       {rutas.length === 0 && <div style={a.empty}>Aún no hay rutas creadas.</div>}
@@ -1067,7 +1137,7 @@ const AcademiasAdminPage = ({ academias = [], sedes = [], usuarios = [] }) => {
                         <label key={ruta.id} style={a.checkRow}>
                           <input
                             type="checkbox"
-                            checked={rutasLiberadas.has(ruta.id)}
+                            checked={rutasScope.has(ruta.id)}
                             onChange={() => toggleRuta(ruta)}
                           />
                           <span style={a.checkText}>
@@ -1078,6 +1148,7 @@ const AcademiasAdminPage = ({ academias = [], sedes = [], usuarios = [] }) => {
                       ))}
                     </div>
                   </section>
+                  </div>
                 </div>
               )}
             </>
@@ -1313,6 +1384,7 @@ const a = {
   staffName: { color: '#fff', fontSize: '0.78rem' },
   staffMeta: { margin: '2px 0 0', color: '#777', fontSize: '0.6rem', textTransform: 'capitalize' },
   contentGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '10px', alignItems: 'start' },
+  scopeBox: { background: '#090909', border: '1px solid rgba(212,175,55,0.25)', borderRadius: '9px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '5px' },
   checkList: { display: 'flex', flexDirection: 'column', gap: '3px', maxHeight: '420px', overflowY: 'auto', paddingRight: '4px' },
   checkRow: { display: 'flex', alignItems: 'flex-start', gap: '8px', background: '#0d0d0d', border: '1px solid #1b1b1b', borderRadius: '6px', padding: '7px 8px', cursor: 'pointer' },
   checkText: { display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 },

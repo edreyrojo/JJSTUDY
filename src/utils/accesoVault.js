@@ -16,6 +16,7 @@ import { mensajeSolicitudAcceso } from '../i18n/translate';
 
 let ACCESO_DINAMICO = { ids: new Set(), cursos: new Set() };
 let CURSOS_ACADEMIA = new Set();
+let CURSOS_SEDE = new Set();
 
 /**
  * Cursos del Vault liberados a la academia (sede madre) del usuario.
@@ -25,7 +26,15 @@ export const setCursosAcademia = (cursos = []) => {
   CURSOS_ACADEMIA = new Set((Array.isArray(cursos) ? cursos : []).map((curso) => String(curso)));
 };
 
+/**
+ * Cursos liberados solo a la sede del usuario (excepción local).
+ */
+export const setCursosSede = (cursos = []) => {
+  CURSOS_SEDE = new Set((Array.isArray(cursos) ? cursos : []).map((curso) => String(curso)));
+};
+
 export const cursosAcademiaActual = () => CURSOS_ACADEMIA;
+export const cursosSedeActual = () => CURSOS_SEDE;
 
 /**
  * App registra aquí el paquete de acceso de las rutas liberadas para que
@@ -45,8 +54,9 @@ export const tieneAccesoVideo = (usuario, tecnica, acceso) => {
   if (!usuario || !tecnica) return false;
   if (usuario.rol === 'admin') return true;
 
-  // Cursos liberados a toda la academia (sede madre).
+  // Cursos liberados a toda la academia o solo a esta sede.
   if (CURSOS_ACADEMIA.has(String(tecnica.cursoId))) return true;
+  if (CURSOS_SEDE.has(String(tecnica.cursoId))) return true;
 
   const extra = acceso || ACCESO_DINAMICO;
   if (extra?.ids?.has?.(tecnica.id)) return true;
