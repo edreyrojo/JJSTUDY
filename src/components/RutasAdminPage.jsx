@@ -12,6 +12,7 @@ import {
     where
 } from 'firebase/firestore';
 import Swal from 'sweetalert2';
+import VaultIcon from './VaultIcon';
 import { useDialogA11y } from '../hooks/useDialogA11y';
 import { CURSOS, buscarTecnicas, tecnicasDeCurso, obtenerCurso } from '../data/vaultIndex';
 import {
