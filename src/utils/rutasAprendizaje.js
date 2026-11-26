@@ -347,7 +347,9 @@ export const coincideDestino = (asignacion, usuario) => {
         return Boolean(teamSede) && teamSede === teamId;
     }
     if (tipo === 'academia' || tipo === 'team') {
-        return Boolean(destino) && destino === teamId;
+        const academiaId = usuario.academiaId || '';
+        return (Boolean(destino) && (destino === academiaId || destino === teamId)) ||
+            (Boolean(asignacion.destinoTeamId) && asignacion.destinoTeamId === teamId);
     }
     return false;
 };

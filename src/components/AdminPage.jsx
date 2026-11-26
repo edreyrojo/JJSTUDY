@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, getDocs, getDoc, doc, deleteDoc, deleteField, addDoc, writeBatch, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, getDocs, doc, deleteDoc, deleteField, addDoc, writeBatch, updateDoc } from 'firebase/firestore';
 import Swal from 'sweetalert2';
 import { DB_INSTRUCCIONALES } from '../data/instruccionales';
 import VaultIcon from './VaultIcon';
+import AcademiasAdminPage from './AcademiasAdminPage';
 import { sincronizarCodigosAcceso } from '../utils/teamsService';
-import { comprimirImagen, comprimirDataUrl } from '../utils/imageUtils';
+import { comprimirDataUrl } from '../utils/imageUtils';
 
 const notify = (mensaje, tipo = 'success') => {
     Swal.fire({
@@ -41,18 +42,7 @@ const AdminPage = ({ onBack }) => {
     const [mensajeAnuncio, setMensajeAnuncio] = useState('');
     const [enviandoAnuncio, setEnviandoAnuncio] = useState(false);
 
-    const [nombreAcademia, setNombreAcademia] = useState('');
-    const [creandoAcademia, setCreandoAcademia] = useState(false);
-    const [logoAcademiaBase64, setLogoAcademiaBase64] = useState('');
-
-    const [nombreSede, setNombreSede] = useState('');
-    const [academiaSeleccionada, setAcademiaSeleccionada] = useState('');
-    const [teamIdProfesor, setTeamIdProfesor] = useState('');
-    const [creandoSede, setCreandoSede] = useState(false);
     const [comprimiendoLogos, setComprimiendoLogos] = useState(false);
-
-    const [academiasAbiertas, setAcademiasAbiertas] = useState({});
-    const toggleAcademia = (id) => setAcademiasAbiertas(prev => ({ ...prev, [id]: !prev[id] }));
 
     const instruccionalesPorAutor = useMemo(() => {
         const autores = {};
@@ -148,61 +138,6 @@ const AdminPage = ({ onBack }) => {
         ];
     }, [usuarios, academias, sedes, tickets]);
 
-    const handleAsignarPersonal = async (uidUsuario, nuevoRol, idSede, idAcademia) => {
-        if (!uidUsuario) return;
-        try {
-            const userRef = doc(db, 'usuarios', uidUsuario);
-            await setDoc(userRef, {
-                rol: nuevoRol,
-                sedeId: idSede || idAcademia,
-                teamId: idSede || idAcademia,
-                academiaId: idAcademia
-            }, { merge: true });
-            notify(`Asignado como ${nuevoRol.toUpperCase()}`);
-        } catch (error) {
-            notify('No se pudo asignar el personal: ' + error.message, 'error');
-        }
-    };
-
-    const generarCodigoSedeMadre = async (idSede, nombreAca) => {
-        try {
-            const prefijo = (nombreAca || 'DOJO').slice(0, 4).toUpperCase().replace(/[^A-Z]/g, 'X');
-            const rand = Math.floor(100000 + Math.random() * 900000);
-            const nuevoCodigo = `${prefijo}-MADRE${rand}`;
-            const sedeRef = doc(db, 'sedes', idSede);
-            const sedeSnap = await getDoc(sedeRef);
-            const teamIdSede = sedeSnap.exists()
-                ? (sedeSnap.data().teamId || sedeSnap.data().academiaId || idSede)
-                : idSede;
-
-            await setDoc(sedeRef, {
-                codigoAcceso: nuevoCodigo,
-                nombreSede: nombreAca || 'Sede Madre Principal',
-                ciudad: 'Sede Central'
-            }, { merge: true });
-
-            // Mapeo privado código → sede para que las reglas validen la vinculación.
-            await setDoc(doc(db, 'codigosAcceso', nuevoCodigo), {
-                sedeId: idSede,
-                teamId: teamIdSede,
-                nombreSede: nombreAca || 'Sede Madre Principal',
-                actualizadoEn: new Date().toISOString()
-            }, { merge: true });
-
-            Swal.fire({
-                title: 'Código generado',
-                html: `<strong style="color:#d4af37;font-size:1.2rem">${nuevoCodigo}</strong>`,
-                icon: 'success',
-                iconColor: '#d4af37',
-                background: '#0a0a0a',
-                color: '#fff',
-                confirmButtonColor: '#d4af37'
-            });
-        } catch (err) {
-            notify(err.message, 'error');
-        }
-    };
-
     const copiarTexto = async (texto, mensajeExito = 'Copiado al portapapeles') => {
         try {
             await navigator.clipboard.writeText(texto);
@@ -210,24 +145,6 @@ const AdminPage = ({ onBack }) => {
         } catch (error) {
             console.error('No se pudo copiar:', error);
             notify('No se pudo copiar. Revisa los permisos del navegador.', 'error');
-        }
-    };
-
-    const handleLogoAcademiaChange = async (e) => {
-        const file = e.target.files?.[0];
-        e.target.value = '';
-        if (!file) return;
-        try {
-            // Comprimimos el logo: el base64 sin comprimir rebasa el límite
-            // de 1 MB del documento de Firestore.
-            const base64 = await comprimirImagen(file, {
-                maxDimension: 600,
-                quality: 0.76,
-                maxBytes: 380000
-            });
-            setLogoAcademiaBase64(base64);
-        } catch (error) {
-            Swal.fire('Error', error?.message || 'No se pudo procesar el logo.', 'error');
         }
     };
 
@@ -296,63 +213,6 @@ const AdminPage = ({ onBack }) => {
             notify('Ticket resuelto');
         } catch (error) {
             notify('No se pudo resolver: ' + error.message, 'error');
-        }
-    };
-
-    const handleCrearAcademia = async (e) => {
-        e.preventDefault();
-        if (!nombreAcademia.trim()) return notify('Ingresa un nombre válido', 'error');
-        setCreandoAcademia(true);
-        try {
-            const nombreLimpio = nombreAcademia.trim().toUpperCase();
-            await addDoc(collection(db, 'academias'), {
-                nombre: nombreLimpio,
-                nombreAcademia: nombreLimpio,
-                horarios: [],
-                logoBase64: logoAcademiaBase64,
-                programas: ['BJJ Adultos', 'BJJ Kids', 'No-Gi'],
-                sede: '',
-                fechaCreacion: new Date().toLocaleString(),
-                ultimaActualizacion: new Date().toISOString(),
-                timestamp: Date.now()
-            });
-            notify(`Academia "${nombreLimpio}" registrada`);
-            setNombreAcademia('');
-            setLogoAcademiaBase64('');
-        } catch {
-            notify('Error al crear la academia', 'error');
-        } finally {
-            setCreandoAcademia(false);
-        }
-    };
-
-    const handleCrearSede = async (e) => {
-        e.preventDefault();
-        if (!nombreSede.trim() || !academiaSeleccionada || !teamIdProfesor.trim()) {
-            return notify('Completa todos los campos', 'error');
-        }
-        const academiaMadre = academias.find(a => a.id === academiaSeleccionada);
-        setCreandoSede(true);
-        try {
-            const sedeRef = doc(collection(db, 'sedes'));
-            await setDoc(sedeRef, {
-                id: sedeRef.id,
-                nombre: nombreSede.trim(),
-                nombreSede: nombreSede.trim(),
-                academiaId: academiaSeleccionada,
-                academiaNombre: academiaMadre?.nombreAcademia || academiaMadre?.nombre || 'Desconocida',
-                teamId: teamIdProfesor.trim(),
-                fechaCreacion: new Date().toISOString(),
-                activa: true,
-                tipo: 'sede_afiliada'
-            });
-            notify('Sede vinculada correctamente');
-            setNombreSede('');
-            setTeamIdProfesor('');
-        } catch (error) {
-            notify(`Error al vincular: ${error.message}`, 'error');
-        } finally {
-            setCreandoSede(false);
         }
     };
 
@@ -698,209 +558,14 @@ const AdminPage = ({ onBack }) => {
                             </div>
                         )}
 
-                        {/* ESTRUCTURAS */}
+                        {/* ACADEMIAS Y SEDES */}
                         {tabActiva === 'estructuras' && (
                             <div style={s.viewSection}>
-                                <div style={s.panelBox}>
-                                    <div style={s.panelHeader}>
-                                        <h2 style={s.panelTitle}><VaultIcon name="tree" size={18} /> Árbol organizacional</h2>
-                                        <span style={s.panelMeta}>{academias.length} academias · {sedes.length} sedes</span>
-                                    </div>
-
-                                    {academias.length === 0 && (
-                                        <div style={s.emptyState}>
-                                            <VaultIcon name="building" size={34} color="#d4af37" />
-                                            <p style={s.emptyTitle}>Aún no hay academias</p>
-                                            <p style={s.emptyText}>Crea la primera academia con el formulario de abajo.</p>
-                                        </div>
-                                    )}
-
-                                    {academias.map(aca => {
-                                        const logoAca = aca.logoBase64 || aca.logobase64;
-                                        const nombreAca = aca.nombreAcademia || aca.nombre || 'Academia';
-                                        const estaAbierto = !!academiasAbiertas[aca.id];
-                                        const profesMadre = usuarios.filter(u => u.academiaId === aca.id && u.rol === 'profesor' && u.sedeId === aca.id);
-                                        const instsMadre = usuarios.filter(u => u.academiaId === aca.id && u.rol === 'instructor' && u.sedeId === aca.id);
-                                        const sedesAfiliadas = sedes.filter(se => se.academiaId === aca.id && se.id !== aca.id);
-
-                                        return (
-                                            <div key={aca.id} style={s.treeCard}>
-                                                <button type="button" onClick={() => toggleAcademia(aca.id)} style={s.treeHeader}>
-                                                    <span style={s.treeIdentity}>
-                                                        {logoAca ? (
-                                                            <img src={logoAca} alt="logo" style={s.treeLogo} />
-                                                        ) : (
-                                                            <span style={s.treeIcon}><VaultIcon name="building" size={18} /></span>
-                                                        )}
-                                                        <span>
-                                                            <span style={s.treeName}>{nombreAca}</span>
-                                                            <span style={s.treeMeta}>{sedesAfiliadas.length} {sedesAfiliadas.length === 1 ? 'sede' : 'sedes'} · {profesMadre.length + instsMadre.length} staff</span>
-                                                        </span>
-                                                    </span>
-                                                    <span style={s.treeChevron}>
-                                                        <VaultIcon name={estaAbierto ? 'chevronUp' : 'chevronDown'} size={16} />
-                                                    </span>
-                                                </button>
-
-                                                {estaAbierto && (
-                                                    <div style={s.treeBody}>
-                                                        <div style={s.sedeMadreCard}>
-                                                            <div style={s.sedeMadreHeader}>
-                                                                <h4 style={s.sedeTitle}><VaultIcon name="home" size={14} /> Sede madre</h4>
-                                                                <button type="button" onClick={() => generarCodigoSedeMadre(aca.id, nombreAca)} style={s.btnGhostSmall}>
-                                                                    <VaultIcon name="lock" size={12} /> Generar código
-                                                                </button>
-                                                            </div>
-
-                                                            <p style={s.miniLabel}>PROFESORES</p>
-                                                            {profesMadre.map(p => (
-                                                                <div key={p.id} style={s.itemPersonal}>
-                                                                    <span style={s.itemName}>{p.nombre || p.email}</span>
-                                                                    <button type="button" onClick={() => handleAsignarPersonal(p.id, 'alumno', '', aca.id)} style={s.btnTextDelete}>Remover</button>
-                                                                </div>
-                                                            ))}
-                                                            <select
-                                                                style={s.formInputSmall}
-                                                                onChange={(e) => {
-                                                                    if (e.target.value) handleAsignarPersonal(e.target.value, 'profesor', aca.id, aca.id);
-                                                                    e.target.value = '';
-                                                                }}
-                                                            >
-                                                                <option value="">+ Asignar profesor...</option>
-                                                                {usuarios.map(u => <option key={u.id} value={u.id}>{u.nombre || u.email}</option>)}
-                                                            </select>
-
-                                                            <p style={s.miniLabel}>INSTRUCTORES</p>
-                                                            {instsMadre.map(i => (
-                                                                <div key={i.id} style={s.itemPersonal}>
-                                                                    <span style={s.itemName}>{i.nombre || i.email}</span>
-                                                                    <button type="button" onClick={() => handleAsignarPersonal(i.id, 'alumno', '', aca.id)} style={s.btnTextDelete}>Remover</button>
-                                                                </div>
-                                                            ))}
-                                                            <select
-                                                                style={s.formInputSmall}
-                                                                onChange={(e) => {
-                                                                    if (e.target.value) handleAsignarPersonal(e.target.value, 'instructor', aca.id, aca.id);
-                                                                    e.target.value = '';
-                                                                }}
-                                                            >
-                                                                <option value="">+ Asignar instructor...</option>
-                                                                {usuarios.map(u => <option key={u.id} value={u.id}>{u.nombre || u.email}</option>)}
-                                                            </select>
-                                                        </div>
-
-                                                        <div style={s.sedesHeader}>
-                                                            <span><VaultIcon name="pin" size={13} /> Sedes afiliadas ({sedesAfiliadas.length})</span>
-                                                        </div>
-
-                                                        {sedesAfiliadas.length === 0 && (
-                                                            <p style={s.emptyInline}>Esta academia aún no tiene sedes afiliadas.</p>
-                                                        )}
-
-                                                        {sedesAfiliadas.map(se => {
-                                                            const personalSede = usuarios.filter(u => u.sedeId === se.id && (u.rol === 'instructor' || u.rol === 'profesor'));
-                                                            return (
-                                                                <div key={se.id} style={s.affiliatedSedeCard}>
-                                                                    <div style={s.affiliatedSedeHeader}>
-                                                                        <div>
-                                                                            <div style={s.sedeName}>{se.nombreSede || se.nombre}</div>
-                                                                            <div style={s.sedeMeta}>{se.ciudad || 'Sin ciudad'} {se.codigoAcceso ? `· ${se.codigoAcceso}` : ''}</div>
-                                                                        </div>
-                                                                        {se.codigoAcceso && (
-                                                                            <button type="button" onClick={() => copiarTexto(se.codigoAcceso, 'Código copiado')} style={s.btnGhostSmall} title="Copiar código">
-                                                                                <VaultIcon name="copy" size={12} /> Copiar código
-                                                                            </button>
-                                                                        )}
-                                                                    </div>
-
-                                                                    {personalSede.length > 0 ? (
-                                                                        <div style={s.staffList}>
-                                                                            {personalSede.map(u => (
-                                                                                <div key={u.id} style={s.itemPersonal}>
-                                                                                    <span style={s.itemName}>{u.nombre || u.email} <small style={s.itemRole}>({u.rol})</small></span>
-                                                                                    <button type="button" onClick={() => handleAsignarPersonal(u.id, 'alumno', '', aca.id)} style={s.btnTextDelete}>Remover</button>
-                                                                                </div>
-                                                                            ))}
-                                                                        </div>
-                                                                    ) : (
-                                                                        <p style={s.emptyInline}>Sin personal asignado.</p>
-                                                                    )}
-
-                                                                    <select
-                                                                        style={s.formInputSmall}
-                                                                        onChange={(e) => {
-                                                                            const usr = usuarios.find(u => u.id === e.target.value);
-                                                                            if (e.target.value) handleAsignarPersonal(e.target.value, usr?.rol || 'instructor', se.id, aca.id);
-                                                                            e.target.value = '';
-                                                                        }}
-                                                                    >
-                                                                        <option value="">+ Asignar rol a esta sede...</option>
-                                                                        {usuarios.filter(u => u.rol === 'instructor' || u.rol === 'profesor').map(u => (
-                                                                            <option key={u.id} value={u.id}>{u.nombre || u.email} ({u.rol})</option>
-                                                                        ))}
-                                                                    </select>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-
-                                <div style={s.structureGrid}>
-                                    <div style={s.panelBox}>
-                                        <h3 style={s.panelTitleSmall}><VaultIcon name="building" size={16} /> Nueva academia</h3>
-                                        <form onSubmit={handleCrearAcademia}>
-                                            <input style={s.formInput} value={nombreAcademia} onChange={(e) => setNombreAcademia(e.target.value)} placeholder="Nombre de la academia" />
-                                            {logoAcademiaBase64 && (
-                                                <div style={s.logoPreview}>
-                                                    <img src={logoAcademiaBase64} alt="Logo de academia" style={s.logoPreviewImg} />
-                                                    <button type="button" onClick={() => setLogoAcademiaBase64('')} style={s.btnTextDelete}>Quitar</button>
-                                                </div>
-                                            )}
-                                            <label style={s.fileUploadBtn}>
-                                                <VaultIcon name="folder" size={14} /> Subir logo
-                                                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoAcademiaChange} />
-                                            </label>
-                                            <button type="submit" disabled={creandoAcademia} className="admin-btn" style={s.btnGoldAction}>
-                                                {creandoAcademia ? 'REGISTRANDO...' : 'REGISTRAR ACADEMIA'}
-                                            </button>
-                                        </form>
-
-                                        <h4 style={s.listTitle}>Academias ({academias.length})</h4>
-                                        <div style={s.listContainer}>
-                                            {academias.map(ac => (
-                                                <div key={ac.id} style={s.listItem}>
-                                                    <span style={s.listItemName}><VaultIcon name="building" size={14} /> {ac.nombreAcademia || ac.nombre}</span>
-                                                    <button type="button" onClick={() => handleAction(ac.id, 'academias', 'delete')} style={s.btnTextDelete}>Eliminar</button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div style={s.panelBox}>
-                                        <h3 style={s.panelTitleSmall}><VaultIcon name="pin" size={16} /> Vincular sede</h3>
-                                        <form onSubmit={handleCrearSede}>
-                                            <input style={s.formInput} value={nombreSede} onChange={(e) => setNombreSede(e.target.value)} placeholder="Nombre de la sede" />
-                                            <select style={s.formInput} value={academiaSeleccionada} onChange={(e) => setAcademiaSeleccionada(e.target.value)}>
-                                                <option value="">Academia madre</option>
-                                                {academias.map(ac => <option key={ac.id} value={ac.id}>{ac.nombreAcademia || ac.nombre}</option>)}
-                                            </select>
-                                            <select style={s.formInput} value={teamIdProfesor} onChange={(e) => setTeamIdProfesor(e.target.value)}>
-                                                <option value="">Profesor asignado</option>
-                                                {usuarios.filter(u => u.rol === 'profesor' || u.rol === 'admin').map(u => (
-                                                    <option key={u.id} value={u.id}>{u.nombre || u.email}</option>
-                                                ))}
-                                            </select>
-                                            <button type="submit" disabled={creandoSede} className="admin-btn" style={s.btnGoldAction}>
-                                                {creandoSede ? 'ENLAZANDO...' : 'VINCULAR SEDE'}
-                                            </button>
-                                        </form>
-                                        <p style={s.helperText}>El profesor seleccionado será el contacto de la sede para el onboarding.</p>
-                                    </div>
-                                </div>
+                                <AcademiasAdminPage
+                                    academias={academias}
+                                    sedes={sedes}
+                                    usuarios={usuarios}
+                                />
                             </div>
                         )}
 

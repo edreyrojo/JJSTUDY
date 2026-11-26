@@ -39,7 +39,6 @@ const HubPage = ({
     const esTablet = ancho >= 768 && ancho < 1100;
     const esStaff = ['admin', 'profesor', 'instructor'].includes(userRole);
     const esAdmin = userRole === 'admin';
-    const esMaestro = ['admin', 'profesor'].includes(userRole);
 
     const coloresCinturon = {
         'Blanco': '#FFFFFF', 'Azul': '#2196F3', 'Morado': '#9C27B0',
@@ -708,7 +707,7 @@ const HubPage = ({
                 <button type="button" className="hub-action" onClick={() => setShowTutoriales(true)}>
                     <VaultIcon name="tutorial" size={14} /> TUTORIALES
                 </button>
-                {esMaestro && (
+                {esAdmin && (
                     <button type="button" className="hub-action" onClick={() => onNavigate('panel_maestro')} title="Panel Maestro">
                         <VaultIcon name="dashboard" size={14} /> PANEL MAESTRO
                     </button>

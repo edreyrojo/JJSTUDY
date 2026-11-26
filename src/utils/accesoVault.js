@@ -15,6 +15,17 @@ import { esVideoGratis } from '../data/vaultIndex';
 import { mensajeSolicitudAcceso } from '../i18n/translate';
 
 let ACCESO_DINAMICO = { ids: new Set(), cursos: new Set() };
+let CURSOS_ACADEMIA = new Set();
+
+/**
+ * Cursos del Vault liberados a la academia (sede madre) del usuario.
+ * Se aplican a todas las sedes de esa academia.
+ */
+export const setCursosAcademia = (cursos = []) => {
+  CURSOS_ACADEMIA = new Set((Array.isArray(cursos) ? cursos : []).map((curso) => String(curso)));
+};
+
+export const cursosAcademiaActual = () => CURSOS_ACADEMIA;
 
 /**
  * App registra aquí el paquete de acceso de las rutas liberadas para que
@@ -33,6 +44,9 @@ export const accesoDinamicoActual = () => ACCESO_DINAMICO;
 export const tieneAccesoVideo = (usuario, tecnica, acceso) => {
   if (!usuario || !tecnica) return false;
   if (usuario.rol === 'admin') return true;
+
+  // Cursos liberados a toda la academia (sede madre).
+  if (CURSOS_ACADEMIA.has(String(tecnica.cursoId))) return true;
 
   const extra = acceso || ACCESO_DINAMICO;
   if (extra?.ids?.has?.(tecnica.id)) return true;
