@@ -55,31 +55,31 @@ Además:
 - `aria-label` en los buscadores principales.
 - Objetivos táctiles de iconos subidos a 32–34 px en Gestión y Rutas.
 
-## 3. Router con historial
+## 3. Navegación sin URL
 
-Sin dependencias nuevas. Rutas por hash:
+Se probó un router por hash y se retiró por decisión de producto: mostrar
+`#/mapa`, `#/alumnos`, etc. expone la estructura interna y facilita que alguien
+busque rutas específicas.
 
-```
-/#/hub
-/#/mapa
-/#/estudio
-/#/notas_hub
-/#/busqueda
-/#/rutas_aprendizaje
-/#/rutas_admin
-/#/alumnos
-/#/planeador
-/#/mi_cuenta
-/#/timer
-/#/panel_maestro
-/#/admin
-```
+Ahora:
 
-- Funcionan **atrás/adelante** del navegador y de Android.
-- Los enlaces directos cargan la página si el usuario tiene sesión y validación.
-- Al recargar en `#/estudio`, se recupera el último video de `localStorage`.
-- `login` y `espera` no se escriben en la URL.
-- No requiere rewrites en Vercel porque todo vive después del `#`.
+- La navegación vuelve a ser **estado interno** (`page`), sin cambiar la URL.
+- Cualquier hash heredado (`#/mapa`, etc.) se limpia al arrancar con
+  `history.replaceState`.
+- No se agregan entradas al historial del navegador.
+- El botón atrás del navegador vuelve al comportamiento normal.
+- Se conserva la navegación interna entre Hub, Mapa, Estudio, Dojo, Planeador,
+  Timer, Admin, etc.
+
+## 3.b Recuperación tras deploy
+
+- El `ErrorBoundary` detecta errores de chunk viejo
+  (`Failed to fetch dynamically imported module`, `Importing a module script failed`,
+  `ChunkLoadError`, etc.).
+- En ese caso **recarga una vez automáticamente** para tomar la versión nueva.
+- Si el error persiste, muestra una pantalla simple con **RECARGAR** y
+  **VOLVER AL INICIO** (sin sugerir borrar datos locales).
+- El detalle técnico queda oculto en un desplegable.
 
 ## 4. Service Worker / offline
 
@@ -106,8 +106,8 @@ git push origin main   # Vercel despliega
 Después del deploy:
 
 - [ ] Abrir la app y recargar una vez para registrar el service worker.
+- [ ] Comprobar que la URL permanece limpia (sin `#/...`) al navegar.
 - [ ] Activar modo avión y comprobar que el shell abre.
 - [ ] Registrar un pago atrasado y usar “PONER AL DÍA”.
 - [ ] Verificar que un pago futuro está bloqueado.
 - [ ] Probar Escape/Tab en el modal de pago y en el expediente.
-- [ ] Navegar con atrás/adelante y recargar en `#/mapa`, `#/alumnos`, etc.

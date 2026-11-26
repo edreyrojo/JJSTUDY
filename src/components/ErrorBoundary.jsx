@@ -2,8 +2,7 @@ import React from 'react';
 
 /**
  * Evita la pantalla negra cuando un componente lanza un error inesperado.
- * Muestra una salida clara y permite recargar o limpiar solo datos locales
- * de la app (no toca la sesión de Firebase).
+ * Si es un chunk viejo tras un deploy, recarga una vez automáticamente.
  */
 export default class ErrorBoundary extends React.Component {
     constructor(props) {
@@ -17,18 +16,25 @@ export default class ErrorBoundary extends React.Component {
 
     componentDidCatch(error, info) {
         console.error('ErrorBoundary:', error, info);
-    }
 
-    limpiarDatosLocales = () => {
-        try {
-            Object.keys(localStorage)
-                .filter((clave) => clave.startsWith('lafortuna_'))
-                .forEach((clave) => localStorage.removeItem(clave));
-        } catch {
-            /* almacenamiento no disponible */
+        // Tras un deploy es normal que un chunk viejo ya no exista. En lugar
+        // de mostrar una pantalla de error, recargamos una vez para tomar
+        // la versión nueva. El flag evita bucles de recarga.
+        const mensaje = String(error?.message || error || '');
+        const errorDeCarga = /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|ChunkLoadError|Loading chunk \d+ failed/i.test(mensaje);
+        if (errorDeCarga) {
+            try {
+                const CLAVE = 'lafortuna_reload_chunk';
+                const ultimo = Number(sessionStorage.getItem(CLAVE) || 0);
+                if (Date.now() - ultimo > 20000) {
+                    sessionStorage.setItem(CLAVE, String(Date.now()));
+                    window.location.reload();
+                }
+            } catch {
+                /* sin sessionStorage */
+            }
         }
-        window.location.reload();
-    };
+    }
 
     render() {
         if (!this.state.error) return this.props.children;
@@ -48,11 +54,11 @@ export default class ErrorBoundary extends React.Component {
                 boxSizing: 'border-box'
             }}>
                 <h1 style={{ color: '#d4af37', letterSpacing: '2px', margin: 0 }}>
-                    ALGO SALIÓ MAL
+                    NO SE PUDO CARGAR
                 </h1>
                 <p style={{ color: '#bbb', maxWidth: '460px', lineHeight: 1.6, margin: 0 }}>
-                    La aplicación encontró un error inesperado. Puedes recargar para continuar.
-                    Si el problema sigue, limpia los datos locales de La Fortuna.
+                    Revisa tu conexión y recarga. Si el problema continúa, cierra la app
+                    y vuelve a abrirla.
                 </p>
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
                     <button
@@ -72,7 +78,7 @@ export default class ErrorBoundary extends React.Component {
                     </button>
                     <button
                         type="button"
-                        onClick={this.limpiarDatosLocales}
+                        onClick={() => { window.location.href = '/'; }}
                         style={{
                             padding: '11px 18px',
                             borderRadius: '8px',
@@ -82,18 +88,21 @@ export default class ErrorBoundary extends React.Component {
                             cursor: 'pointer'
                         }}
                     >
-                        LIMPIAR DATOS LOCALES
+                        VOLVER AL INICIO
                     </button>
                 </div>
-                <pre style={{
-                    maxWidth: '100%',
-                    overflow: 'auto',
-                    color: '#555',
-                    fontSize: '0.65rem',
-                    textAlign: 'left'
-                }}>
-                    {String(this.state.error?.message || this.state.error || '')}
-                </pre>
+                <details style={{ maxWidth: '100%', color: '#666', fontSize: '0.7rem' }}>
+                    <summary style={{ cursor: 'pointer' }}>Detalle técnico</summary>
+                    <pre style={{
+                        maxWidth: '100%',
+                        overflow: 'auto',
+                        color: '#666',
+                        fontSize: '0.65rem',
+                        textAlign: 'left'
+                    }}>
+                        {String(this.state.error?.message || this.state.error || '')}
+                    </pre>
+                </details>
             </div>
         );
     }

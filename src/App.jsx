@@ -111,18 +111,6 @@ const leerGuardadoLocal = (clave, porDefecto) => {
   }
 };
 
-// Router mínimo por hash: no requiere react-router ni rewrites del servidor.
-const PAGINAS = new Set([
-  'hub', 'mapa', 'estudio', 'notas_hub', 'busqueda', 'rutas_aprendizaje',
-  'rutas_admin', 'alumnos', 'planeador', 'mi_cuenta', 'timer',
-  'panel_maestro', 'admin'
-]);
-
-const leerPaginaHash = () => {
-  const hash = String(window.location.hash || '').replace(/^#\/?/, '').trim();
-  return PAGINAS.has(hash) ? hash : null;
-};
-
 // --- 1. CONFIGURACIÓN DE ESTILOS ---
 const styles = {
   containerCenter: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 'var(--app-vh)' },
@@ -172,7 +160,7 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [usuario, setUsuario] = React.useState(null);
   const [cargando, setCargando] = React.useState(true);
-  const [page, setPage] = useState(() => leerPaginaHash() || 'login');
+  const [page, setPage] = useState('login');
   const [sedeGestionSel, setSedeGestionSel] = useState(null);
   const [userRole, setUserRole] = useState('usuario');
   const [categoriaSel, setCategoriaSel] = useState('AUTORES');
@@ -291,32 +279,16 @@ export default function App() {
 
   // --- 3. FUNCIONES DE LÓGICA ---
 
-  // Navegación de usuario: actualiza estado y URL (hash) para que funcionen
-  // el botón atrás del navegador/Android y los enlaces directos.
+  // Navegación interna: SIN cambiar la URL. La app no expone rutas/hashes.
   const navegar = React.useCallback((destino) => {
-    if (!destino) return;
-    if (!PAGINAS.has(destino)) {
-      setPage(destino);
-      return;
-    }
-    setPage(destino);
-    const hash = `#/${destino}`;
-    if (window.location.hash !== hash) {
-      window.location.hash = hash;
-    }
+    if (destino) setPage(destino);
   }, []);
 
+  // Limpia cualquier hash heredado de versiones anteriores (p. ej. #/mapa).
   React.useEffect(() => {
-    const aplicarHash = () => {
-      const destino = leerPaginaHash();
-      if (destino) setPage(destino);
-    };
-    window.addEventListener('hashchange', aplicarHash);
-    window.addEventListener('popstate', aplicarHash);
-    return () => {
-      window.removeEventListener('hashchange', aplicarHash);
-      window.removeEventListener('popstate', aplicarHash);
-    };
+    if (window.location.hash) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
   }, []);
 
   const manejarNavegacion = React.useCallback((p) => {
@@ -327,19 +299,6 @@ export default function App() {
       navegar(p);
     }
   }, [navegar]);
-
-  // Mantiene la URL sincronizada sin llenar el historial en transiciones de auth.
-  React.useEffect(() => {
-    if (page === 'login' || page === 'espera') {
-      if (window.location.hash) {
-        window.history.replaceState(null, '', window.location.pathname + window.location.search);
-      }
-      return;
-    }
-    if (PAGINAS.has(page) && window.location.hash !== `#/${page}`) {
-      window.history.replaceState(null, '', `#/${page}`);
-    }
-  }, [page]);
 
   const handleLogout = async () => {
     try {
