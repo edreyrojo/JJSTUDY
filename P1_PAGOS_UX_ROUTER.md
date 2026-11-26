@@ -81,6 +81,19 @@ Ahora:
   **VOLVER AL INICIO** (sin sugerir borrar datos locales).
 - El detalle técnico queda oculto en un desplegable.
 
+## 3.c Corrección del error de DOJO
+
+- El error de “no se pudo cargar” al entrar a DOJO **no era de datos ni de
+  seguridad**: al añadir el hook de accesibilidad se reemplazó por accidente
+  `import VaultIcon from './VaultIcon'` en `GestionAlumnosPage` (y en
+  `RutasAdminPage`). Eso producía `ReferenceError: VaultIcon is not defined`.
+- Se restauraron ambos imports.
+- Verificado en producción con una cuenta admin temporal: DOJO cargó los
+  alumnos, pagos y configuración sin errores de consola. La cuenta temporal se
+  eliminó al terminar.
+- Se añadió `react/jsx-no-undef` al lint para que un componente usado sin
+  importar falle en `npm run lint` y no llegue a producción.
+
 ## 4. Service Worker / offline
 
 Archivo: `public/sw.js`, registrado solo en producción desde `src/main.jsx`.
