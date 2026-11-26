@@ -26,30 +26,32 @@ import {
 } from 'firebase/firestore';
 
 // 4. Tus otros archivos (Componentes y Páginas)
-import GestionAlumnosPage from './components/GestionAlumnosPage';
-import PlaneadorClasesPage from './components/PlaneadorClasesPage';
+// Las páginas pesadas se cargan bajo demanda para aligerar el arranque.
+const GestionAlumnosPage = React.lazy(() => import('./components/GestionAlumnosPage'));
+const PlaneadorClasesPage = React.lazy(() => import('./components/PlaneadorClasesPage'));
+const MapaPage = React.lazy(() => import('./components/MapaPage'));
+const MiCuenta = React.lazy(() => import('./components/MiCuenta'));
+const NotasHubPage = React.lazy(() => import('./components/NotasHubPage'));
+const EstudioPage = React.lazy(() => import('./components/EstudioPage'));
+const AdminPage = React.lazy(() => import('./components/AdminPage'));
+const BusquedaPage = React.lazy(() => import('./components/BusquedaPage'));
+const RutasAdminPage = React.lazy(() => import('./components/RutasAdminPage'));
+const RutasAprendizajePage = React.lazy(() => import('./components/RutasAprendizajePage'));
+const TimerPage = React.lazy(() => import('./components/TimerPage'));
+const PanelMaestro = React.lazy(() => import('./components/PanelMaestro'));
+
 import { DB_INSTRUCCIONALES } from './data/instruccionales';
-import MapaPage from './components/MapaPage';
-import MiCuenta from './components/MiCuenta';
-import NotasHubPage from './components/NotasHubPage';
-import EstudioPage from './components/EstudioPage';
-import AdminPage from './components/AdminPage';
-import BusquedaPage from './components/BusquedaPage';
 import LoginPage from './components/LoginPage';
 import HubPage from './components/HubPage';
 import InstalacionModal from './components/InstalacionModal';
-import RutasAdminPage from './components/RutasAdminPage';
-import RutasAprendizajePage from './components/RutasAprendizajePage';
 import { getAdjacentVideo } from './utils/videoHelpers';
 import { obtenerTecnica } from './data/vaultIndex';
 import { tieneAccesoVideo, tieneAccesoVideoDinamico, pedirAcceso, setAccesoDinamico } from './utils/accesoVault';
 import { adyacenteEnRuta, construirAccesoRutas, mapaVideos, rutasParaUsuario } from './utils/rutasAprendizaje';
 import { useI18n } from './i18n/context';
 import { mensajeContenidoBloqueado, mensajeVideoBloqueado } from './i18n/translate';
-import TimerPage from './components/TimerPage';
 
 // --- NUEVOS COMPONENTES INTEGRADOS ---
-import PanelMaestro from './components/PanelMaestro';
 import OnboardingModal from './components/OnboardingModal';
 
 import Swal from 'sweetalert2';
@@ -124,6 +126,33 @@ const styles = {
   grid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', maxWidth: '600px', margin: '0 auto' },
   hubBtn: { padding: '40px 20px', backgroundColor: '#111', border: '1px solid #333', color: '#fff', fontSize: '1.1rem', cursor: 'pointer', borderRadius: '8px', transition: '0.3s' },
 };
+
+// Fallback mientras se descarga una página bajo demanda.
+const CargandoPagina = () => (
+  <div style={{
+    minHeight: '60vh',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '16px',
+    backgroundColor: '#0a0a0a',
+    color: '#d4af37'
+  }}>
+    <style>{`
+      .spinner-mini {
+        width: 38px; height: 38px;
+        border: 3px solid #1a1a1a;
+        border-top: 3px solid #d4af37;
+        border-radius: 50%;
+        animation: spin 0.9s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    `}</style>
+    <div className="spinner-mini" />
+    <span style={{ fontSize: '0.7rem', letterSpacing: '3px' }}>CARGANDO...</span>
+  </div>
+);
 
 // --- 4. COMPONENTE PRINCIPAL (EXPORT DEFAULT) ---//
 export default function App() {
@@ -850,7 +879,9 @@ export default function App() {
       `}</style>
 
       <div className="page-transition" key={page}>
-        {getContent()}
+        <React.Suspense fallback={<CargandoPagina />}>
+          {getContent()}
+        </React.Suspense>
       </div>
     </div>
   );
