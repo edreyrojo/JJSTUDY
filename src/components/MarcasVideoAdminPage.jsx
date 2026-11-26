@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { db, auth } from '../firebase';
 import {
   collection,
@@ -54,6 +54,9 @@ const MarcasVideoAdminPage = () => {
   const [editandoId, setEditandoId] = useState(null);
   const [guardando, setGuardando] = useState(false);
   const [previewStart, setPreviewStart] = useState(0);
+  const [tiempoActual, setTiempoActual] = useState(0);
+  const [videoError, setVideoError] = useState(false);
+  const videoRef = useRef(null);
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -100,9 +103,21 @@ const MarcasVideoAdminPage = () => {
     ? `https://www.youtube.com/embed/${videoSel.id}?rel=0&modestbranding=1&playsinline=1${previewStart > 0 ? `&start=${previewStart}` : ''}`
     : '';
   const previewSrc = esYoutube ? youtubeSrc : drivePreview;
+  // En producción usamos un proxy propio para tener reproductor nativo y poder
+  // capturar el segundo exacto. En desarrollo no existe /api, así que usamos
+  // el visor de Drive.
+  const proxySrc = videoSel ? `/api/drive?id=${encodeURIComponent(videoSel.id)}` : '';
+  const puedeProxy = Boolean(import.meta.env.PROD);
 
   useEffect(() => {
     setPreviewStart(0);
+    setTiempoActual(0);
+    setVideoError(false);
+    const player = videoRef.current;
+    if (player) {
+      try { player.pause(); } catch { /* sin video cargado */ }
+      try { player.currentTime = 0; } catch { /* sin video cargado */ }
+    }
   }, [videoSelId]);
 
   const marcasVideo = useMemo(
@@ -117,10 +132,34 @@ const MarcasVideoAdminPage = () => {
     setEditandoId(null);
   };
 
+  const modoNativo = !esYoutube && puedeProxy && !videoError;
+
   const verEnVideo = (segundos) => {
     const valor = Number(segundos);
     if (!Number.isFinite(valor) || valor < 0) return;
+    const player = videoRef.current;
+    if (modoNativo && player) {
+      try {
+        player.currentTime = valor;
+        setTiempoActual(valor);
+      } catch (error) {
+        console.error('No se pudo mover el video:', error);
+        setPreviewStart(Math.floor(valor));
+      }
+      return;
+    }
     setPreviewStart(Math.floor(valor));
+  };
+
+  const capturarTiempo = () => {
+    const player = videoRef.current;
+    if (!player || !Number.isFinite(player.currentTime)) {
+      return notify('Reproduce el video y pausa en el momento que quieras marcar.', 'error');
+    }
+    const segundos = Math.floor(player.currentTime);
+    setForm((prev) => ({ ...prev, tiempo: formatearTiempo(segundos) }));
+    setTiempoActual(segundos);
+    notify(`Tiempo capturado: ${formatearTiempo(segundos)}`);
   };
 
   const usarTiempoEscrito = () => {
@@ -288,34 +327,74 @@ const MarcasVideoAdminPage = () => {
               </div>
 
               <div style={m.playerBox}>
-                <iframe
-                  key={`${videoSel.id}-${previewStart}`}
-                  src={previewSrc}
-                  title={videoSel.nombre}
-                  style={m.playerFrame}
-                  allow="autoplay; encrypted-media; picture-in-picture"
-                  allowFullScreen
-                />
+                {modoNativo ? (
+                  <video
+                    ref={videoRef}
+                    src={proxySrc}
+                    poster={`https://drive.google.com/thumbnail?id=${videoSel.id}&sz=w1000`}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    style={m.videoEl}
+                    onTimeUpdate={(event) => setTiempoActual(event.currentTarget.currentTime)}
+                    onSeeked={(event) => setTiempoActual(event.currentTarget.currentTime)}
+                    onLoadedMetadata={(event) => setTiempoActual(event.currentTarget.currentTime)}
+                    onError={() => setVideoError(true)}
+                  >
+                    Tu navegador no puede reproducir este video.
+                  </video>
+                ) : (
+                  <iframe
+                    key={`${videoSel.id}-${previewStart}`}
+                    src={previewSrc}
+                    title={videoSel.nombre}
+                    style={m.playerFrame}
+                    allow="autoplay; encrypted-media; picture-in-picture"
+                    allowFullScreen
+                  />
+                )}
 
                 <div style={m.playerBar}>
                   <span style={m.playerClock}>
                     <VaultIcon name="clock" size={12} />
-                    REPRODUCTOR: <strong>{videoSel.nombre}</strong>
+                    {modoNativo ? (
+                      <>EN REPRODUCTOR: <strong>{formatearTiempo(tiempoActual)}</strong></>
+                    ) : (
+                      <>REPRODUCTOR: <strong>{videoSel.nombre}</strong></>
+                    )}
                   </span>
                   <div style={m.playerActions}>
-                    <button type="button" onClick={() => setPreviewStart(0)} style={m.secondaryBtn}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (modoNativo) {
+                          verEnVideo(0);
+                          try { videoRef.current?.pause(); } catch { /* sin video */ }
+                        } else {
+                          setPreviewStart(0);
+                        }
+                      }}
+                      style={m.secondaryBtn}
+                    >
                       REINICIAR
                     </button>
-                    <button type="button" onClick={usarTiempoEscrito} style={m.goldBtn}>
-                      <VaultIcon name="pin" size={13} /> IR AL TIEMPO ESCRITO
+                    <button type="button" onClick={usarTiempoEscrito} style={m.secondaryBtn}>
+                      IR AL TIEMPO ESCRITO
                     </button>
+                    {modoNativo && (
+                      <button type="button" onClick={capturarTiempo} style={m.goldBtn}>
+                        <VaultIcon name="pin" size={13} /> CAPTURAR TIEMPO
+                      </button>
+                    )}
                   </div>
                 </div>
 
                 <p style={m.playerNote}>
-                  Reproduce el video y pausa en el momento exacto. Mira el tiempo que muestra
-                  el reproductor, escríbelo abajo y pulsa <strong>IR AL TIEMPO ESCRITO</strong> para
-                  confirmarlo. {esYoutube ? 'En YouTube también puedes copiar el minuto actual.' : ''}
+                  {modoNativo
+                    ? 'Reproduce, pausa en el momento exacto y pulsa CAPTURAR TIEMPO. También puedes ajustar con -5s / +5s.'
+                    : esYoutube
+                      ? 'Pausa el video, escribe el minuto en TIEMPO y pulsa IR AL TIEMPO ESCRITO para confirmarlo.'
+                      : 'Pausa el video en Drive, mira el tiempo que muestra el reproductor y escríbelo abajo. Usa IR AL TIEMPO ESCRITO para confirmar.'}
                 </p>
               </div>
 
@@ -448,6 +527,7 @@ const m = {
   videoBadge: { position: 'absolute', top: '6px', right: '6px', background: '#d4af37', color: '#000', borderRadius: '50%', width: '17px', height: '17px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.56rem', fontWeight: 800 },
   videoHead: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap', background: '#0a0a0a', border: '1px solid #222', borderRadius: '10px', padding: '12px' },
   playerBox: { background: '#0a0a0a', border: '1px solid #222', borderRadius: '10px', overflow: 'hidden', display: 'flex', flexDirection: 'column' },
+  videoEl: { width: '100%', aspectRatio: '16 / 9', maxHeight: '440px', background: '#000', display: 'block' },
   playerFrame: { width: '100%', aspectRatio: '16 / 9', maxHeight: '440px', border: 'none', background: '#000', display: 'block' },
   playerBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap', padding: '9px 11px', borderTop: '1px solid #1c1c1c' },
   playerClock: { display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#999', fontSize: '0.64rem', fontWeight: 700, letterSpacing: '0.4px' },
