@@ -506,7 +506,7 @@ const DetalleRuta = ({ ruta, videosPorId, vistos, esMovil, onVolver, onAbrirLecc
 /* ------------------------------------------------------------------ */
 const s = {
     root: {
-        minHeight: '100vh', width: '100%', backgroundColor: '#000', color: '#fff', boxSizing: 'border-box',
+        minHeight: 'var(--app-vh)', width: '100%', backgroundColor: '#000', color: '#fff', boxSizing: 'border-box',
         overflowX: 'hidden',
         paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)',
         paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 40px)',

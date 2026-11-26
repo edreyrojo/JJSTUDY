@@ -2575,7 +2575,7 @@ const ModalTiposBloque = ({ onCerrar, onElegir }) => (
 
 const s = {
     root: {
-        minHeight: '100vh',
+        minHeight: 'var(--app-vh)',
         width: '100%',
         backgroundColor: '#000',
         color: '#fff',

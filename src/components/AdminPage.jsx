@@ -1329,7 +1329,7 @@ const UserRow = ({ user, autores = {}, academias = [], sedes = [], onUpdate, onD
 const s = {
     container: {
         backgroundColor: '#050505',
-        minHeight: '100vh',
+        minHeight: 'var(--app-vh)',
         color: '#fff',
         fontFamily: "'Inter', sans-serif",
         boxSizing: 'border-box',

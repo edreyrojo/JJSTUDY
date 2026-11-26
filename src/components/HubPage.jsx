@@ -204,7 +204,7 @@ const HubPage = ({
 
     if (!usuario) {
         return (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#d4af37', fontSize: '1.2rem', backgroundColor: '#0a0a0a', padding: '20px', textAlign: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 'var(--app-vh)', color: '#d4af37', fontSize: '1.2rem', backgroundColor: '#0a0a0a', padding: '20px', textAlign: 'center' }}>
                 <p style={{ letterSpacing: '1px' }}>Conectando al tatami digital...</p>
             </div>
         );
@@ -254,7 +254,7 @@ const HubPage = ({
     const contenedorEstilos = {
         ...styles.container,
         position: 'relative',
-        minHeight: '100vh',
+        minHeight: 'var(--app-vh)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -726,7 +726,7 @@ const HubPage = ({
 
             {/* MODAL DE ANUNCIO */}
             {showAnuncio && anuncioReciente && (
-                <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10001, padding: '16px', boxSizing: 'border-box' }}>
+                <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: 'var(--app-vh)', backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10001, padding: '16px', boxSizing: 'border-box' }}>
                     <div style={{ backgroundColor: '#0a0a0a', border: '1px solid #d4af37', padding: esMovil ? '20px' : '25px', borderRadius: '12px', width: '100%', maxWidth: '400px', maxHeight: '90vh', overflowY: 'auto', boxSizing: 'border-box' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
                             <VaultIcon name="megaphone" size={22} color="#d4af37" />
@@ -741,7 +741,7 @@ const HubPage = ({
 
             {/* MODAL DE SOPORTE */}
             {showSoporte && (
-                <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10001, padding: '16px', boxSizing: 'border-box' }}>
+                <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: 'var(--app-vh)', backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10001, padding: '16px', boxSizing: 'border-box' }}>
                     <div style={{ backgroundColor: '#111', border: '1px solid #d4af37', padding: esMovil ? '20px' : '25px', borderRadius: '12px', width: '100%', maxWidth: '420px', maxHeight: '90vh', overflowY: 'auto', textAlign: 'center', boxSizing: 'border-box' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '14px' }}>
                             <VaultIcon name="support" size={20} color="#d4af37" />
@@ -771,7 +771,7 @@ const HubPage = ({
 
             {/* MODAL DE TUTORIALES */}
             {showTutoriales && (
-                <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10001, padding: '16px', boxSizing: 'border-box' }}>
+                <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: 'var(--app-vh)', backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10001, padding: '16px', boxSizing: 'border-box' }}>
                     <div style={{ backgroundColor: '#111', border: '1px solid #d4af37', padding: esMovil ? '20px' : '25px', borderRadius: '12px', width: '100%', maxWidth: '450px', maxHeight: '90vh', overflowY: 'auto', boxSizing: 'border-box' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '16px' }}>
                             <VaultIcon name="tutorial" size={20} color="#d4af37" />

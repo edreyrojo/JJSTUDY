@@ -113,7 +113,7 @@ const leerGuardadoLocal = (clave, porDefecto) => {
 
 // --- 1. CONFIGURACIÓN DE ESTILOS ---
 const styles = {
-  containerCenter: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh' },
+  containerCenter: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 'var(--app-vh)' },
   container: { padding: '40px', textAlign: 'center' },
   goldTitle: { color: '#d4af37', letterSpacing: '3px', marginBottom: '30px', textTransform: 'uppercase' },
   card: { backgroundColor: '#111', padding: '30px', borderRadius: '12px', border: '1px solid #333', width: '300px', textAlign: 'center' },
@@ -819,7 +819,7 @@ export default function App() {
         top: 0,
         left: 0,
         width: '100vw',
-        height: '100vh',
+        height: 'var(--app-vh)',
         backgroundColor: '#000',
         display: 'flex',
         justifyContent: 'center',
@@ -860,7 +860,7 @@ export default function App() {
   }
 
   return (
-    <div className="App" style={{ backgroundColor: '#0a0a0a', color: '#fff', minHeight: '100vh', width: '100vw', fontFamily: 'sans-serif' }}>
+    <div className="App" style={{ backgroundColor: '#0a0a0a', color: '#fff', minHeight: 'var(--app-vh)', width: '100vw', fontFamily: 'sans-serif' }}>
       <style>{`
         @keyframes float { 
           0% { transform: translate(0px, 0px); } 

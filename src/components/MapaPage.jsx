@@ -15,7 +15,7 @@ import VaultIcon from './VaultIcon';
 
 const MAX_NODOS_MAPA = 18;
 const mapStyles = {
-    layout: { display: 'flex', height: '100vh', width: '100%', backgroundColor: '#050505', overflow: 'hidden', boxSizing: 'border-box' },
+    layout: { display: 'flex', height: 'var(--app-vh)', width: '100%', backgroundColor: '#050505', overflow: 'hidden', boxSizing: 'border-box' },
     sidebar: { borderRight: '1px solid #222', padding: '20px', backgroundColor: '#0a0a0a', boxSizing: 'border-box' },
     sideItem: { padding: '10px 12px', cursor: 'pointer', borderRadius: '5px', fontSize: '0.8rem', fontWeight: 'bold', border: '1px solid #d4af37' },
     mapArea: { position: 'relative', flex: 1, overflow: 'hidden', touchAction: 'none', cursor: 'grab', boxSizing: 'border-box' },
@@ -421,7 +421,7 @@ const MapaPage = ({
             <aside style={{
                 ...mapStyles.sidebar,
                 width: esMovil ? '100%' : '240px',
-                height: esMovil ? 'auto' : '100vh',
+                height: esMovil ? 'auto' : 'var(--app-vh)',
                 position: esMovil ? 'relative' : 'fixed',
                 display: 'flex',
                 flexDirection: 'column',

@@ -186,7 +186,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
         <div style={{ 
             display: 'flex', 
             flexDirection: esMovil ? 'column' : 'row', 
-            minHeight: '100vh', 
+            minHeight: 'var(--app-vh)', 
             width: '100%', 
             boxSizing: 'border-box', 
             backgroundColor: '#000', 

@@ -47,7 +47,7 @@ const LoginPage = ({
             background: 'radial-gradient(circle, #1a1a1a 0%, #000 100%)',
             padding: '20px',
             boxSizing: 'border-box',
-            minHeight: '100vh',
+            minHeight: 'var(--app-vh)',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',

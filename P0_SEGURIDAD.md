@@ -108,7 +108,27 @@ puede fallar con “Código no reconocido”. Es esperado y se resuelve con el p
   pertenece a otra sede.
 - **Reglas nuevas ya desplegadas** junto con el primer bloque.
 
-## 5. Pendiente para el siguiente bloque (P1)
+## 5. Tercer bloque aplicado (rendimiento / PWA)
+
+- **Error Boundary global:** un error de render ya no deja pantalla negra.
+- **Carga diferida:** Mapa, Estudio, Búsqueda, Timer, Admin, Gestión, Planeador,
+  Rutas, MiCuenta y Panel Maestro se descargan bajo demanda. El bundle inicial
+  bajó de ~1.40 MB a ~0.88 MB (gzip ~285 KB).
+- **Viewport:** se permitió el zoom (se quitó `user-scalable=no`).
+- **PWA:** el manifest ya no fuerza orientación vertical (`orientation: any`),
+  útil en iPad/tablet.
+- **Altura dinámica:** todas las pantallas usan `var(--app-vh)` con fallback
+  `100vh` → `100dvh` cuando el navegador lo soporta.
+- **Base móvil:** se eliminó el `body` centrado de la plantilla de Vite y se
+  fijó esquema oscuro.
+- **Logos pesados:** nuevo botón en Admin → Mantenimiento →
+  “Comprimir logos pesados”. Comprime los logos antiguos que superan 400 KB y
+  elimina el campo duplicado `logobase64`. También se evita reescribir un logo
+  gigante sin cambios al guardar la sede.
+
+> Tras desplegar, entra como admin y pulsa **“Comprimir logos pesados”** una vez.
+
+## 6. Pendiente para el siguiente bloque (P1)
 
 - **Paywall real.** Hoy se limita a usuarios validados, pero un usuario
   validado con la consola todavía puede leer metadatos de videos/rutas. Para
@@ -116,4 +136,4 @@ puede fallar con “Código no reconocido”. Es esperado y se resuelve con el p
   denormalizar una ACL por usuario/sede en cada video/ruta.
 - `firestore.indexes.json` versionado y paginación real en alumnos/clases.
 - Fotos fuera de Firestore (Storage) para dejar de acercarse al límite de 1 MB.
-- Router/URLs, `100dvh`, service worker, `signInWithRedirect` en iOS.
+- Router/URLs, service worker, `signInWithRedirect` en iOS.

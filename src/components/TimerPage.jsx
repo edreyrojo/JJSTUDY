@@ -1003,7 +1003,7 @@ export default function TimerPage({ onBack }) {
             width: '100%'
         }
         : {
-            minHeight: '100vh',
+            minHeight: 'var(--app-vh)',
             backgroundColor: '#000',
             color: '#fff',
             boxSizing: 'border-box',

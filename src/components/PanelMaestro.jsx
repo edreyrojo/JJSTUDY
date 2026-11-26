@@ -121,7 +121,7 @@ const PanelMaestro = ({ usuario, teamData, styles, onVerSede, onBack }) => {
     const sedesAfiliadas = sedes.filter(s => s.tipo === 'afiliado').length;
 
     return (
-        <div style={{ padding: '20px', backgroundColor: '#000', minHeight: '100vh', color: '#fff', boxSizing: 'border-box' }}>
+        <div style={{ padding: '20px', backgroundColor: '#000', minHeight: 'var(--app-vh)', color: '#fff', boxSizing: 'border-box' }}>
 
             {/* ── HEADER PANEL MAESTRO ── */}
             <div style={{ marginBottom: '30px' }}>

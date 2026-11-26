@@ -1959,7 +1959,7 @@ const Campo = ({ label, required, hint, children, full = false }) => (
 /* ------------------------------------------------------------------ */
 const s = {
     root: {
-        minHeight: '100vh', width: '100%', backgroundColor: '#000', color: '#fff', boxSizing: 'border-box',
+        minHeight: 'var(--app-vh)', width: '100%', backgroundColor: '#000', color: '#fff', boxSizing: 'border-box',
         overflowX: 'hidden',
         paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)',
         paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 70px)',
@@ -2013,7 +2013,7 @@ const s = {
         background: '#d4af37', border: '1px solid #d4af37', color: '#000', borderRadius: '999px', padding: '5px 9px',
         fontSize: '0.5rem', fontWeight: 800, cursor: 'pointer'
     },
-    routeList: { display: 'flex', flexDirection: 'column', gap: '5px', maxHeight: 'calc(100vh - 190px)', overflowY: 'auto' },
+    routeList: { display: 'flex', flexDirection: 'column', gap: '5px', maxHeight: 'calc(var(--app-vh) - 190px)', overflowY: 'auto' },
     routeItem: {
         display: 'flex', flexDirection: 'column', gap: '3px', textAlign: 'left', width: '100%', background: '#080808',
         border: '1px solid #1d1d1d', borderRadius: '8px', padding: '9px', cursor: 'pointer', color: '#fff'

@@ -113,7 +113,7 @@ const BusquedaPage = ({ onBack, onSelectVideo, styles, usuario, vistos = [], vid
             paddingBottom: esMovil ? 'calc(env(safe-area-inset-bottom, 0px) + 12px)' : '24px',
             paddingLeft: esMovil ? 'calc(env(safe-area-inset-left, 0px) + 12px)' : '24px',
             paddingRight: esMovil ? 'calc(env(safe-area-inset-right, 0px) + 12px)' : '24px',
-            backgroundColor: '#000', color: '#fff', height: '100vh', boxSizing: 'border-box',
+            backgroundColor: '#000', color: '#fff', height: 'var(--app-vh)', boxSizing: 'border-box',
             display: 'flex', flexDirection: 'column', width: '100%', overflow: 'hidden',
         }}>
             {/* HEADER */}
