@@ -12,6 +12,7 @@ import Swal from 'sweetalert2';
 import VaultIcon from './VaultIcon';
 import { CURSOS, tecnicasDeCurso } from '../data/vaultIndex';
 import { normalizar } from '../data/taxonomia';
+import { driveMediaUrl } from '../utils/driveVideo';
 
 const notify = (texto, icono = 'success') => Swal.fire({
   text: texto,
@@ -55,6 +56,7 @@ const MarcasVideoAdminPage = () => {
   const [guardando, setGuardando] = useState(false);
   const [previewStart, setPreviewStart] = useState(0);
   const [tiempoActual, setTiempoActual] = useState(0);
+  const [duracionVideo, setDuracionVideo] = useState(0);
   const [videoError, setVideoError] = useState(false);
   const videoRef = useRef(null);
 
@@ -103,15 +105,15 @@ const MarcasVideoAdminPage = () => {
     ? `https://www.youtube.com/embed/${videoSel.id}?rel=0&modestbranding=1&playsinline=1${previewStart > 0 ? `&start=${previewStart}` : ''}`
     : '';
   const previewSrc = esYoutube ? youtubeSrc : drivePreview;
-  // En producción usamos un proxy propio para tener reproductor nativo y poder
-  // capturar el segundo exacto. En desarrollo no existe /api, así que usamos
-  // el visor de Drive.
-  const proxySrc = videoSel ? `/api/drive?id=${encodeURIComponent(videoSel.id)}` : '';
-  const puedeProxy = Boolean(import.meta.env.PROD);
+  // Drive API permite reproducir con el reproductor nativo y capturar el
+  // segundo exacto. Si el archivo no es público o la clave falla, se usa el
+  // visor oficial de Drive como respaldo.
+  const driveApiSrc = videoSel ? driveMediaUrl(videoSel.id) : '';
 
   useEffect(() => {
     setPreviewStart(0);
     setTiempoActual(0);
+    setDuracionVideo(0);
     setVideoError(false);
     const player = videoRef.current;
     if (player) {
@@ -132,7 +134,7 @@ const MarcasVideoAdminPage = () => {
     setEditandoId(null);
   };
 
-  const modoNativo = !esYoutube && puedeProxy && !videoError;
+  const modoNativo = !esYoutube && !videoError;
 
   const verEnVideo = (segundos) => {
     const valor = Number(segundos);
@@ -149,6 +151,18 @@ const MarcasVideoAdminPage = () => {
       return;
     }
     setPreviewStart(Math.floor(valor));
+  };
+
+  const irAMarca = (marca) => {
+    const segundos = Number(marca.segundos);
+    if (modoNativo && duracionVideo > 0 && segundos > duracionVideo + 1) {
+      notify(
+        `Esa marca (${marca.tiempo || formatearTiempo(segundos)}) está fuera de este video, que dura ${formatearTiempo(duracionVideo)}. Bórrala o muévela al video correcto.`,
+        'error'
+      );
+      return;
+    }
+    verEnVideo(segundos);
   };
 
   const capturarTiempo = () => {
@@ -183,6 +197,12 @@ const MarcasVideoAdminPage = () => {
     if (segundos === null) return notify('Usa un tiempo válido, por ejemplo 03:45 o 1:02:10.', 'error');
     const titulo = form.titulo.trim();
     if (!titulo) return notify('Escribe un título para la marca.', 'error');
+    if (modoNativo && duracionVideo > 0 && segundos > duracionVideo + 1) {
+      return notify(
+        `Este video dura ${formatearTiempo(duracionVideo)}. La marca ${formatearTiempo(segundos)} queda fuera del video.`,
+        'error'
+      );
+    }
 
     setGuardando(true);
     try {
@@ -330,7 +350,7 @@ const MarcasVideoAdminPage = () => {
                 {modoNativo ? (
                   <video
                     ref={videoRef}
-                    src={proxySrc}
+                    src={driveApiSrc}
                     poster={`https://drive.google.com/thumbnail?id=${videoSel.id}&sz=w1000`}
                     controls
                     playsInline
@@ -338,7 +358,15 @@ const MarcasVideoAdminPage = () => {
                     style={m.videoEl}
                     onTimeUpdate={(event) => setTiempoActual(event.currentTarget.currentTime)}
                     onSeeked={(event) => setTiempoActual(event.currentTarget.currentTime)}
-                    onLoadedMetadata={(event) => setTiempoActual(event.currentTarget.currentTime)}
+                    onLoadedMetadata={(event) => {
+                      const player = event.currentTarget;
+                      setTiempoActual(player.currentTime);
+                      setDuracionVideo(Number.isFinite(player.duration) ? player.duration : 0);
+                    }}
+                    onDurationChange={(event) => {
+                      const player = event.currentTarget;
+                      setDuracionVideo(Number.isFinite(player.duration) ? player.duration : 0);
+                    }}
                     onError={() => setVideoError(true)}
                   >
                     Tu navegador no puede reproducir este video.
@@ -358,7 +386,12 @@ const MarcasVideoAdminPage = () => {
                   <span style={m.playerClock}>
                     <VaultIcon name="clock" size={12} />
                     {modoNativo ? (
-                      <>EN REPRODUCTOR: <strong>{formatearTiempo(tiempoActual)}</strong></>
+                      <>
+                        EN REPRODUCTOR: <strong>{formatearTiempo(tiempoActual)}</strong>
+                        {duracionVideo > 0 && (
+                          <span style={m.durationChip}>DURACIÓN {formatearTiempo(duracionVideo)}</span>
+                        )}
+                      </>
                     ) : (
                       <>REPRODUCTOR: <strong>{videoSel.nombre}</strong></>
                     )}
@@ -407,30 +440,41 @@ const MarcasVideoAdminPage = () => {
                   <p style={m.empty}>Aún no hay marcas globales para este video.</p>
                 )}
                 <div style={m.markerList}>
-                  {marcasVideo.map((marca) => (
-                    <div key={marca.id} style={m.markerRow}>
-                      <button
-                        type="button"
-                        onClick={() => verEnVideo(marca.segundos)}
-                        style={m.timeChip}
-                        title="Ir a este momento del video"
-                      >
-                        {marca.tiempo || formatearTiempo(marca.segundos)}
-                      </button>
-                      <div style={m.markerText}>
-                        <strong>{marca.titulo}</strong>
-                        {marca.descripcion && <small>{marca.descripcion}</small>}
-                      </div>
-                      <div style={m.markerActions}>
-                        <button type="button" onClick={() => editar(marca)} style={m.iconBtn} title="Editar">
-                          <VaultIcon name="edit" size={13} />
+                  {marcasVideo.map((marca) => {
+                    const fueraDeRango = modoNativo && duracionVideo > 0
+                      && Number(marca.segundos) > duracionVideo + 1;
+                    return (
+                      <div key={marca.id} style={m.markerRow}>
+                        <button
+                          type="button"
+                          onClick={() => irAMarca(marca)}
+                          style={fueraDeRango ? { ...m.timeChip, background: '#ff6b6b' } : m.timeChip}
+                          title={fueraDeRango
+                            ? 'Esta marca queda fuera de la duración del video'
+                            : 'Ir a este momento del video'}
+                        >
+                          {marca.tiempo || formatearTiempo(marca.segundos)}
                         </button>
-                        <button type="button" onClick={() => eliminar(marca)} style={m.iconBtnDanger} title="Eliminar">
-                          <VaultIcon name="trash" size={13} />
-                        </button>
+                        <div style={m.markerText}>
+                          <strong>{marca.titulo}</strong>
+                          {marca.descripcion && <small>{marca.descripcion}</small>}
+                          {fueraDeRango && (
+                            <small style={{ color: '#ff6b6b' }}>
+                              Fuera de este video ({formatearTiempo(duracionVideo)})
+                            </small>
+                          )}
+                        </div>
+                        <div style={m.markerActions}>
+                          <button type="button" onClick={() => editar(marca)} style={m.iconBtn} title="Editar">
+                            <VaultIcon name="edit" size={13} />
+                          </button>
+                          <button type="button" onClick={() => eliminar(marca)} style={m.iconBtnDanger} title="Eliminar">
+                            <VaultIcon name="trash" size={13} />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </section>
 
@@ -440,6 +484,7 @@ const MarcasVideoAdminPage = () => {
                     <VaultIcon name={editandoId ? 'edit' : 'plus'} size={14} />
                     {editandoId ? 'Editar marca' : 'Nueva marca'}
                   </h4>
+                  <span style={m.panelMeta}>SE GUARDA EN: {videoSel.nombre}</span>
                   {editandoId && (
                     <button type="button" onClick={limpiarForm} style={m.linkBtn}>CANCELAR EDICIÓN</button>
                   )}
@@ -530,7 +575,8 @@ const m = {
   videoEl: { width: '100%', aspectRatio: '16 / 9', maxHeight: '440px', background: '#000', display: 'block' },
   playerFrame: { width: '100%', aspectRatio: '16 / 9', maxHeight: '440px', border: 'none', background: '#000', display: 'block' },
   playerBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap', padding: '9px 11px', borderTop: '1px solid #1c1c1c' },
-  playerClock: { display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#999', fontSize: '0.64rem', fontWeight: 700, letterSpacing: '0.4px' },
+  playerClock: { display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#999', fontSize: '0.64rem', fontWeight: 700, letterSpacing: '0.4px', flexWrap: 'wrap' },
+  durationChip: { border: '1px solid #333', color: '#888', borderRadius: '4px', padding: '2px 5px', fontSize: '0.55rem' },
   playerActions: { display: 'flex', gap: '6px', flexWrap: 'wrap' },
   secondaryBtn: { display: 'inline-flex', alignItems: 'center', gap: '5px', background: 'transparent', border: '1px solid #333', color: '#ccc', borderRadius: '7px', padding: '8px 10px', fontSize: '0.62rem', fontWeight: 700, cursor: 'pointer' },
   playerNote: { margin: 0, padding: '0 11px 10px', color: '#777', fontSize: '0.62rem', lineHeight: 1.4 },

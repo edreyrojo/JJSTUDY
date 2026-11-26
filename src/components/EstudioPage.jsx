@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 // IMPORTANTE: Importaciones para Firestore
 import { db } from '../firebase';
 import { doc, setDoc, addDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import { obtenerTecnica } from '../data/vaultIndex';
 import { tieneAccesoVideo, pedirAcceso } from '../utils/accesoVault';
+import { driveMediaUrl } from '../utils/driveVideo';
 import { mensajeContenidoBloqueado } from '../i18n/translate';
 import VaultIcon from './VaultIcon';
 import { useDialogA11y } from '../hooks/useDialogA11y';
@@ -15,6 +16,9 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
     const [tiempoActivo, setTiempoActivo] = useState(video?.startTime || 0);
     const [nombreMarcador, setNombreMarcador] = useState("");
     const [marcasGlobales, setMarcasGlobales] = useState([]);
+    const [duracionVideo, setDuracionVideo] = useState(0);
+    const [videoError, setVideoError] = useState(false);
+    const videoRef = useRef(null);
     const [esMovil, setEsMovil] = useState(window.innerWidth < 768);
     const [esTablet, setEsTablet] = useState(() => {
         const ancho = window.innerWidth;
@@ -56,10 +60,17 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
     const tecnicaSiguiente = videoSiguiente ? obtenerTecnica(videoSiguiente.id) : null;
     const puedeAnterior = !tecnicaAnterior || tieneAccesoVideo(usuario, tecnicaAnterior, accesoRutas);
     const puedeSiguiente = !tecnicaSiguiente || tieneAccesoVideo(usuario, tecnicaSiguiente, accesoRutas);
+    // Si una marca quedó guardada con un minuto mayor a la duración real del
+    // video, no se muestra: no se puede saltar a un punto que no existe.
+    const marcasGlobalesVisibles = marcasGlobales.filter(
+        (marca) => !duracionVideo || Number(marca.segundos) <= duracionVideo + 1
+    );
 
     // --- EFECTOS ---
     useEffect(() => {
         if (video) {
+            setVideoError(false);
+            setDuracionVideo(0);
             const notaExistente = usuario?.notas?.[video.id];
             const textoCargado = typeof notaExistente === 'string' ? notaExistente : (notaExistente?.texto || "");
             setNota(textoCargado);
@@ -94,6 +105,22 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
         );
         return () => unsub();
     }, [video?.id]);
+
+    // Busca el minuto exacto en el reproductor nativo cuando el usuario toca
+    // una marca de tiempo (global o privada).
+    useEffect(() => {
+        if (video?.fuente === 'youtube' || videoError) return;
+        const player = videoRef.current;
+        if (!player || !Number.isFinite(player.duration) || player.duration <= 0) return;
+        const destino = Math.min(Math.max(0, tiempoActivo), Math.max(0, player.duration - 0.5));
+        if (Math.abs(player.currentTime - destino) > 0.75) {
+            try {
+                player.currentTime = destino;
+            } catch (error) {
+                console.error('No se pudo mover el video:', error);
+            }
+        }
+    }, [tiempoActivo, video?.id, video?.fuente, videoError]);
 
     useEffect(() => {
         const handleResize = () => {
@@ -197,6 +224,8 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
     const driveSrc = `https://drive.google.com/file/d/${driveId}/preview${paramsDrive.length ? `?${paramsDrive.join('&')}` : ''}`;
     const youtubeSrc = `https://www.youtube.com/embed/${youtubeId}?rel=0&modestbranding=1&playsinline=1${tiempoActivo ? `&start=${tiempoActivo}` : ''}`;
     const videoSrc = fuente === 'youtube' ? youtubeSrc : driveSrc;
+    const driveApiSrc = driveMediaUrl(driveId);
+    const usarNativo = fuente === 'drive' && !videoError;
 
     const tamanoBotonBarra = '40px';
     const estiloIconoBarra = {
@@ -395,14 +424,36 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                         width: '100%',
                         height: pantallaCompleta ? undefined : '100%'
                     }}>
-                        <iframe
-                            key={`${fuente}-${video?.id}-${tiempoActivo}`}
-                            src={videoSrc}
-                            title={video?.titulo || 'Reproductor de video'}
-                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
-                            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-                            allowFullScreen
-                        ></iframe>
+                        {usarNativo ? (
+                            <video
+                                ref={videoRef}
+                                src={driveApiSrc}
+                                poster={`https://drive.google.com/thumbnail?id=${driveId}&sz=w1000`}
+                                controls
+                                playsInline
+                                preload="metadata"
+                                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: '#000', objectFit: 'contain' }}
+                                onLoadedMetadata={(event) => {
+                                    const player = event.currentTarget;
+                                    setDuracionVideo(Number.isFinite(player.duration) ? player.duration : 0);
+                                    if (tiempoActivo > 0 && Number.isFinite(player.duration)) {
+                                        player.currentTime = Math.min(tiempoActivo, Math.max(0, player.duration - 0.5));
+                                    }
+                                }}
+                                onError={() => setVideoError(true)}
+                            >
+                                Tu navegador no puede reproducir este video.
+                            </video>
+                        ) : (
+                            <iframe
+                                key={`${fuente}-${video?.id}-${tiempoActivo}`}
+                                src={videoSrc}
+                                title={video?.titulo || 'Reproductor de video'}
+                                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+                                allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                                allowFullScreen
+                            ></iframe>
+                        )}
                     </div>
                 </div>
 
@@ -501,13 +552,13 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
                 </div>
 
                 {/* MARCAS GLOBALES DEL ADMINISTRADOR */}
-                {marcasGlobales.length > 0 && (
+                {marcasGlobalesVisibles.length > 0 && (
                     <div style={{ backgroundColor: '#111', padding: '12px', borderRadius: '8px', marginBottom: '14px', border: '1px solid rgba(212,175,55,0.35)' }}>
                         <p style={{ fontSize: '0.62rem', color: '#d4af37', margin: '0 0 8px 0', letterSpacing: '1px', fontWeight: 'bold' }}>
                             MARCADORES DEL PROFESOR:
                         </p>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            {marcasGlobales.map((marca) => (
+                            {marcasGlobalesVisibles.map((marca) => (
                                 <button
                                     key={marca.id}
                                     type="button"
