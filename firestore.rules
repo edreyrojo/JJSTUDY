@@ -279,35 +279,51 @@ service cloud.firestore {
     }
 
     // 5. ALUMNOS
+    // - Admin: todo.
+    // - Profesor: todo su team.
+    // - Instructor: SOLO los alumnos de su sede.
     match /alumnos/{alumnoId} {
 
       allow read: if esValidado() && (
         esAdminTotal() ||
-        esDeMiEquipo()
+        (getRol() == 'profesor' && esDeMiEquipo()) ||
+        (getRol() == 'instructor' &&
+          resource.data.get('teamId', '') == getMiTeam() &&
+          resource.data.get('sedeId', '') == getMiSede())
       );
 
       allow create: if esValidado() && (
         esAdminTotal() ||
-        (getRol() in ['profesor', 'instructor'] && (
-          request.resource.data.get('teamId', '') == getMiTeam() ||
-          request.resource.data.get('academiaId', '') == getMiAcademia()
-        ))
+        (getRol() == 'profesor' &&
+          request.resource.data.get('teamId', '') == getMiTeam()) ||
+        (getRol() == 'instructor' &&
+          request.resource.data.get('teamId', '') == getMiTeam() &&
+          request.resource.data.get('sedeId', '') == getMiSede())
       );
 
       allow update: if esValidado() && (
         esAdminTotal() ||
-        (getRol() in ['profesor', 'instructor'] &&
+        (getRol() == 'profesor' &&
           esDeMiEquipo() &&
-          (request.resource.data.get('teamId', '') == getMiTeam() || request.resource.data.get('academiaId', '') == getMiAcademia()))
+          request.resource.data.get('teamId', '') == getMiTeam()) ||
+        (getRol() == 'instructor' &&
+          esDeMiEquipo() &&
+          resource.data.get('sedeId', '') == getMiSede() &&
+          request.resource.data.get('sedeId', '') == getMiSede())
       );
 
       allow delete: if esValidado() && (
         esAdminTotal() ||
-        (getRol() in ['profesor', 'instructor'] && esDeMiEquipo())
+        (getRol() == 'profesor' && esDeMiEquipo()) ||
+        (getRol() == 'instructor' &&
+          esDeMiEquipo() &&
+          resource.data.get('sedeId', '') == getMiSede())
       );
     }
 
     // 6. CLASES / CONTENIDO
+    // Lectura: todo el team (la agenda no es secreta) + clases globales.
+    // Escritura: profesor en todo el team; instructor solo en su sede.
     match /clases/{claseId} {
       allow read: if isAuthenticated() && (
         esAdminTotal() ||
@@ -321,15 +337,25 @@ service cloud.firestore {
 
       allow create: if esValidado() && (
         esAdminTotal() ||
-        (getRol() in ['profesor', 'instructor'] && request.resource.data.get('teamId', '') == getMiTeam())
+        (getRol() == 'profesor' && request.resource.data.get('teamId', '') == getMiTeam()) ||
+        (getRol() == 'instructor' &&
+          request.resource.data.get('teamId', '') == getMiTeam() &&
+          request.resource.data.get('sedeId', '') == getMiSede())
       );
 
       allow update: if esValidado() && (
         esAdminTotal() ||
         (
-          getRol() in ['profesor', 'instructor'] &&
+          getRol() == 'profesor' &&
+          resource.data.get('teamId', '') == getMiTeam() &&
+          request.resource.data.get('teamId', '') == getMiTeam()
+        ) ||
+        (
+          getRol() == 'instructor' &&
+          resource.data.get('teamId', '') == getMiTeam() &&
           request.resource.data.get('teamId', '') == getMiTeam() &&
-          resource.data.get('teamId', '') == getMiTeam()
+          request.resource.data.get('sedeId', '') == resource.data.get('sedeId', '') &&
+          (resource.data.get('sedeId', '') == getMiSede() || resource.data.get('sedeId', '') == '')
         ) ||
         (
           resource.data.get('visibilidad', '') == 'global' &&
@@ -340,7 +366,10 @@ service cloud.firestore {
 
       allow delete: if esValidado() && (
         esAdminTotal() ||
-        (getRol() in ['profesor', 'instructor'] && resource.data.get('teamId', '') == getMiTeam())
+        (getRol() == 'profesor' && resource.data.get('teamId', '') == getMiTeam()) ||
+        (getRol() == 'instructor' &&
+          resource.data.get('teamId', '') == getMiTeam() &&
+          (resource.data.get('sedeId', '') == getMiSede() || resource.data.get('sedeId', '') == ''))
       );
     }
 

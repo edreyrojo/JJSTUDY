@@ -131,6 +131,7 @@ const PlaneadorClasesPage = ({ onBack, usuario }) => {
     const userName = usuario?.nombre || 'Instructor';
     const dojoNombre = usuario?.academiaNombre || usuario?.nombreSede || '';
     const esAdmin = usuario?.rol === 'admin';
+    const esInstructor = usuario?.rol === 'instructor';
 
     // --- DATOS ---
     const [clasesEquipo, setClasesEquipo] = useState([]);
@@ -225,8 +226,16 @@ const PlaneadorClasesPage = ({ onBack, usuario }) => {
         [alumnos]
     );
 
-    const esMiClase = Boolean(claseActual && claseActual.teamId === teamId);
-    const puedeEditarClase = Boolean(claseActual && (claseActual.teamId === teamId || esAdmin));
+    const esMiClase = Boolean(
+        claseActual &&
+        claseActual.teamId === teamId &&
+        (!esInstructor || !claseActual.sedeId || claseActual.sedeId === usuario?.sedeId)
+    );
+    const puedeEditarClase = Boolean(
+        claseActual &&
+        (claseActual.teamId === teamId || esAdmin) &&
+        (!esInstructor || !claseActual.sedeId || claseActual.sedeId === usuario?.sedeId)
+    );
     const bloqueTimer = timerBloqueIdx !== null ? claseActual?.bloques?.[timerBloqueIdx] || null : null;
     const timerActivo = timerFase !== 'idle';
 
@@ -307,23 +316,33 @@ const PlaneadorClasesPage = ({ onBack, usuario }) => {
             }
         );
 
-        const qAlumnos = query(collection(db, 'alumnos'), where('teamId', '==', teamId));
-        const unsubAlumnos = onSnapshot(
-            qAlumnos,
-            (snap) => {
-                setAlumnos(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-            },
-            (error) => {
-                console.error('Error al cargar alumnos:', error);
-            }
-        );
+        const esInstructor = usuario?.rol === 'instructor';
+        const qAlumnos = esInstructor
+            ? query(
+                collection(db, 'alumnos'),
+                where('teamId', '==', teamId),
+                where('sedeId', '==', usuario?.sedeId || '')
+            )
+            : query(collection(db, 'alumnos'), where('teamId', '==', teamId));
+        // Un instructor sin sede no debe ver alumnos "sueltos" de otras sedes.
+        const unsubAlumnos = (esInstructor && !usuario?.sedeId)
+            ? (() => { setAlumnos([]); return () => {}; })()
+            : onSnapshot(
+                qAlumnos,
+                (snap) => {
+                    setAlumnos(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+                },
+                (error) => {
+                    console.error('Error al cargar alumnos:', error);
+                }
+            );
 
         return () => {
             unsubEquipo();
             unsubGlobal();
             unsubAlumnos();
         };
-    }, [teamId]);
+    }, [teamId, usuario?.rol, usuario?.sedeId]);
 
     // --- ASISTENCIA: INICIALIZAR / MEZCLAR ALUMNOS ---
     useEffect(() => {
@@ -1039,7 +1058,9 @@ const PlaneadorClasesPage = ({ onBack, usuario }) => {
     };
 
     const eliminarClase = async (clase) => {
-        if (!clase || !(esAdmin || clase.teamId === teamId)) return;
+        if (!clase) return;
+        const claseDeMiSede = !esInstructor || !clase.sedeId || clase.sedeId === usuario?.sedeId;
+        if (!(esAdmin || (clase.teamId === teamId && claseDeMiSede))) return;
         const res = await Swal.fire({
             title: '¿Eliminar esta clase?',
             text: 'Esta acción no se puede deshacer.',

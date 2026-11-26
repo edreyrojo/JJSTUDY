@@ -95,15 +95,25 @@ puede fallar con “Código no reconocido”. Es esperado y se resuelve con el p
 - [ ] Panel Maestro → “GESTIONAR ALUMNOS” abre la sede correcta.
 - [ ] Un instructor que cambia de sede con un código nuevo.
 
-## 4. Pendiente para el siguiente bloque (P1)
+## 4. Segundo bloque aplicado (P1)
+
+- **Alumnos por sede:** un `instructor` ya solo puede leer/crear/editar/borrar
+  alumnos de su propia sede; el `profesor` conserva la visión de todo el team y
+  el admin la visión global.
+- **Clases por sede:** un instructor solo puede crear/editar/borrar clases de su
+  sede (las legacy sin `sedeId` siguen siendo accesibles). El profesor conserva
+  todo el team.
+- **Planeador:** la lista de alumnos se consulta por `sedeId` cuando el usuario
+  es instructor; la asistencia y las acciones de la clase se ocultan si la clase
+  pertenece a otra sede.
+- **Reglas nuevas ya desplegadas** junto con el primer bloque.
+
+## 5. Pendiente para el siguiente bloque (P1)
 
 - **Paywall real.** Hoy se limita a usuarios validados, pero un usuario
   validado con la consola todavía puede leer metadatos de videos/rutas. Para
   cerrarlo de verdad hay que mover videos a Storage con URLs firmadas o
   denormalizar una ACL por usuario/sede en cada video/ruta.
-- **Alumnos por sede.** Un instructor aún puede leer alumnos de todo el team
-  (`firestore.rules`), no solo de su sede. Para restringirlo hay que guardar
-  `sedeId` en las clases y ajustar la consulta del Planeador.
 - `firestore.indexes.json` versionado y paginación real en alumnos/clases.
 - Fotos fuera de Firestore (Storage) para dejar de acercarse al límite de 1 MB.
 - Router/URLs, `100dvh`, service worker, `signInWithRedirect` en iOS.
