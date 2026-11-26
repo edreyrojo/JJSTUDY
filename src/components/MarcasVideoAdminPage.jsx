@@ -109,6 +109,7 @@ const MarcasVideoAdminPage = () => {
   // segundo exacto. Si el archivo no es público o la clave falla, se usa el
   // visor oficial de Drive como respaldo.
   const driveApiSrc = videoSel ? driveMediaUrl(videoSel.id) : '';
+  const modoNativo = !esYoutube && !videoError;
 
   useEffect(() => {
     setPreviewStart(0);
@@ -138,8 +139,6 @@ const MarcasVideoAdminPage = () => {
     setForm({ tiempo: '', titulo: '', descripcion: '' });
     setEditandoId(null);
   };
-
-  const modoNativo = !esYoutube && !videoError;
 
   const verEnVideo = (segundos) => {
     const valor = Number(segundos);
