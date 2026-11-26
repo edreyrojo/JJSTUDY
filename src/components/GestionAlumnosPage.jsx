@@ -761,6 +761,15 @@ const GestionAlumnosPage = ({ onBack, usuario, sedeActual }) => {
                 diaVencimiento: Math.min(31, Math.max(1, Number(configDraft.diaVencimiento) || 1)),
                 ultimaActualizacion: new Date().toISOString()
             };
+            // Si el logo ya estaba guardado y es gigante, no lo reescribimos:
+            // así el guardado de la sede no choca con el límite de 1 MB.
+            if (
+                payload.logoBase64 &&
+                payload.logoBase64.length > 500000 &&
+                payload.logoBase64 === config.logoBase64
+            ) {
+                delete payload.logoBase64;
+            }
             const batch = writeBatch(db);
             batch.set(doc(db, 'sedes', sedeIdEfectiva), payload, { merge: true });
 

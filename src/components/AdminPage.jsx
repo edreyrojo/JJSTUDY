@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, getDocs, getDoc, doc, deleteDoc, addDoc, writeBatch, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, getDocs, getDoc, doc, deleteDoc, deleteField, addDoc, writeBatch, setDoc, updateDoc } from 'firebase/firestore';
 import Swal from 'sweetalert2';
 import { DB_INSTRUCCIONALES } from '../data/instruccionales';
 import VaultIcon from './VaultIcon';
 import { sincronizarCodigosAcceso } from '../utils/teamsService';
-import { comprimirImagen } from '../utils/imageUtils';
+import { comprimirImagen, comprimirDataUrl } from '../utils/imageUtils';
 
 const notify = (mensaje, tipo = 'success') => {
     Swal.fire({
@@ -49,6 +49,7 @@ const AdminPage = ({ onBack }) => {
     const [academiaSeleccionada, setAcademiaSeleccionada] = useState('');
     const [teamIdProfesor, setTeamIdProfesor] = useState('');
     const [creandoSede, setCreandoSede] = useState(false);
+    const [comprimiendoLogos, setComprimiendoLogos] = useState(false);
 
     const [academiasAbiertas, setAcademiasAbiertas] = useState({});
     const toggleAcademia = (id) => setAcademiasAbiertas(prev => ({ ...prev, [id]: !prev[id] }));
@@ -410,6 +411,57 @@ const AdminPage = ({ onBack }) => {
         } catch (error) {
             notify('No se pudieron sincronizar: ' + error.message, 'error');
         }
+    };
+
+    const handleComprimirLogos = async () => {
+        const pesados = (sedes || []).filter((sede) => {
+            const logo = sede.logoBase64 || sede.logobase64 || '';
+            return typeof logo === 'string' && /^data:image\//i.test(logo) && logo.length > 400000;
+        });
+        if (!pesados.length) {
+            notify('No hay logos pesados en las sedes.', 'info');
+            return;
+        }
+        const res = await Swal.fire({
+            title: '¿Comprimir logos?',
+            text: `${pesados.length} sede(s) tienen un logo muy pesado. Se comprimirán a ~380 KB para proteger el límite de Firestore.`,
+            icon: 'question',
+            showCancelButton: true,
+            background: '#1a1a1a',
+            color: '#fff',
+            confirmButtonColor: '#d4af37',
+            cancelButtonColor: '#333',
+            confirmButtonText: 'Sí, comprimir'
+        });
+        if (!res.isConfirmed) return;
+
+        setComprimiendoLogos(true);
+        let ok = 0;
+        let fallos = 0;
+        for (const sede of pesados) {
+            try {
+                const logo = sede.logoBase64 || sede.logobase64;
+                const base64 = await comprimirDataUrl(logo, {
+                    maxDimension: 600,
+                    quality: 0.76,
+                    maxBytes: 380000
+                });
+                await updateDoc(doc(db, 'sedes', sede.id), {
+                    logoBase64: base64,
+                    logobase64: deleteField(),
+                    ultimaActualizacion: new Date().toISOString()
+                });
+                ok += 1;
+            } catch (error) {
+                console.error('No se pudo comprimir el logo de la sede', sede.id, error);
+                fallos += 1;
+            }
+        }
+        setComprimiendoLogos(false);
+        notify(
+            `Logos comprimidos: ${ok}${fallos ? ` · fallos: ${fallos}` : ''}`,
+            fallos ? 'error' : 'success'
+        );
     };
 
     const handlePublicarAnuncio = async () => {
@@ -1022,6 +1074,9 @@ const AdminPage = ({ onBack }) => {
                                             </button>
                                             <button type="button" onClick={handleSincronizarCodigos} className="admin-btn" style={s.btnOutlineAction}>
                                                 <VaultIcon name="lock" size={14} /> Sincronizar códigos de acceso
+                                            </button>
+                                            <button type="button" onClick={handleComprimirLogos} disabled={comprimiendoLogos} className="admin-btn" style={{ ...s.btnOutlineAction, opacity: comprimiendoLogos ? 0.6 : 1 }}>
+                                                <VaultIcon name="image" size={14} /> {comprimiendoLogos ? 'Comprimiendo logos...' : 'Comprimir logos pesados'}
                                             </button>
                                         </div>
 

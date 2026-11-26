@@ -4,6 +4,12 @@
  * antes de subirlas para no rebasar el límite de 1 MB por documento.
  */
 
+const OPCIONES_DEFECTO = {
+    maxDimension: 1100,
+    quality: 0.72,
+    maxBytes: 620000
+};
+
 const leerArchivo = (file) => new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);
@@ -18,17 +24,8 @@ const cargarImagen = (src) => new Promise((resolve, reject) => {
     img.src = src;
 });
 
-export const comprimirImagen = async (file, {
-    maxDimension = 1100,
-    quality = 0.72,
-    maxBytes = 620000
-} = {}) => {
-    if (!file) throw new Error('No se seleccionó ninguna imagen.');
-    if (!file.type?.startsWith('image/')) throw new Error('El archivo debe ser una imagen.');
-    if (file.size > 15 * 1024 * 1024) throw new Error('La imagen supera los 15 MB.');
-
-    const dataUrl = await leerArchivo(file);
-    const img = await cargarImagen(dataUrl);
+const comprimirDesdeImagen = async (img, opciones = {}) => {
+    const { maxDimension, quality, maxBytes } = { ...OPCIONES_DEFECTO, ...opciones };
 
     let escala = Math.min(1, maxDimension / Math.max(img.width, img.height));
     let calidad = quality;
@@ -57,4 +54,27 @@ export const comprimirImagen = async (file, {
     }
 
     throw new Error('La foto sigue siendo muy pesada. Intenta con una imagen más pequeña.');
+};
+
+export const comprimirImagen = async (file, opciones = {}) => {
+    if (!file) throw new Error('No se seleccionó ninguna imagen.');
+    if (!file.type?.startsWith('image/')) throw new Error('El archivo debe ser una imagen.');
+    if (file.size > 15 * 1024 * 1024) throw new Error('La imagen supera los 15 MB.');
+
+    const dataUrl = await leerArchivo(file);
+    const img = await cargarImagen(dataUrl);
+    return comprimirDesdeImagen(img, opciones);
+};
+
+/**
+ * Comprime una imagen que ya está guardada como data URL (por ejemplo,
+ * un logo antiguo en Firestore que quedó demasiado pesado).
+ */
+export const comprimirDataUrl = async (dataUrl, opciones = {}) => {
+    const texto = String(dataUrl || '');
+    if (!/^data:image\//i.test(texto)) {
+        throw new Error('La imagen guardada no es un data URL válido.');
+    }
+    const img = await cargarImagen(texto);
+    return comprimirDesdeImagen(img, opciones);
 };
