@@ -14,7 +14,7 @@ import {
     getDocs
 } from 'firebase/firestore';
 import Swal from 'sweetalert2';
-import VaultIcon from './VaultIcon';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 import { buildAlumnosQuery, vincularInstructorASede } from '../utils/teamsService';
 import { comprimirImagen } from '../utils/imageUtils';
 import {
@@ -29,6 +29,8 @@ import {
     formatearMoneda,
     calcularEdad,
     sumarMeses,
+    mesesParaAlDia,
+    parseFechaLocal,
     crearConfigInicial,
     crearAlumnoVacio,
     normalizarAlumno,
@@ -174,7 +176,7 @@ const GestionAlumnosPage = ({ onBack, usuario, sedeActual }) => {
         [todosAlumnos, alumnoPagoId]
     );
 
-    const stats = useMemo(() => estadisticasAlumnos(alumnosActivos, config), [alumnosActivos, config]);
+    const stats = useMemo(() => estadisticasAlumnos(todosAlumnos, config), [todosAlumnos, config]);
     const visibles = useMemo(() => {
         const base = verArchivados ? alumnosArchivados : alumnosActivos;
         const texto = busqueda.trim().toLowerCase();
@@ -589,17 +591,25 @@ const GestionAlumnosPage = ({ onBack, usuario, sedeActual }) => {
         if (!Number.isFinite(monto) || monto <= 0) {
             return notify('Ingresa un monto válido.', 'error');
         }
-        const meses = Math.min(12, Math.max(1, Number(pagoDraft.meses) || 1));
-        const fechaBase = alumnoPago.fechaPago || fechaHoy();
+        const fechaPago = pagoDraft.fecha || fechaHoy();
+        if (fechaPago > fechaHoy()) {
+            return notify('La fecha del pago no puede ser futura.', 'error');
+        }
+        const meses = Math.min(36, Math.max(1, Number(pagoDraft.meses) || 1));
+        const fechaBase = parseFechaLocal(alumnoPago.fechaPago)
+            ? String(alumnoPago.fechaPago).slice(0, 10)
+            : fechaHoy();
         const nuevaFecha = sumarMeses(fechaBase, meses);
         const registro = {
             id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            fecha: pagoDraft.fecha || fechaHoy(),
+            fecha: fechaPago,
             monto,
             metodo: pagoDraft.metodo || 'Efectivo',
             meses,
             nota: pagoDraft.nota.trim(),
             periodo: fechaBase,
+            periodoDesde: fechaBase,
+            periodoHasta: nuevaFecha,
             registradoPor: usuario?.uid || '',
             registradoEn: new Date().toISOString()
         };
@@ -615,7 +625,13 @@ const GestionAlumnosPage = ({ onBack, usuario, sedeActual }) => {
                 ultimaActualizacion: new Date().toISOString()
             });
             setAlumnoPagoId(null);
-            notify('Pago registrado');
+            const estadoNuevo = calcularEstadoPago(nuevaFecha, true);
+            notify(
+                estadoNuevo.key === 'atrasado'
+                    ? `Pago registrado. Aún quedan ${Math.abs(estadoNuevo.diff)} días de atraso.`
+                    : 'Pago registrado',
+                estadoNuevo.key === 'atrasado' ? 'warning' : 'success'
+            );
         } catch (error) {
             console.error('Error al registrar pago:', error);
             notify('No se pudo registrar el pago.', 'error');
@@ -973,6 +989,7 @@ const GestionAlumnosPage = ({ onBack, usuario, sedeActual }) => {
                             value={busqueda}
                             onChange={(e) => setBusqueda(e.target.value)}
                             placeholder="Buscar por nombre, teléfono, programa..."
+                            aria-label="Buscar alumnos"
                             style={s.searchInput}
                         />
                         {busqueda && (
@@ -1477,6 +1494,7 @@ const DetalleAlumno = ({
     setNotasDetalle,
     guardarNotasDetalle,
     guardandoNotas}) => {
+    const dialogRef = useDialogA11y(true, cerrarDetalle);
     const data = normalizarAlumno(alumno, config);
     const estado = calcularEstadoPago(data.fechaPago, data.activo);
     const alerta = tieneAlertaMedica(data);
@@ -1497,7 +1515,7 @@ const DetalleAlumno = ({
 
     return (
         <div style={{ ...s.modalOverlay, padding: 0, alignItems: 'stretch', justifyContent: 'flex-end' }} className="gestion-modal-overlay" onClick={cerrarDetalle}>
-            <aside style={s.drawer} className="gestion-drawer" onClick={(e) => e.stopPropagation()}>
+            <aside ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={`Expediente de ${data.nombre || 'alumno'}`} style={s.drawer} className="gestion-drawer" onClick={(e) => e.stopPropagation()}>
                 <div style={s.drawerHeader}>
                     <div style={s.drawerIdentity}>
                         <span style={s.drawerAvatar}>
@@ -1542,11 +1560,13 @@ const DetalleAlumno = ({
                     )}
                 </div>
 
-                <div className="gestion-detail-tabs" style={s.detailTabs}>
+                <div className="gestion-detail-tabs" style={s.detailTabs} role="tablist" aria-label="Secciones del expediente">
                     {tabs.map((tab) => (
                         <button
                             key={tab.id}
                             type="button"
+                            role="tab"
+                            aria-selected={tabDetalle === tab.id}
                             onClick={() => setTabDetalle(tab.id)}
                             style={tabDetalle === tab.id ? s.detailTabActive : s.detailTab}
                         >
@@ -1758,6 +1778,11 @@ const DetalleAlumno = ({
                                         <div style={s.paymentRowText}>
                                             <strong>{formatearMoneda(pago.monto, config.moneda)}</strong>
                                             <span>{formatearFecha(pago.fecha)} · {pago.metodo || 'Pago'}{pago.meses > 1 ? ` · ${pago.meses} meses` : ''}</span>
+                                            {pago.periodoDesde && pago.periodoHasta && (
+                                                <span style={{ color: '#777', fontSize: '0.6rem' }}>
+                                                    Cubre {formatearFecha(pago.periodoDesde, { conAnio: false })} → {formatearFecha(pago.periodoHasta, { conAnio: false })}
+                                                </span>
+                                            )}
                                             {pago.nota && <span style={s.paymentNote}>{pago.nota}</span>}
                                         </div>
                                     </div>
@@ -1806,6 +1831,7 @@ const FormularioAlumno = ({
     config,
     togglePrograma,
     toggleHorario}) => {
+    const dialogRef = useDialogA11y(true, cerrarFormulario);
     const pasos = [
         { label: 'Personal', icon: 'user' },
         { label: 'Salud', icon: 'medical' },
@@ -1819,7 +1845,7 @@ const FormularioAlumno = ({
 
     return (
         <div style={{ ...s.modalOverlay, zIndex: 3200 }} className="gestion-modal-overlay">
-            <div style={s.formModal} className="gestion-form-modal">
+            <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={editandoId ? 'Editar alumno' : 'Nuevo alumno'} style={s.formModal} className="gestion-form-modal">
                 <div style={s.formHeader}>
                     <div style={{ minWidth: 0 }}>
                         <span style={s.eyebrow}>{editandoId ? 'EDITAR EXPEDIENTE' : 'NUEVO ALUMNO'}</span>
@@ -2181,6 +2207,7 @@ const ConfiguracionSede = ({
     vincularInstructor,
     copiarCodigo,
     esPropietario}) => {
+    const dialogRef = useDialogA11y(true, cerrarConfig);
     const tabs = [
         { id: 'identidad', label: 'Identidad', icon: 'building' },
         { id: 'horarios', label: 'Horarios', icon: 'calendar' },
@@ -2191,7 +2218,7 @@ const ConfiguracionSede = ({
 
     return (
         <div style={{ ...s.modalOverlay, zIndex: 3300 }} className="gestion-modal-overlay">
-            <div style={s.configModal} className="gestion-config-modal">
+            <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Configuración de sede" style={s.configModal} className="gestion-config-modal">
                 <div style={s.formHeader}>
                     <div style={{ minWidth: 0 }}>
                         <span style={s.eyebrow}>PANEL DEL DOJO</span>
@@ -2202,11 +2229,13 @@ const ConfiguracionSede = ({
                     </button>
                 </div>
 
-                <div className="gestion-config-tabs" style={s.configTabs}>
+                <div className="gestion-config-tabs" style={s.configTabs} role="tablist" aria-label="Secciones de configuración">
                     {tabs.map((tab) => (
                         <button
                             key={tab.id}
                             type="button"
+                            role="tab"
+                            aria-selected={tabConfig === tab.id}
                             onClick={() => setTabConfig(tab.id)}
                             style={tabConfig === tab.id ? s.configTabActive : s.configTab}
                         >
@@ -2489,13 +2518,21 @@ const ModalPago = ({
     cerrarPago,
     guardarPago,
     guardandoPago}) => {
-    const fechaBase = alumno.fechaPago || fechaHoy();
-    const proximaFecha = sumarMeses(fechaBase, Math.max(1, Number(pagoDraft.meses) || 1));
+    const fechaBase = parseFechaLocal(alumno.fechaPago)
+        ? String(alumno.fechaPago).slice(0, 10)
+        : fechaHoy();
+    const meses = Math.max(1, Number(pagoDraft.meses) || 1);
+    const proximaFecha = sumarMeses(fechaBase, meses);
+    const estadoActual = calcularEstadoPago(fechaBase, alumno.activo);
+    const estadoNuevo = calcularEstadoPago(proximaFecha, true);
+    const mesesAlDia = mesesParaAlDia(fechaBase);
+    const opcionesMeses = [...new Set([1, 2, 3, 4, 6, 12, meses, mesesAlDia])].sort((a, b) => a - b);
     const metodosDisponibles = [...new Set([...(metodosPago || []), pagoDraft.metodo].filter(Boolean))];
+    const dialogRef = useDialogA11y(true, cerrarPago);
 
     return (
         <div style={{ ...s.modalOverlay, zIndex: 3400 }} className="gestion-modal-overlay gestion-payment-overlay">
-            <div style={s.paymentModal} className="gestion-payment-modal">
+            <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={`Registrar pago de ${alumno.nombre || 'alumno'}`} style={s.paymentModal} className="gestion-payment-modal">
                 <div style={s.formHeader}>
                     <div>
                         <span style={s.eyebrow}>REGISTRAR PAGO</span>
@@ -2510,12 +2547,24 @@ const ModalPago = ({
                     <div style={s.paymentCurrent}>
                         <span style={s.financeLabel}>PRÓXIMO PAGO ACTUAL</span>
                         <strong style={s.paymentCurrentValue}>{formatearFecha(fechaBase)}</strong>
+                        <span style={{ ...s.paymentCurrentSub, color: estadoActual.color, fontWeight: 'bold' }}>
+                            {estadoActual.label}
+                        </span>
                         <span style={s.paymentCurrentSub}>{formatearMoneda(alumno.montoMensualidad, config.moneda)} de mensualidad</span>
+                        {estadoActual.key === 'atrasado' && meses < mesesAlDia && (
+                            <button
+                                type="button"
+                                onClick={() => setPagoDraft((prev) => ({ ...prev, meses: mesesAlDia }))}
+                                style={{ ...s.ghostBtn, marginTop: '6px', padding: '7px 9px', fontSize: '0.62rem' }}
+                            >
+                                PONER AL DÍA ({mesesAlDia} {mesesAlDia === 1 ? 'mes' : 'meses'})
+                            </button>
+                        )}
                     </div>
 
                     <div className="gestion-form-grid" style={s.formGrid}>
                         <Campo label="Fecha del pago">
-                            <input type="date" value={pagoDraft.fecha} onChange={(e) => setPagoDraft((prev) => ({ ...prev, fecha: e.target.value }))} style={s.input} />
+                            <input type="date" max={fechaHoy()} value={pagoDraft.fecha} onChange={(e) => setPagoDraft((prev) => ({ ...prev, fecha: e.target.value }))} style={s.input} />
                         </Campo>
                         <Campo label={`Monto (${config.moneda || 'MXN'})`} required>
                             <input type="number" min="0" step="50" value={pagoDraft.monto} onChange={(e) => setPagoDraft((prev) => ({ ...prev, monto: e.target.value }))} style={s.input} placeholder="0" />
@@ -2527,7 +2576,7 @@ const ModalPago = ({
                         </Campo>
                         <Campo label="Meses cubiertos">
                             <select value={pagoDraft.meses} onChange={(e) => setPagoDraft((prev) => ({ ...prev, meses: Number(e.target.value) }))} style={s.input}>
-                                {[1, 2, 3, 4, 6, 12].map((meses) => <option key={meses} value={meses}>{meses} {meses === 1 ? 'mes' : 'meses'}</option>)}
+                                {opcionesMeses.map((opcion) => <option key={opcion} value={opcion}>{opcion} {opcion === 1 ? 'mes' : 'meses'}</option>)}
                             </select>
                         </Campo>
                         <Campo label="Nota" full>
@@ -2535,11 +2584,29 @@ const ModalPago = ({
                         </Campo>
                     </div>
 
-                    <div style={s.nextPaymentBox}>
-                        <VaultIcon name="calendar" size={16} color="#4CAF50" />
+                    <div style={{
+                        ...s.nextPaymentBox,
+                        background: estadoNuevo.key === 'atrasado' ? 'rgba(255,107,107,0.06)' : s.nextPaymentBox.background,
+                        borderColor: estadoNuevo.key === 'atrasado' ? 'rgba(255,107,107,0.35)' : 'rgba(76,175,80,0.25)'
+                    }}>
+                        <VaultIcon name="calendar" size={16} color={estadoNuevo.key === 'atrasado' ? '#ff6b6b' : '#4CAF50'} />
                         <div>
                             <span style={s.financeLabel}>NUEVO PRÓXIMO PAGO</span>
-                            <strong style={s.nextPaymentValue}>{formatearFecha(proximaFecha)}</strong>
+                            <strong style={{ ...s.nextPaymentValue, color: estadoNuevo.key === 'atrasado' ? '#ff6b6b' : '#4CAF50' }}>
+                                {formatearFecha(proximaFecha)}
+                            </strong>
+                            <span style={s.paymentCurrentSub}>
+                                Cubre {formatearFecha(fechaBase, { conAnio: false })} → {formatearFecha(proximaFecha, { conAnio: false })}
+                            </span>
+                            {estadoNuevo.key === 'atrasado' ? (
+                                <p style={{ margin: '4px 0 0', color: '#ff6b6b', fontSize: '0.66rem', lineHeight: 1.4 }}>
+                                    Aún quedarán {Math.abs(estadoNuevo.diff)} días de atraso. Con {mesesAlDia} {mesesAlDia === 1 ? 'mes' : 'meses'} quedaría al día.
+                                </p>
+                            ) : (
+                                <p style={{ margin: '4px 0 0', color: '#4CAF50', fontSize: '0.66rem' }}>
+                                    Quedará al día.
+                                </p>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -2733,7 +2800,7 @@ const s = {
     },
     searchInput: { flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: '0.7rem' },
     clearSearch: {
-        width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: 'transparent', border: 'none', color: '#666', cursor: 'pointer'
     },
     filterRow: { display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' },
@@ -2800,7 +2867,7 @@ const s = {
     medicalFlag: { display: 'inline-flex', alignItems: 'center', gap: '3px', color: '#ff6b6b', fontSize: '0.46rem', fontWeight: 800 },
     cellActions: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px' },
     rowAction: {
-        width: '27px', height: '27px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: '#111', border: '1px solid #2a2a2a', color: '#888', borderRadius: '5px', cursor: 'pointer'
     },
 
@@ -3048,11 +3115,11 @@ const s = {
     scheduleTime: { color: '#d4af37', fontSize: '0.66rem', fontWeight: 800, minWidth: '46px' },
     scheduleInfo: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1px' },
     iconBtnSmall: {
-        width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: '#111', border: '1px solid #2a2a2a', color: '#888', borderRadius: '5px', cursor: 'pointer'
     },
     iconBtnDanger: {
-        width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: 'rgba(255,107,107,0.06)', border: '1px solid rgba(255,107,107,0.35)',
         color: '#ff6b6b', borderRadius: '5px', cursor: 'pointer'
     },

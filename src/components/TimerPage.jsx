@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import Swal from 'sweetalert2';
 import VaultIcon from './VaultIcon';
 import { timerSounds, unlockAudio, vibrate } from '../utils/timerAudio';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
 const formatTime = (segundos = 0) => {
     const total = Math.max(0, Math.floor(segundos));
@@ -480,6 +481,7 @@ export default function TimerPage({ onBack }) {
     });
     const [customRules, setCustomRules] = useState(cargarReglasCustom);
     const [showRulesSettings, setShowRulesSettings] = useState(false);
+    const rulesDialogRef = useDialogA11y(showRulesSettings, () => setShowRulesSettings(false));
     const [customDraft, setCustomDraft] = useState(cargarReglasCustom);
 
     useEffect(() => {
@@ -1034,8 +1036,8 @@ export default function TimerPage({ onBack }) {
 
     const bloqueReloj = (
         <div style={esMovil ? { minWidth: 0 } : s.compClockBlock}>
-            <div style={{ ...s.compTimeValue, color: matchUrgente ? '#ff6b6b' : '#d4af37' }} className="comp-time-value">{formatTime(matchDisplay)}</div>
-            <div style={{ ...s.compStatus, color: winner && winner !== 'Empate' ? '#4CAF50' : matchPhase === 'running' ? '#d4af37' : '#888' }}>
+            <div role="timer" aria-label={`Tiempo de combate ${formatTime(matchDisplay)}`} style={{ ...s.compTimeValue, color: matchUrgente ? '#ff6b6b' : '#d4af37' }} className="comp-time-value">{formatTime(matchDisplay)}</div>
+            <div aria-live="polite" style={{ ...s.compStatus, color: winner && winner !== 'Empate' ? '#4CAF50' : matchPhase === 'running' ? '#d4af37' : '#888' }}>
                 {winner && winner !== 'Empate' && <VaultIcon name="trophy" size={13} color="#4CAF50" />}
                 {estadoCompetencia()}
             </div>
@@ -1239,10 +1241,10 @@ export default function TimerPage({ onBack }) {
                                 </div>
 
                                 <div style={s.bigTimerBox}>
-                                    <span style={{ ...s.phaseLabel, color: intervalPhase === 'rest' ? '#4CAF50' : intervalPhase === 'paused' ? '#888' : '#d4af37' }}>
+                                    <span aria-live="polite" style={{ ...s.phaseLabel, color: intervalPhase === 'rest' ? '#4CAF50' : intervalPhase === 'paused' ? '#888' : '#d4af37' }}>
                                         {etiquetaFaseIntervalo()}
                                     </span>
-                                    <div style={{ ...s.bigTime, color: intervaloUrgente ? '#ff6b6b' : intervalPhase === 'rest' ? '#4CAF50' : '#d4af37' }}>
+                                    <div role="timer" aria-label={`Tiempo ${formatTime(intervalDisplay)}`} style={{ ...s.bigTime, color: intervaloUrgente ? '#ff6b6b' : intervalPhase === 'rest' ? '#4CAF50' : '#d4af37' }}>
                                         {formatTime(intervalDisplay)}
                                     </div>
                                     <div style={s.timerMeta}>
@@ -1399,7 +1401,7 @@ export default function TimerPage({ onBack }) {
             {/* MODAL DE REGLAS PERSONALIZADAS */}
             {showRulesSettings && (
                 <div style={s.modalOverlay}>
-                    <div style={s.modalCard}>
+                    <div ref={rulesDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Reglas personalizadas" style={s.modalCard}>
                         <div style={s.modalHeader}>
                             <h3 style={s.modalTitle}><VaultIcon name="settings" size={16} /> Reglas personalizadas</h3>
                             <button type="button" onClick={() => setShowRulesSettings(false)} style={s.iconBtn} aria-label="Cerrar">

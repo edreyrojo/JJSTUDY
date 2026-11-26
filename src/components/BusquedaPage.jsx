@@ -142,6 +142,7 @@ const BusquedaPage = ({ onBack, onSelectVideo, styles, usuario, vistos = [], vid
                 <input
                     type="text"
                     placeholder="Busca técnica, posición, autor, etiqueta... (ej: darce, media guardia, Gordon)"
+                    aria-label="Buscar técnicas"
                     value={termino}
                     onChange={(e) => { setTermino(e.target.value); setLimite(60); }}
                     style={{ width: '100%', padding: '13px 42px 13px 40px', backgroundColor: '#111', border: '1px solid #d4af37', color: '#fff', borderRadius: '8px', fontSize: '0.9rem', boxSizing: 'border-box', outline: 'none' }}

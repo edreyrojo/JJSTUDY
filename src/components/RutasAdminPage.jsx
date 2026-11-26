@@ -12,7 +12,7 @@ import {
     where
 } from 'firebase/firestore';
 import Swal from 'sweetalert2';
-import VaultIcon from './VaultIcon';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 import { CURSOS, buscarTecnicas, tecnicasDeCurso, obtenerCurso } from '../data/vaultIndex';
 import {
     TIPOS_RUTA,
@@ -808,6 +808,7 @@ const RutasAdminPage = ({ onBack, usuario }) => {
                                     value={busquedaRutas}
                                     onChange={(e) => setBusquedaRutas(e.target.value)}
                                     placeholder="Buscar ruta..."
+                        aria-label="Buscar ruta"
                                     style={s.searchInput}
                                 />
                             </div>
@@ -1281,6 +1282,7 @@ const TabContenido = ({
                     value={cursoTerm}
                     onChange={(e) => setCursoTerm(e.target.value)}
                     placeholder="Buscar curso del Vault para liberar completo..."
+                    aria-label="Buscar curso del Vault"
                     style={s.searchInput}
                 />
             </div>
@@ -1350,6 +1352,7 @@ const TabVideos = ({ videos, onNuevo, onEditar, onEliminar, onIndexarEnRuta, dra
                     value={busqueda}
                     onChange={(e) => setBusqueda(e.target.value)}
                     placeholder="Buscar video indexado por nombre, curso o etiqueta..."
+                    aria-label="Buscar video indexado"
                     style={s.searchInput}
                 />
             </div>
@@ -1493,6 +1496,7 @@ const TabDestinos = ({
                     value={busquedaDestino}
                     onChange={(e) => setBusquedaDestino(e.target.value)}
                     placeholder="Buscar destino por nombre..."
+                    aria-label="Buscar destino"
                     style={s.searchInput}
                 />
             </div>
@@ -1639,6 +1643,7 @@ const TabAjustes = ({ draft, actualizar, metricas, asignacionesRuta, onGuardar, 
 /* MODAL DE VIDEO                                                      */
 /* ------------------------------------------------------------------ */
 const ModalVideo = ({ videoDraft, setVideoDraft, onCerrar, onGuardar, guardando, editando }) => {
+    const dialogRef = useDialogA11y(true, onCerrar);
     const fuente = videoDraft.fuente === 'youtube' ? 'youtube' : 'drive';
     const idDetectado = fuente === 'youtube' ? extraerYoutubeId(videoDraft.url) : extraerDriveId(videoDraft.url);
     const normalizado = normalizarVideoDinamico({ ...videoDraft, driveId: fuente === 'drive' ? idDetectado : '', youtubeId: fuente === 'youtube' ? idDetectado : '' });
@@ -1646,7 +1651,7 @@ const ModalVideo = ({ videoDraft, setVideoDraft, onCerrar, onGuardar, guardando,
 
     return (
         <div style={s.modalOverlay} className="rutas-admin-modal-overlay">
-            <div style={s.modal}>
+            <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={editando ? 'Editar video' : 'Nuevo video'} style={s.modal}>
                 <div style={s.modalHead}>
                     <div>
                         <span style={s.eyebrow}>{editando ? 'EDITAR VIDEO' : 'INDEXAR VIDEO'}</span>
@@ -1767,6 +1772,7 @@ const ModalPicker = ({
     onElegirVideo,
     onAgregarCurso
 }) => {
+    const dialogRef = useDialogA11y(true, onCerrar);
     const modoVault = picker.modo === 'vault';
     const cursos = useMemo(() => {
         if (!modoVault) return [];
@@ -1780,7 +1786,7 @@ const ModalPicker = ({
 
     return (
         <div style={s.modalOverlay} className="rutas-admin-modal-overlay rutas-admin-picker-overlay">
-            <div style={{ ...s.modal, maxWidth: modoVault ? '720px' : '640px' }} className="rutas-admin-picker-modal">
+            <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={modoVault ? 'Contenido del Vault' : 'Videos indexados'} style={{ ...s.modal, maxWidth: modoVault ? '720px' : '640px' }} className="rutas-admin-picker-modal">
                 <div style={s.modalHead} className="rutas-admin-picker-head">
                     <div>
                         <span style={s.eyebrow}>AGREGAR LECCIÓN</span>
@@ -2132,20 +2138,20 @@ const s = {
     },
     seccionActions: { display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 },
     iconBtnSmall: {
-        width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: '#111', border: '1px solid #2a2a2a', color: '#888', borderRadius: '5px', cursor: 'pointer'
     },
     iconBtnDanger: {
-        width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: 'rgba(255,107,107,0.06)', border: '1px solid rgba(255,107,107,0.32)', color: '#ff6b6b',
         borderRadius: '5px', cursor: 'pointer'
     },
     iconBtnTiny: {
-        width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: '#111', border: '1px solid #252525', color: '#888', borderRadius: '4px', cursor: 'pointer'
     },
     iconBtnTinyDanger: {
-        width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: 'rgba(255,107,107,0.06)', border: '1px solid rgba(255,107,107,0.28)', color: '#ff6b6b',
         borderRadius: '4px', cursor: 'pointer'
     },

@@ -452,6 +452,7 @@ const MapaPage = ({
                     <input
                         type="text"
                         placeholder="Buscar técnica o autor..."
+                        aria-label="Buscar técnica o autor"
                         value={terminoBusqueda}
                         onChange={(e) => setTerminoBusqueda(e.target.value)}
                         style={{ width: '100%', padding: '10px 10px 10px 32px', backgroundColor: '#111', border: '1px solid #d4af37', color: '#fff', borderRadius: '6px', fontSize: '0.8rem', outline: 'none', boxSizing: 'border-box' }}

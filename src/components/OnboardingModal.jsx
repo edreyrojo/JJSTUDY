@@ -1,10 +1,12 @@
 // src/components/OnboardingModal.jsx
 import React, { useState, useEffect } from 'react';
 import { crearNuevoTeam, vincularInstructorASede, migrarDatosLegacy } from '../utils/teamsService';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
 const OnboardingModal = ({ usuario, styles, onComplete }) => {
     // Protección: Si styles no llega, evitamos que la app crashee
     const s = styles || {};
+    const dialogRef = useDialogA11y(true);
     
     const [paso, setPaso] = useState('elegir'); 
     const [cargando, setCargando] = useState(false);
@@ -90,7 +92,7 @@ const OnboardingModal = ({ usuario, styles, onComplete }) => {
 
     return (
         <div style={estiloBase}>
-            <div style={{ ...s.card, width: '100%', maxWidth: '480px', padding: '40px', border: '1px solid #d4af37' }}>
+            <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Configuración inicial" style={{ ...s.card, width: '100%', maxWidth: '480px', padding: '40px', border: '1px solid #d4af37' }}>
 
                 {/* HEADER */}
                 <div style={{ textAlign: 'center', marginBottom: '30px' }}>

@@ -1,6 +1,8 @@
 import React from 'react';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
 const InstalacionModal = ({ isOpen, onClose, styles = {} }) => {
+    const dialogRef = useDialogA11y(isOpen, onClose);
     if (!isOpen) return null;
 
     // Detectamos si es iOS para dar las instrucciones precisas
@@ -12,7 +14,7 @@ const InstalacionModal = ({ isOpen, onClose, styles = {} }) => {
             backgroundColor: 'rgba(0,0,0,0.9)', display: 'flex', justifyContent: 'center',
             alignItems: 'center', zIndex: 10000, padding: '20px', boxSizing: 'border-box'
         }}>
-            <div style={{
+            <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Instalar la aplicación" style={{
                 backgroundColor: '#111', border: '1px solid #d4af37', padding: '30px',
                 borderRadius: '15px', textAlign: 'center', maxWidth: '400px', position: 'relative'
             }}>

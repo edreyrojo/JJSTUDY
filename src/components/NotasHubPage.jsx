@@ -433,6 +433,7 @@ const NotasHubPage = ({ onBack, onNavigateToVideo, usuario, styles = {} }) => {
                             <input
                                 type="text"
                                 placeholder="Buscar en tus notas..."
+                                aria-label="Buscar en notas"
                                 value={busquedaNota}
                                 onChange={(e) => setBusquedaNota(e.target.value)}
                                 onFocus={(e) => e.target.style.borderColor = '#d4af37'}

@@ -6,6 +6,7 @@ import { obtenerTecnica } from '../data/vaultIndex';
 import { tieneAccesoVideo, pedirAcceso } from '../utils/accesoVault';
 import { mensajeContenidoBloqueado } from '../i18n/translate';
 import VaultIcon from './VaultIcon';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
 const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos = [], toggleVisto, usuario, styles = {}, getAdjacentVideo, accesoRutas }) => {
     // --- ESTADOS ---
@@ -25,6 +26,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
     // --- ESTADOS PARA REPORTES ---
     const [mostrarReporte, setMostrarReporte] = useState(false);
     const [enviandoReporte, setEnviandoReporte] = useState(false);
+    const reporteDialogRef = useDialogA11y(mostrarReporte, () => setMostrarReporte(false));
 
     const navegarVideo = (direccion) => {
         if (!getAdjacentVideo || !video) return;
@@ -498,7 +500,7 @@ const EstudioPage = ({ video, onBack, onSelectVideo, onNavigateToNotes, vistos =
             {/* MODAL DE REPORTE TÉCNICO */}
             {mostrarReporte && (
                 <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10005, padding: '20px', boxSizing: 'border-box' }}>
-                    <div style={{ backgroundColor: '#111', border: '1px solid #d4af37', padding: '25px', borderRadius: '12px', width: '100%', maxWidth: '350px', textAlign: 'center', boxSizing: 'border-box' }}>
+                    <div ref={reporteDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Reportar video" style={{ backgroundColor: '#111', border: '1px solid #d4af37', padding: '25px', borderRadius: '12px', width: '100%', maxWidth: '350px', textAlign: 'center', boxSizing: 'border-box' }}>
                         <h3 style={{ color: '#d4af37', marginTop: 0 }}>REPORTAR VIDEO</h3>
                         <p style={{ color: '#ccc', fontSize: '0.85rem', lineHeight: '1.5' }}>
                             ¿El video <b>"{video?.titulo}"</b> no carga o tiene errores? Ngasi revisará el enlace en el Vault.

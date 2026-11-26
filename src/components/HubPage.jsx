@@ -4,6 +4,7 @@ import { collection, addDoc, doc, query, orderBy, limit, getDocs, updateDoc, whe
 import Swal from 'sweetalert2';
 import VaultIcon from './VaultIcon';
 import { useI18n } from '../i18n/context';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
 const HubPage = ({
     onNavigate,
@@ -24,6 +25,9 @@ const HubPage = ({
     const [showAnuncio, setShowAnuncio] = useState(false);
     const [ancho, setAncho] = useState(window.innerWidth);
     const { lang, toggleLang } = useI18n();
+    const anuncioDialogRef = useDialogA11y(Boolean(showAnuncio && anuncioReciente), () => setShowAnuncio(false));
+    const soporteDialogRef = useDialogA11y(showSoporte, () => setShowSoporte(false));
+    const tutorialesDialogRef = useDialogA11y(showTutoriales, () => setShowTutoriales(false));
 
     useEffect(() => {
         const handleResize = () => setAncho(window.innerWidth);
@@ -727,7 +731,7 @@ const HubPage = ({
             {/* MODAL DE ANUNCIO */}
             {showAnuncio && anuncioReciente && (
                 <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: 'var(--app-vh)', backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10001, padding: '16px', boxSizing: 'border-box' }}>
-                    <div style={{ backgroundColor: '#0a0a0a', border: '1px solid #d4af37', padding: esMovil ? '20px' : '25px', borderRadius: '12px', width: '100%', maxWidth: '400px', maxHeight: '90vh', overflowY: 'auto', boxSizing: 'border-box' }}>
+                    <div ref={anuncioDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Anuncio reciente" style={{ backgroundColor: '#0a0a0a', border: '1px solid #d4af37', padding: esMovil ? '20px' : '25px', borderRadius: '12px', width: '100%', maxWidth: '400px', maxHeight: '90vh', overflowY: 'auto', boxSizing: 'border-box' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
                             <VaultIcon name="megaphone" size={22} color="#d4af37" />
                             <h3 style={{ color: '#d4af37', margin: 0 }}>{anuncioReciente.titulo || 'Nueva actualización'}</h3>
@@ -742,7 +746,7 @@ const HubPage = ({
             {/* MODAL DE SOPORTE */}
             {showSoporte && (
                 <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: 'var(--app-vh)', backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10001, padding: '16px', boxSizing: 'border-box' }}>
-                    <div style={{ backgroundColor: '#111', border: '1px solid #d4af37', padding: esMovil ? '20px' : '25px', borderRadius: '12px', width: '100%', maxWidth: '420px', maxHeight: '90vh', overflowY: 'auto', textAlign: 'center', boxSizing: 'border-box' }}>
+                    <div ref={soporteDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Contactar a soporte" style={{ backgroundColor: '#111', border: '1px solid #d4af37', padding: esMovil ? '20px' : '25px', borderRadius: '12px', width: '100%', maxWidth: '420px', maxHeight: '90vh', overflowY: 'auto', textAlign: 'center', boxSizing: 'border-box' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '14px' }}>
                             <VaultIcon name="support" size={20} color="#d4af37" />
                             <h3 style={{ color: '#d4af37', margin: 0 }}>CONTACTAR A SOPORTE</h3>
@@ -772,7 +776,7 @@ const HubPage = ({
             {/* MODAL DE TUTORIALES */}
             {showTutoriales && (
                 <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: 'var(--app-vh)', backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10001, padding: '16px', boxSizing: 'border-box' }}>
-                    <div style={{ backgroundColor: '#111', border: '1px solid #d4af37', padding: esMovil ? '20px' : '25px', borderRadius: '12px', width: '100%', maxWidth: '450px', maxHeight: '90vh', overflowY: 'auto', boxSizing: 'border-box' }}>
+                    <div ref={tutorialesDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Tutoriales de la app" style={{ backgroundColor: '#111', border: '1px solid #d4af37', padding: esMovil ? '20px' : '25px', borderRadius: '12px', width: '100%', maxWidth: '450px', maxHeight: '90vh', overflowY: 'auto', boxSizing: 'border-box' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '16px' }}>
                             <VaultIcon name="tutorial" size={20} color="#d4af37" />
                             <h3 style={{ color: '#d4af37', margin: 0 }}>TUTORIALES DE LA APP</h3>

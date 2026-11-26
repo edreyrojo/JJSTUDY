@@ -111,6 +111,18 @@ const leerGuardadoLocal = (clave, porDefecto) => {
   }
 };
 
+// Router mínimo por hash: no requiere react-router ni rewrites del servidor.
+const PAGINAS = new Set([
+  'hub', 'mapa', 'estudio', 'notas_hub', 'busqueda', 'rutas_aprendizaje',
+  'rutas_admin', 'alumnos', 'planeador', 'mi_cuenta', 'timer',
+  'panel_maestro', 'admin'
+]);
+
+const leerPaginaHash = () => {
+  const hash = String(window.location.hash || '').replace(/^#\/?/, '').trim();
+  return PAGINAS.has(hash) ? hash : null;
+};
+
 // --- 1. CONFIGURACIÓN DE ESTILOS ---
 const styles = {
   containerCenter: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 'var(--app-vh)' },
@@ -160,7 +172,7 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [usuario, setUsuario] = React.useState(null);
   const [cargando, setCargando] = React.useState(true);
-  const [page, setPage] = useState('login');
+  const [page, setPage] = useState(() => leerPaginaHash() || 'login');
   const [sedeGestionSel, setSedeGestionSel] = useState(null);
   const [userRole, setUserRole] = useState('usuario');
   const [categoriaSel, setCategoriaSel] = useState('AUTORES');
@@ -278,6 +290,56 @@ export default function App() {
   }, [usuario?.uid, usuario?.validado]);
 
   // --- 3. FUNCIONES DE LÓGICA ---
+
+  // Navegación de usuario: actualiza estado y URL (hash) para que funcionen
+  // el botón atrás del navegador/Android y los enlaces directos.
+  const navegar = React.useCallback((destino) => {
+    if (!destino) return;
+    if (!PAGINAS.has(destino)) {
+      setPage(destino);
+      return;
+    }
+    setPage(destino);
+    const hash = `#/${destino}`;
+    if (window.location.hash !== hash) {
+      window.location.hash = hash;
+    }
+  }, []);
+
+  React.useEffect(() => {
+    const aplicarHash = () => {
+      const destino = leerPaginaHash();
+      if (destino) setPage(destino);
+    };
+    window.addEventListener('hashchange', aplicarHash);
+    window.addEventListener('popstate', aplicarHash);
+    return () => {
+      window.removeEventListener('hashchange', aplicarHash);
+      window.removeEventListener('popstate', aplicarHash);
+    };
+  }, []);
+
+  const manejarNavegacion = React.useCallback((p) => {
+    if (p === 'instalar') setShowInstalar(true);
+    else if (p === 'onboarding') setShowOnboarding(true);
+    else {
+      if (p === 'alumnos') setSedeGestionSel(null);
+      navegar(p);
+    }
+  }, [navegar]);
+
+  // Mantiene la URL sincronizada sin llenar el historial en transiciones de auth.
+  React.useEffect(() => {
+    if (page === 'login' || page === 'espera') {
+      if (window.location.hash) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+      return;
+    }
+    if (PAGINAS.has(page) && window.location.hash !== `#/${page}`) {
+      window.history.replaceState(null, '', `#/${page}`);
+    }
+  }, [page]);
 
   const handleLogout = async () => {
     try {
@@ -494,7 +556,7 @@ export default function App() {
       const seleccionado = { ...v, origen };
       setVideoActual(seleccionado);
       localStorage.setItem('lafortuna_last_video', JSON.stringify(seleccionado));
-      setPage('estudio');
+      navegar('estudio');
       return;
     }
 
@@ -515,7 +577,7 @@ export default function App() {
     };
     setVideoActual(enriquecido);
     localStorage.setItem('lafortuna_last_video', JSON.stringify(enriquecido));
-    setPage('estudio');
+    navegar('estudio');
   };
 
   const handleContinue = () => {
@@ -612,14 +674,7 @@ export default function App() {
           <>
             <HubPage
               usuario={usuario}
-              onNavigate={(p) => {
-                if (p === 'instalar') setShowInstalar(true);
-                else if (p === 'onboarding') setShowOnboarding(true);
-                else {
-                  if (p === 'alumnos') setSedeGestionSel(null);
-                  setPage(p);
-                }
-              }}
+              onNavigate={manejarNavegacion}
               onContinue={handleContinue}
               hasSession={!!videoActual}
               userRole={userRole}
@@ -641,7 +696,7 @@ export default function App() {
         );
 
       case 'mapa':
-        return <MapaPage onBack={() => setPage('hub')} vistos={vistos} usuario={usuario}
+        return <MapaPage onBack={() => navegar('hub')} vistos={vistos} usuario={usuario}
           styles={styles}
           categoriaSel={categoriaSel} setCategoriaSel={setCategoriaSel}
           autorSel={autorSel} setAutorSel={setAutorSel}
@@ -649,22 +704,35 @@ export default function App() {
           volSel={volSel} setVolSel={setVolSel}
           rutasLiberadas={rutasLiberadas}
           accesoRutas={accesoRutas}
-          onOpenRutas={() => setPage('rutas_aprendizaje')}
+          onOpenRutas={() => navegar('rutas_aprendizaje')}
           onSelectVideo={handleSelectVideo}
-          onNavigateToNotes={() => setPage('notas_hub')} onContinue={handleContinue} hasSession={!!videoActual} />;
+          onNavigateToNotes={() => navegar('notas_hub')} onContinue={handleContinue} hasSession={!!videoActual} />;
 
       case 'estudio':
+        if (!videoActual) {
+          return (
+            <HubPage
+              usuario={usuario}
+              onNavigate={manejarNavegacion}
+              onContinue={handleContinue}
+              hasSession={false}
+              userRole={userRole}
+              onLogout={handleLogout}
+              styles={styles}
+            />
+          );
+        }
         return (
           <EstudioPage
             video={videoActual}
-            onBack={() => setPage(videoActual?.origen || 'mapa')}
+            onBack={() => navegar(videoActual?.origen || 'mapa')}
             vistos={vistos}
             toggleVisto={toggleVisto}
             styles={styles}
             getAdjacentVideo={getAdjacent}
             usuario={usuario}
             accesoRutas={accesoRutas}
-            onNavigateToNotes={() => setPage('notas_hub')}
+            onNavigateToNotes={() => navegar('notas_hub')}
             onSelectVideo={handleSelectVideo}
           />
         );
@@ -672,7 +740,7 @@ export default function App() {
       case 'notas_hub':
         return (
           <NotasHubPage
-            onBack={() => setPage('hub')}
+            onBack={() => navegar('hub')}
             eliminarNota={handleEliminarNota}
             onNavigateToVideo={handleSelectVideo}
             usuario={usuario}
@@ -683,7 +751,7 @@ export default function App() {
       case 'busqueda':
         return (
           <BusquedaPage
-            onBack={() => setPage('hub')}
+            onBack={() => navegar('hub')}
             onSelectVideo={handleSelectVideo}
             usuario={usuario}
             vistos={vistos}
@@ -696,26 +764,26 @@ export default function App() {
       case 'rutas_aprendizaje':
         return (
           <RutasAprendizajePage
-            onBack={() => setPage('hub')}
+            onBack={() => navegar('hub')}
             usuario={usuario}
             vistos={vistos}
             rutas={rutasData.rutas}
             videos={rutasData.videos}
             asignaciones={rutasData.asignaciones}
             onSelectVideo={handleSelectVideo}
-            onOpenBuilder={() => setPage('rutas_admin')}
-            onOpenMapa={() => setPage('mapa')}
+            onOpenBuilder={() => navegar('rutas_admin')}
+            onOpenMapa={() => navegar('mapa')}
           />
         );
 
       case 'rutas_admin':
         if (userRole === 'admin') {
-          return <RutasAdminPage onBack={() => setPage('hub')} usuario={usuario} />;
+          return <RutasAdminPage onBack={() => navegar('hub')} usuario={usuario} />;
         }
         return (
           <HubPage
             usuario={usuario}
-            onNavigate={setPage}
+            onNavigate={manejarNavegacion}
             userRole={userRole}
             onLogout={handleLogout}
             styles={styles}
@@ -726,26 +794,26 @@ export default function App() {
         if (['admin', 'profesor', 'instructor'].includes(userRole)) {
           return (
             <GestionAlumnosPage
-              onBack={() => { setSedeGestionSel(null); setPage('hub'); }}
+              onBack={() => { setSedeGestionSel(null); navegar('hub'); }}
               styles={styles}
               usuario={usuario}
               sedeActual={sedeGestionSel || (usuario?.sedeId ? null : academiaData)}
             />
           );
         }
-        return <HubPage usuario={usuario} onNavigate={setPage} userRole={userRole} onLogout={handleLogout} styles={styles} />;
+        return <HubPage usuario={usuario} onNavigate={manejarNavegacion} userRole={userRole} onLogout={handleLogout} styles={styles} />;
 
       case 'planeador':
         if (['admin', 'profesor', 'instructor'].includes(userRole)) {
           return (
             <PlaneadorClasesPage
-              onBack={() => setPage('hub')}
+              onBack={() => navegar('hub')}
               styles={styles}
               usuario={usuario}
             />
           );
         }
-        return <HubPage usuario={usuario} onNavigate={setPage} userRole={userRole} onLogout={handleLogout} styles={styles} />;
+        return <HubPage usuario={usuario} onNavigate={manejarNavegacion} userRole={userRole} onLogout={handleLogout} styles={styles} />;
 
       case 'mi_cuenta':
         return (
@@ -753,7 +821,7 @@ export default function App() {
             usuario={usuario}
             sedeActual={academiaData}
             notify={notify}
-            onBack={() => setPage('hub')}
+            onBack={() => navegar('hub')}
             styles={styles}
           />
         );
@@ -761,7 +829,7 @@ export default function App() {
       case 'timer':
         return (
           <TimerPage
-            onBack={() => setPage('hub')}
+            onBack={() => navegar('hub')}
             styles={styles}
           />
         );
@@ -775,23 +843,23 @@ export default function App() {
               sedeData={academiaData}
               onVerSede={(sede) => {
                 setSedeGestionSel(sede || null);
-                setPage('alumnos');
+                navegar('alumnos');
               }}
-              onBack={() => setPage('hub')}
+              onBack={() => navegar('hub')}
               styles={styles}
             />
           );
         }
-        return <HubPage usuario={usuario} onNavigate={setPage} userRole={userRole} onLogout={handleLogout} styles={styles} />;
+        return <HubPage usuario={usuario} onNavigate={manejarNavegacion} userRole={userRole} onLogout={handleLogout} styles={styles} />;
 
       case 'admin':
         if (userRole === 'admin') {
-          return <AdminPage onBack={() => setPage('hub')} />;
+          return <AdminPage onBack={() => navegar('hub')} />;
         }
         return (
           <HubPage
             usuario={usuario}
-            onNavigate={setPage}
+            onNavigate={manejarNavegacion}
             userRole={userRole}
             onLogout={handleLogout}
             styles={styles}
@@ -802,7 +870,7 @@ export default function App() {
         return (
           <HubPage
             usuario={usuario}
-            onNavigate={setPage}
+            onNavigate={manejarNavegacion}
             userRole={userRole}
             onLogout={handleLogout}
             styles={styles}

@@ -97,8 +97,26 @@ export const sumarMeses = (fechaBase, meses = 1) => {
     return isoLocal(resultado);
 };
 
-export const proximoVencimiento = (diaVencimiento = 1) => {
-    const dia = Math.min(31, Math.max(1, Number(diaVencimiento) || 1));
+/**
+ * Meses mínimos que hay que pagar para que el nuevo vencimiento quede
+ * en el futuro. Si ya está al día devuelve 1.
+ */
+export const mesesParaAlDia = (fechaVencimiento, mesesMax = 36) => {
+    const vencimiento = parseFechaLocal(fechaVencimiento);
+    if (!vencimiento) return 1;
+
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    if (vencimiento >= hoy) return 1;
+
+    for (let meses = 1; meses <= mesesMax; meses += 1) {
+        const nueva = parseFechaLocal(sumarMeses(fechaVencimiento, meses));
+        if (nueva && nueva > hoy) return meses;
+    }
+    return mesesMax;
+};
+
+export const proximoVencimiento = (diaVencimiento = 1) => {    const dia = Math.min(31, Math.max(1, Number(diaVencimiento) || 1));
     const hoy = new Date();
     let anio = hoy.getFullYear();
     let mes = hoy.getMonth();
@@ -294,7 +312,11 @@ export const estadisticasAlumnos = (alumnos = [], config = {}) => {
             esperadoMes += monto;
             if (estado.key === 'atrasado') pendienteEstimado += monto;
         }
+    });
 
+    // Cobrado del mes: incluye pagos de alumnos activos y archivados.
+    // Es dinero que entró, no solo de la lista activa.
+    alumnos.forEach((alumno) => {
         if (Array.isArray(alumno.historialPagos)) {
             alumno.historialPagos.forEach((pago) => {
                 if (String(pago?.fecha || '').slice(0, 7) === mesActual) {

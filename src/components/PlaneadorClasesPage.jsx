@@ -19,6 +19,7 @@ import Swal from 'sweetalert2';
 import VaultIcon from './VaultIcon';
 import { timerSounds, unlockAudio, vibrate } from '../utils/timerAudio';
 import { comprimirImagen } from '../utils/imageUtils';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 import {
     PLANTILLAS,
     TIPOS_BLOQUE,
@@ -168,6 +169,7 @@ const PlaneadorClasesPage = ({ onBack, usuario }) => {
     // --- FOTO / BITÁCORA ---
     const [subiendoFoto, setSubiendoFoto] = useState(false);
     const [fotoAmpliada, setFotoAmpliada] = useState(false);
+    const fotoDialogRef = useDialogA11y(fotoAmpliada, () => setFotoAmpliada(false));
     const [feedbackDraft, setFeedbackDraft] = useState({ rating: 0, funciono: '', mejorar: '' });
     const [guardandoFeedback, setGuardandoFeedback] = useState(false);
     const [comentarioDraft, setComentarioDraft] = useState('');
@@ -1580,7 +1582,15 @@ const PlaneadorClasesPage = ({ onBack, usuario }) => {
             )}
 
             {fotoAmpliada && claseActual?.fotoBase64 && (
-                <div style={s.modalOverlay} onClick={() => setFotoAmpliada(false)}>
+                <div
+                ref={fotoDialogRef}
+                tabIndex={-1}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Foto ampliada de la clase"
+                style={s.modalOverlay}
+                onClick={() => setFotoAmpliada(false)}
+            >
                     <div style={s.photoModal} onClick={(e) => e.stopPropagation()}>
                         <button type="button" onClick={() => setFotoAmpliada(false)} style={s.modalClose} aria-label="Cerrar foto">
                             <VaultIcon name="close" size={18} />
@@ -2069,6 +2079,7 @@ const DetalleClase = ({
                                 value={busquedaAlumno}
                                 onChange={(e) => setBusquedaAlumno(e.target.value)}
                                 placeholder="Buscar alumno..."
+                        aria-label="Buscar alumno en la lista"
                                 style={s.studentSearchInput}
                             />
                         </div>
@@ -2377,10 +2388,10 @@ const DetalleClase = ({
                     </div>
 
                     <div style={s.timerClockWrap}>
-                        <span className={urgente ? 'planner-timer-urgent' : ''} style={s.timerClock}>
+                        <span role="timer" aria-label={`Tiempo ${formatearTiempo(timerRestante)}`} className={urgente ? 'planner-timer-urgent' : ''} style={s.timerClock}>
                             {formatearTiempo(timerRestante)}
                         </span>
-                        <span style={s.timerClockLabel}>{timerFase === 'prep' ? 'PREP' : 'TIEMPO'}</span>
+                        <span aria-live="polite" style={s.timerClockLabel}>{timerFase === 'prep' ? 'PREP' : 'TIEMPO'}</span>
                     </div>
 
                     <div style={s.timerControls}>
@@ -2541,9 +2552,11 @@ const DetalleClase = ({
     );
 };
 
-const ModalTiposBloque = ({ onCerrar, onElegir }) => (
-    <div style={s.modalOverlay} onClick={onCerrar}>
-        <div style={s.modalCard} onClick={(e) => e.stopPropagation()}>
+const ModalTiposBloque = ({ onCerrar, onElegir }) => {
+    const dialogRef = useDialogA11y(true, onCerrar);
+    return (
+        <div style={s.modalOverlay} onClick={onCerrar}>
+            <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Tipos de bloque" style={s.modalCard} onClick={(e) => e.stopPropagation()}>
             <div style={s.modalHeader}>
                 <div>
                     <span style={s.eyebrow}>NUEVO BLOQUE</span>
@@ -2567,7 +2580,8 @@ const ModalTiposBloque = ({ onCerrar, onElegir }) => (
             </div>
         </div>
     </div>
-);
+    );
+};
 
 /* ------------------------------------------------------------------ */
 /* ESTILOS                                                             */

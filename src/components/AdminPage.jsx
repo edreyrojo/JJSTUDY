@@ -642,6 +642,7 @@ const AdminPage = ({ onBack }) => {
                                         <VaultIcon name="search" size={16} />
                                         <input
                                             placeholder="Buscar por nombre, correo, rol o academia..."
+                                            aria-label="Buscar usuarios"
                                             style={s.searchInput}
                                             value={filtroUser}
                                             onChange={(e) => setFiltroUser(e.target.value)}
@@ -970,6 +971,7 @@ const AdminPage = ({ onBack }) => {
                                         <VaultIcon name="search" size={16} />
                                         <input
                                             placeholder="Buscar por nombre, correo o mensaje..."
+                                            aria-label="Buscar tickets de soporte"
                                             style={s.searchInput}
                                             value={busquedaTicket}
                                             onChange={(e) => setBusquedaTicket(e.target.value)}
