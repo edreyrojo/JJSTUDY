@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { db, auth } from '../firebase';
 import {
   collection,
@@ -53,9 +53,7 @@ const MarcasVideoAdminPage = () => {
   const [form, setForm] = useState({ tiempo: '', titulo: '', descripcion: '' });
   const [editandoId, setEditandoId] = useState(null);
   const [guardando, setGuardando] = useState(false);
-  const [tiempoActual, setTiempoActual] = useState(0);
-  const [videoError, setVideoError] = useState(false);
-  const videoRef = useRef(null);
+  const [previewStart, setPreviewStart] = useState(0);
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -92,22 +90,19 @@ const MarcasVideoAdminPage = () => {
   const videoSel = tecnicasCurso.find((t) => t.id === videoSelId) || null;
   const cursoSel = CURSOS.find((c) => c.id === cursoId) || null;
 
-  // Los instruccionales del Vault son archivos de Drive. Para los videos de
-  // YouTube se usa el embed, donde el tiempo se escribe a mano.
+  // Los instruccionales del Vault son archivos de Drive y se reproducen con el
+  // visor oficial embebido. Los videos de YouTube usan su propio embed.
   const esYoutube = /^[A-Za-z0-9_-]{11}$/.test(String(videoSel?.id || ''));
-  const driveSrc = videoSel
-    ? `https://drive.usercontent.google.com/download?id=${videoSel.id}&export=download&confirm=t`
+  const drivePreview = videoSel
+    ? `https://drive.google.com/file/d/${videoSel.id}/preview${previewStart > 0 ? `?t=${previewStart}s` : ''}`
     : '';
-  const youtubeSrc = videoSel ? `https://www.youtube.com/embed/${videoSel.id}?rel=0&modestbranding=1&playsinline=1` : '';
+  const youtubeSrc = videoSel
+    ? `https://www.youtube.com/embed/${videoSel.id}?rel=0&modestbranding=1&playsinline=1${previewStart > 0 ? `&start=${previewStart}` : ''}`
+    : '';
+  const previewSrc = esYoutube ? youtubeSrc : drivePreview;
 
   useEffect(() => {
-    setVideoError(false);
-    setTiempoActual(0);
-    const player = videoRef.current;
-    if (player) {
-      try { player.pause(); } catch { /* sin video cargado */ }
-      try { player.currentTime = 0; } catch { /* sin video cargado */ }
-    }
+    setPreviewStart(0);
   }, [videoSelId]);
 
   const marcasVideo = useMemo(
@@ -122,27 +117,10 @@ const MarcasVideoAdminPage = () => {
     setEditandoId(null);
   };
 
-  const irATiempo = (segundos) => {
+  const verEnVideo = (segundos) => {
     const valor = Number(segundos);
-    const player = videoRef.current;
-    if (!player || !Number.isFinite(valor) || valor < 0) return;
-    try {
-      player.currentTime = valor;
-      setTiempoActual(valor);
-    } catch (error) {
-      console.error('No se pudo mover el video:', error);
-    }
-  };
-
-  const capturarTiempo = () => {
-    const player = videoRef.current;
-    if (!player || !Number.isFinite(player.currentTime)) {
-      return notify('Reproduce el video y pausa en el momento que quieras marcar.', 'error');
-    }
-    const segundos = Math.floor(player.currentTime);
-    setForm((prev) => ({ ...prev, tiempo: formatearTiempo(segundos) }));
-    setTiempoActual(segundos);
-    notify(`Tiempo capturado: ${formatearTiempo(segundos)}`);
+    if (!Number.isFinite(valor) || valor < 0) return;
+    setPreviewStart(Math.floor(valor));
   };
 
   const usarTiempoEscrito = () => {
@@ -150,8 +128,14 @@ const MarcasVideoAdminPage = () => {
     if (segundos === null) {
       return notify('Escribe un tiempo válido, por ejemplo 03:45.', 'error');
     }
-    irATiempo(segundos);
+    verEnVideo(segundos);
     notify(`Video en ${formatearTiempo(segundos)}`);
+  };
+
+  const ajustarTiempo = (delta) => {
+    const base = parsearTiempo(form.tiempo) ?? previewStart;
+    const siguiente = Math.max(0, Math.round(base) + delta);
+    setForm((prev) => ({ ...prev, tiempo: formatearTiempo(siguiente) }));
   };
 
   const guardar = async () => {
@@ -304,72 +288,35 @@ const MarcasVideoAdminPage = () => {
               </div>
 
               <div style={m.playerBox}>
-                {esYoutube ? (
-                  <iframe
-                    src={youtubeSrc}
-                    title={videoSel.nombre}
-                    style={m.playerFrame}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
-                ) : videoError ? (
-                  <iframe
-                    src={`https://drive.google.com/file/d/${videoSel.id}/preview`}
-                    title={videoSel.nombre}
-                    style={m.playerFrame}
-                    allow="autoplay"
-                    allowFullScreen
-                  />
-                ) : (
-                  <video
-                    ref={videoRef}
-                    src={driveSrc}
-                    controls
-                    playsInline
-                    preload="metadata"
-                    style={m.videoEl}
-                    onTimeUpdate={(event) => setTiempoActual(event.currentTarget.currentTime)}
-                    onSeeked={(event) => setTiempoActual(event.currentTarget.currentTime)}
-                    onLoadedMetadata={(event) => setTiempoActual(event.currentTarget.currentTime)}
-                    onError={() => setVideoError(true)}
-                  >
-                    Tu navegador no puede reproducir este video.
-                  </video>
-                )}
+                <iframe
+                  key={`${videoSel.id}-${previewStart}`}
+                  src={previewSrc}
+                  title={videoSel.nombre}
+                  style={m.playerFrame}
+                  allow="autoplay; encrypted-media; picture-in-picture"
+                  allowFullScreen
+                />
 
                 <div style={m.playerBar}>
                   <span style={m.playerClock}>
                     <VaultIcon name="clock" size={12} />
-                    EN REPRODUCTOR: <strong>{formatearTiempo(tiempoActual)}</strong>
+                    REPRODUCTOR: <strong>{videoSel.nombre}</strong>
                   </span>
                   <div style={m.playerActions}>
-                    {!esYoutube && !videoError && (
-                      <button type="button" onClick={capturarTiempo} style={m.goldBtn}>
-                        <VaultIcon name="pin" size={13} /> CAPTURAR TIEMPO
-                      </button>
-                    )}
-                    <button type="button" onClick={usarTiempoEscrito} style={m.secondaryBtn}>
-                      IR AL TIEMPO ESCRITO
+                    <button type="button" onClick={() => setPreviewStart(0)} style={m.secondaryBtn}>
+                      REINICIAR
+                    </button>
+                    <button type="button" onClick={usarTiempoEscrito} style={m.goldBtn}>
+                      <VaultIcon name="pin" size={13} /> IR AL TIEMPO ESCRITO
                     </button>
                   </div>
                 </div>
 
-                {esYoutube && (
-                  <p style={m.playerNote}>
-                    Video de YouTube: pausa y escribe el minuto en el campo TIEMPO.
-                  </p>
-                )}
-                {videoError && (
-                  <p style={m.playerNote}>
-                    No se pudo reproducir aquí. Usa el visor de Drive y escribe el minuto
-                    visible en el reproductor.
-                  </p>
-                )}
-                {!esYoutube && !videoError && (
-                  <p style={m.playerNote}>
-                    Reproduce, pausa en el momento exacto y pulsa <strong>CAPTURAR TIEMPO</strong>.
-                  </p>
-                )}
+                <p style={m.playerNote}>
+                  Reproduce el video y pausa en el momento exacto. Mira el tiempo que muestra
+                  el reproductor, escríbelo abajo y pulsa <strong>IR AL TIEMPO ESCRITO</strong> para
+                  confirmarlo. {esYoutube ? 'En YouTube también puedes copiar el minuto actual.' : ''}
+                </p>
               </div>
 
               <section style={m.panel}>
@@ -385,7 +332,7 @@ const MarcasVideoAdminPage = () => {
                     <div key={marca.id} style={m.markerRow}>
                       <button
                         type="button"
-                        onClick={() => irATiempo(marca.segundos)}
+                        onClick={() => verEnVideo(marca.segundos)}
                         style={m.timeChip}
                         title="Ir a este momento del video"
                       >
@@ -425,8 +372,22 @@ const MarcasVideoAdminPage = () => {
                       value={form.tiempo}
                       onChange={(e) => setForm((prev) => ({ ...prev, tiempo: e.target.value }))}
                       placeholder="03:45"
+                      inputMode="numeric"
                       style={{ ...m.input, textAlign: 'center', color: '#d4af37', fontWeight: 'bold' }}
                     />
+                    <div style={m.nudgeRow}>
+                      {[-5, -1, 1, 5].map((delta) => (
+                        <button
+                          key={delta}
+                          type="button"
+                          onClick={() => ajustarTiempo(delta)}
+                          style={m.nudgeBtn}
+                          title={`${delta > 0 ? 'Sumar' : 'Restar'} ${Math.abs(delta)} segundos`}
+                        >
+                          {delta > 0 ? `+${delta}s` : `${delta}s`}
+                        </button>
+                      ))}
+                    </div>
                   </label>
                   <label style={{ ...m.field, gridColumn: 'span 2' }}>
                     <span style={m.label}>TÍTULO</span>
@@ -450,7 +411,7 @@ const MarcasVideoAdminPage = () => {
                   </label>
                 </div>
                 <div style={m.formActions}>
-                  <p style={m.hint}>Reproduce el video, captura el tiempo y guarda la marca. Los usuarios la verán al abrirlo.</p>
+                  <p style={m.hint}>Pausa el video en el momento exacto, escribe el tiempo y guarda. Los usuarios lo verán al abrirlo.</p>
                   <button type="button" onClick={guardar} disabled={guardando} style={m.goldBtn}>
                     <VaultIcon name={guardando ? 'clock' : 'check'} size={13} />
                     {guardando ? 'GUARDANDO...' : (editandoId ? 'GUARDAR CAMBIOS' : 'CREAR MARCA')}
@@ -487,7 +448,6 @@ const m = {
   videoBadge: { position: 'absolute', top: '6px', right: '6px', background: '#d4af37', color: '#000', borderRadius: '50%', width: '17px', height: '17px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.56rem', fontWeight: 800 },
   videoHead: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap', background: '#0a0a0a', border: '1px solid #222', borderRadius: '10px', padding: '12px' },
   playerBox: { background: '#0a0a0a', border: '1px solid #222', borderRadius: '10px', overflow: 'hidden', display: 'flex', flexDirection: 'column' },
-  videoEl: { width: '100%', aspectRatio: '16 / 9', maxHeight: '440px', background: '#000', display: 'block' },
   playerFrame: { width: '100%', aspectRatio: '16 / 9', maxHeight: '440px', border: 'none', background: '#000', display: 'block' },
   playerBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap', padding: '9px 11px', borderTop: '1px solid #1c1c1c' },
   playerClock: { display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#999', fontSize: '0.64rem', fontWeight: 700, letterSpacing: '0.4px' },
@@ -509,6 +469,8 @@ const m = {
   iconBtnDanger: { background: 'rgba(255,107,107,0.06)', border: '1px solid rgba(255,107,107,0.3)', color: '#ff6b6b', borderRadius: '5px', padding: '6px', display: 'flex', cursor: 'pointer' },
   formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px' },
   field: { display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0 },
+  nudgeRow: { display: 'flex', gap: '3px', marginTop: '3px' },
+  nudgeBtn: { flex: 1, background: '#0d0d0d', border: '1px solid #262626', color: '#999', borderRadius: '4px', padding: '4px 0', fontSize: '0.55rem', fontWeight: 700, cursor: 'pointer' },
   formActions: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '10px' },
   hint: { color: '#666', fontSize: '0.6rem', margin: 0, lineHeight: 1.4 },
   goldBtn: { display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#d4af37', color: '#000', border: 'none', borderRadius: '7px', padding: '9px 12px', fontSize: '0.64rem', fontWeight: 800, cursor: 'pointer' },
