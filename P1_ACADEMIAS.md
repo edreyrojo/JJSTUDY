@@ -109,7 +109,23 @@ La vista muestra **4 sedes sin academia**; hay que asignarlas desde
 
 Al asignarlas, el botón **NORMALIZAR** alinea su team y sus datos.
 
-## 8. Siguiente endurecimiento (opcional)
+## 8. Marcas de tiempo globales de instruccionales
+
+**Admin → CONTROL MAESTRO → MARCAS**
+
+- El admin elige curso y video, y crea marcas con tiempo (`03:45`), título y
+  descripción opcional.
+- Se guardan en `marcasVideo/{marcaId}`:
+  `videoId`, `cursoId`, `tiempo`, `segundos`, `titulo`, `descripcion`.
+- Reglas: lectura para usuarios validados; escritura solo admin.
+- En **Modo Estudio**, el usuario ve dos bloques separados:
+  - **MARCADORES DEL PROFESOR:** marcas globales del admin. Al tocarlas salta
+    al minuto.
+  - **MIS MARCADORES:** notas privadas del alumno (sin cambios).
+- Son independientes: el alumno puede seguir creando sus propias marcas sin
+  modificar las globales.
+
+## 9. Siguiente endurecimiento (opcional)
 
 - Mover `clases.asistencia` a una subcolección privada
   (`clases/{id}/asistencia/{alumnoId}`) si en el futuro se quieren compartir
