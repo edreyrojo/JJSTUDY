@@ -161,7 +161,8 @@ Validación de duración:
 - El admin muestra la duración real del video.
 - No permite guardar una marca posterior al final del video.
 - Las marcas viejas que quedaron fuera de rango se muestran en rojo en el
-  panel y se ocultan en Modo Estudio para no saltar al final por error.
+  panel, con un botón **LIMPIAR FUERA DE RANGO**, y se ocultan en Modo Estudio
+  para no saltar al final por error.
 
 ## 9. Siguiente endurecimiento (opcional)
 
