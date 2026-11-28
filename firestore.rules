@@ -385,6 +385,12 @@ service cloud.firestore {
       allow write: if esAdminTotal();
     }
 
+    // Cursos importados desde Drive: se suman al índice del Vault.
+    match /cursosVault/{cursoId} {
+      allow read: if esValidado();
+      allow write: if esAdminTotal();
+    }
+
     match /rutas/{rutaId} {
       allow read: if esValidado();
       allow write: if esAdminTotal();

@@ -42,7 +42,7 @@ const PanelMaestro = React.lazy(() => import('./components/PanelMaestro'));
 import LoginPage from './components/LoginPage';import HubPage from './components/HubPage';
 import InstalacionModal from './components/InstalacionModal';
 import { getAdjacentVideo } from './utils/videoHelpers';
-import { obtenerTecnica } from './data/vaultIndex';
+import { obtenerTecnica, registrarCursosDinamicos } from './data/vaultIndex';
 import { tieneAccesoVideo, tieneAccesoVideoDinamico, pedirAcceso, setAccesoDinamico, setCursosAcademia, setCursosSede } from './utils/accesoVault';
 import { adyacenteEnRuta, construirAccesoRutas, mapaVideos, rutasParaUsuario } from './utils/rutasAprendizaje';
 import { useI18n } from './i18n/context';
@@ -177,6 +177,7 @@ export default function App() {
   const [videoActual, setVideoActual] = useState(() => leerGuardadoLocal('lafortuna_last_video', null));
   const [academiaIdInput, setAcademiaIdInput] = useState('');
   const [rutasData, setRutasData] = useState({ rutas: [], videos: [], asignaciones: [] });
+  const [vaultVersion, setVaultVersion] = useState(0);
 
   // --- 2. EFECTO DE AUTENTICACIÓN (VERSIÓN BLINDADA) ---
   React.useEffect(() => {
@@ -301,6 +302,7 @@ export default function App() {
   React.useEffect(() => {
     if (!usuario?.uid || !usuario?.validado) {
       setRutasData({ rutas: [], videos: [], asignaciones: [] });
+      registrarCursosDinamicos([]);
       return undefined;
     }
 
@@ -319,7 +321,15 @@ export default function App() {
     const unsubs = [
       onSnapshot(collection(db, 'rutas'), manejar('rutas'), silencioso),
       onSnapshot(collection(db, 'videos'), manejar('videos'), silencioso),
-      onSnapshot(collection(db, 'asignacionesRuta'), manejar('asignaciones'), silencioso)
+      onSnapshot(collection(db, 'asignacionesRuta'), manejar('asignaciones'), silencioso),
+      onSnapshot(
+        collection(db, 'cursosVault'),
+        (snap) => {
+          registrarCursosDinamicos(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+          setVaultVersion((version) => version + 1);
+        },
+        silencioso
+      )
     ];
 
     return () => unsubs.forEach((unsub) => unsub());
@@ -703,7 +713,7 @@ export default function App() {
         );
 
       case 'mapa':
-        return <MapaPage onBack={() => navegar('hub')} vistos={vistos} usuario={usuario}
+        return <MapaPage key={`mapa-${vaultVersion}`} onBack={() => navegar('hub')} vistos={vistos} usuario={usuario}
           styles={styles}
           categoriaSel={categoriaSel} setCategoriaSel={setCategoriaSel}
           autorSel={autorSel} setAutorSel={setAutorSel}
@@ -758,6 +768,7 @@ export default function App() {
       case 'busqueda':
         return (
           <BusquedaPage
+            key={`busqueda-${vaultVersion}`}
             onBack={() => navegar('hub')}
             onSelectVideo={handleSelectVideo}
             usuario={usuario}

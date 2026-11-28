@@ -53,6 +53,7 @@ export const accesoDinamicoActual = () => ACCESO_DINAMICO;
 export const tieneAccesoVideo = (usuario, tecnica, acceso) => {
   if (!usuario || !tecnica) return false;
   if (usuario.rol === 'admin') return true;
+  if (tecnica.acceso === 'todos') return true;
 
   // Cursos liberados a toda la academia o solo a esta sede.
   if (CURSOS_ACADEMIA.has(String(tecnica.cursoId))) return true;

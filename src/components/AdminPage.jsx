@@ -6,6 +6,7 @@ import { DB_INSTRUCCIONALES } from '../data/instruccionales';
 import VaultIcon from './VaultIcon';
 import AcademiasAdminPage from './AcademiasAdminPage';
 import MarcasVideoAdminPage from './MarcasVideoAdminPage';
+import ImportarVaultPage from './ImportarVaultPage';
 import { sincronizarCodigosAcceso } from '../utils/teamsService';
 import { comprimirDataUrl } from '../utils/imageUtils';
 
@@ -395,6 +396,7 @@ const AdminPage = ({ onBack }) => {
     const tabs = [
         { id: 'usuarios', label: 'USUARIOS', icon: 'user', badge: usuariosPendientes },
         { id: 'estructuras', label: 'ESTRUCTURAS', icon: 'building', badge: 0 },
+        { id: 'vault', label: 'IMPORTAR', icon: 'bookOpen', badge: 0 },
         { id: 'marcas', label: 'MARCAS', icon: 'clock', badge: 0 },
         { id: 'anuncios', label: 'ANUNCIOS', icon: 'megaphone', badge: anuncios.length },
         { id: 'tickets', label: 'SOPORTE', icon: 'flag', badge: tickets.length },
@@ -568,6 +570,13 @@ const AdminPage = ({ onBack }) => {
                                     sedes={sedes}
                                     usuarios={usuarios}
                                 />
+                            </div>
+                        )}
+
+                        {/* IMPORTAR INSTRUCCIONALES */}
+                        {tabActiva === 'vault' && (
+                            <div style={s.viewSection}>
+                                <ImportarVaultPage />
                             </div>
                         )}
 

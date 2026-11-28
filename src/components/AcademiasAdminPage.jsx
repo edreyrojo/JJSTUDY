@@ -223,11 +223,12 @@ const AcademiasAdminPage = ({ academias = [], sedes = [], usuarios = [] }) => {
     setContenidoDestino('');
   }, [academia?.id]);
 
-  const busquedaCursos = useMemo(() => {
+  // Sin useMemo: CURSOS puede crecer cuando se importan cursos desde Firestore.
+  const busquedaCursos = (() => {
     const texto = busquedaCurso.trim().toLowerCase();
     if (!texto) return CURSOS;
     return CURSOS.filter((curso) => `${curso.titulo} ${curso.autor}`.toLowerCase().includes(texto));
-  }, [busquedaCurso]);
+  })();
 
   const salud = useMemo(() => {
     const sinTeam = academias.filter((aca) => !limpiar(aca.teamId)).length;
