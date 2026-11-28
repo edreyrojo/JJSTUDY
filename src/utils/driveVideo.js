@@ -27,9 +27,7 @@ export const extraerDriveFolderId = (valor = '') => {
   const texto = String(valor || '').trim();
   if (!texto) return '';
   const enlace = texto.match(/folders\/([A-Za-z0-9_-]+)/);
-  if (enlace) return enlace[1];
-  if (!texto.includes('/') && /^[A-Za-z0-9_-]{10,}$/.test(texto)) return texto;
-  return '';
+  return enlace ? enlace[1] : '';
 };
 
 export const formatearDuracionDrive = (milisegundos) => {
