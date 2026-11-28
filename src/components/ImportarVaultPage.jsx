@@ -1,6 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { db, auth } from '../firebase';
-import { addDoc, collection, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
+import {
+  arrayUnion,
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  setDoc,
+  updateDoc
+} from 'firebase/firestore';
 import Swal from 'sweetalert2';
 import VaultIcon from './VaultIcon';
 import {
@@ -42,6 +50,8 @@ const ImportarVaultPage = () => {
   const [etiquetas, setEtiquetas] = useState('');
   const [volumenNombre, setVolumenNombre] = useState('Contenido');
   const [acceso, setAcceso] = useState('academia');
+  const [academiaDestino, setAcademiaDestino] = useState('');
+  const [academias, setAcademias] = useState([]);
   const [videos, setVideos] = useState([]);
   const [importando, setImportando] = useState(false);
   const [cursos, setCursos] = useState([]);
@@ -53,6 +63,15 @@ const ImportarVaultPage = () => {
       (error) => {
         console.error('No se pudieron cargar los cursos importados:', error);
       }
+    );
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      collection(db, 'academias'),
+      (snap) => setAcademias(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      (error) => console.error('No se pudieron cargar las academias:', error)
     );
     return () => unsub();
   }, []);
@@ -175,7 +194,8 @@ const ImportarVaultPage = () => {
 
     setImportando(true);
     try {
-      await addDoc(collection(db, 'cursosVault'), {
+      const cursoRef = doc(collection(db, 'cursosVault'));
+      await setDoc(cursoRef, {
         titulo: nombreCurso,
         autor: autor.trim() || 'La Fortuna',
         ejes: separarLista(ejes),
@@ -187,7 +207,19 @@ const ImportarVaultPage = () => {
         creadoEn: hoyIso(),
         actualizadoEn: hoyIso()
       });
-      notify('Curso agregado al Vault');
+
+      if (acceso === 'academia' && academiaDestino) {
+        await updateDoc(doc(db, 'academias', academiaDestino), {
+          cursos_liberados: arrayUnion(cursoRef.id),
+          ultimaActualizacion: hoyIso()
+        });
+      }
+
+      notify(
+        academiaDestino && acceso === 'academia'
+          ? 'Curso agregado y liberado a la academia'
+          : 'Curso agregado al Vault'
+      );
       setLinks('');
       setVideos([]);
       setCarpetaRaiz('');
@@ -196,6 +228,7 @@ const ImportarVaultPage = () => {
       setEtiquetas('');
       setVolumenNombre('Contenido');
       setAcceso('academia');
+      setAcademiaDestino('');
       setAutor('');
     } catch (error) {
       console.error(error);
@@ -294,6 +327,19 @@ const ImportarVaultPage = () => {
                     <option value="todos">Visible para todos los validados</option>
                   </select>
                 </label>
+                {acceso === 'academia' && (
+                  <label style={s.field}>
+                    <span style={s.label}>LIBERAR A ACADEMIA (OPCIONAL)</span>
+                    <select value={academiaDestino} onChange={(e) => setAcademiaDestino(e.target.value)} style={s.input}>
+                      <option value="">Liberar después</option>
+                      {academias.map((aca) => (
+                        <option key={aca.id} value={aca.id}>
+                          {aca.nombreAcademia || aca.nombre || 'Academia'}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 <label style={s.field}>
                   <span style={s.label}>EJES (SEPARADOS POR COMA)</span>
                   <input value={ejes} onChange={(e) => setEjes(e.target.value)} placeholder="NO GI, ESCAPES" style={s.input} />
@@ -305,7 +351,7 @@ const ImportarVaultPage = () => {
               </div>
               <p style={s.help}>
                 {acceso === 'academia'
-                  ? 'Después de importarlo, ve a Estructuras → Contenido para liberarlo a una academia o sede.'
+                  ? 'Puedes liberarlo ahora a una academia o después en Estructuras → Contenido (también por sede).'
                   : 'Todos los usuarios validados podrán abrirlo desde el Mapa y la Búsqueda.'}
               </p>
             </>
